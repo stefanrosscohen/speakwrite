@@ -65,12 +65,40 @@ export async function initOAuth(): Promise<{
 
 /**
  * Initiates OAuth sign-in. Redirects the browser to the user's PDS auth page.
- * This promise never resolves — the page navigates away.
+ * This promise never resolves on success — the page navigates away.
+ *
+ * Tries with transition:generic (write access) first. If the PDS rejects that
+ * scope (older / self-hosted PDSes), retries with base atproto scope only.
+ * Without transition:generic, publishing will not work — only reading.
  */
 export async function signIn(handle: string): Promise<void> {
-  await oauthClient.signIn(handle, {
-    state: crypto.randomUUID(),
-  });
+  const state = crypto.randomUUID();
+  try {
+    await oauthClient.signIn(handle, {
+      state,
+      scope: "atproto transition:generic",
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (
+      message.includes("invalid_scope") ||
+      message.includes("not declared") ||
+      message.includes("Unsupported scope") ||
+      message.includes("transition:generic")
+    ) {
+      // PDS doesn't support transition:generic — fall back to base scope.
+      // Publishing will fail but at least auth works.
+      console.warn(
+        "PDS does not support transition:generic, falling back to atproto scope (read-only)",
+      );
+      await oauthClient.signIn(handle, {
+        state,
+        scope: "atproto",
+      });
+    } else {
+      throw err;
+    }
+  }
 }
 
 /**
