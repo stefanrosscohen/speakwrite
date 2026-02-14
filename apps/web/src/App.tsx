@@ -50,10 +50,10 @@ function RequiresIOSScreen() {
   );
 }
 
-function LoginScreen() {
+function LoginScreen({ authError }: { authError?: string | null }) {
   const [handle, setHandle] = useState("");
   const [signingIn, setSigningIn] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(authError ?? null);
 
   const handleSignIn = async () => {
     if (!handle.trim()) return;
@@ -176,6 +176,7 @@ export default function App() {
   const clearATProto = useAppStore((s) => s.clearATProto);
   const atprotoHandle = useAppStore((s) => s.atprotoHandle);
   const atprotoLoading = useAppStore((s) => s.atprotoLoading);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
     let cleanup: (() => void) | undefined;
@@ -188,6 +189,7 @@ export default function App() {
         }
       } catch (e) {
         console.error("OAuth init failed:", e);
+        setAuthError(String(e));
       } finally {
         setATProtoLoading(false);
       }
@@ -217,7 +219,7 @@ export default function App() {
 
   // Not logged in — show login
   if (!atprotoHandle) {
-    return <LoginScreen />;
+    return <LoginScreen authError={authError} />;
   }
 
   // Logged in — editor with post bar
