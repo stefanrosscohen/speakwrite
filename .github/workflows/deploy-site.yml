@@ -1,9 +1,8 @@
-name: Deploy Site
+name: Deploy Site + App
 
 on:
   push:
     branches: [main]
-    paths: [apps/site/**]
   workflow_dispatch:
 
 permissions:
@@ -24,11 +23,31 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Build the web app (builds core first)
+      - run: pnpm build:web
+
+      # Assemble the deployment: site at root, app at /app/
+      - run: |
+          mkdir -p _deploy/app
+          cp -r apps/site/* _deploy/
+          cp -r apps/web/dist/* _deploy/app/
+
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: apps/site
+          path: _deploy
 
       - id: deployment
         uses: actions/deploy-pages@v4

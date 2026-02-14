@@ -1,0 +1,380 @@
+@import "tailwindcss";
+
+:root {
+  --bg-primary: #1a1a2e;
+  --bg-secondary: #16213e;
+  --bg-surface: #0f3460;
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --accent: #e94560;
+  --accent-dim: #c73e54;
+  --border: #2d3748;
+  --success: #48bb78;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  overflow: hidden;
+  height: 100vh;
+  /* Safe area for iPhone notch + home indicator */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+#root {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* TipTap Editor Styles */
+.tiptap {
+  outline: none;
+  padding: 1.25rem;
+  min-height: 100%;
+  font-size: 16px;
+  line-height: 1.75;
+  color: var(--text-primary);
+}
+
+@media (min-width: 640px) {
+  .tiptap {
+    padding: 2rem;
+  }
+}
+
+.tiptap p.is-editor-empty:first-child::before {
+  color: var(--text-secondary);
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.tiptap h1 { font-size: 2em; font-weight: 700; margin: 1em 0 0.5em; }
+.tiptap h2 { font-size: 1.5em; font-weight: 600; margin: 0.8em 0 0.4em; }
+.tiptap h3 { font-size: 1.25em; font-weight: 600; margin: 0.6em 0 0.3em; }
+
+.tiptap p { margin: 0 0 0.75em; }
+
+.tiptap ul, .tiptap ol { padding-left: 1.5em; margin: 0 0 0.75em; }
+.tiptap li { margin: 0.25em 0; }
+
+.tiptap code {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  padding: 0.2em 0.4em;
+  font-size: 0.9em;
+  font-family: "SF Mono", "Fira Code", monospace;
+}
+
+.tiptap pre {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  padding: 1em;
+  margin: 0.75em 0;
+  overflow-x: auto;
+}
+
+.tiptap pre code {
+  background: none;
+  padding: 0;
+}
+
+.tiptap blockquote {
+  border-left: 3px solid var(--accent);
+  padding-left: 1em;
+  margin: 0.75em 0;
+  color: var(--text-secondary);
+}
+
+.tiptap hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1.5em 0;
+}
+
+.tiptap strong { font-weight: 700; }
+.tiptap em { font-style: italic; }
+
+/* Task Lists */
+.tiptap ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+  margin: 0 0 0.75em;
+}
+
+.tiptap ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5em;
+  margin: 0.25em 0;
+}
+
+.tiptap ul[data-type="taskList"] li label {
+  flex-shrink: 0;
+  margin-top: 0.25em;
+}
+
+.tiptap ul[data-type="taskList"] li label input[type="checkbox"] {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border);
+  border-radius: 3px;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+}
+
+.tiptap ul[data-type="taskList"] li label input[type="checkbox"]:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.tiptap ul[data-type="taskList"] li label input[type="checkbox"]:checked::after {
+  content: "\2713";
+  position: absolute;
+  top: -2px;
+  left: 1px;
+  font-size: 12px;
+  color: #fff;
+  font-weight: bold;
+}
+
+.tiptap ul[data-type="taskList"] li[data-checked="true"] > div > p {
+  text-decoration: line-through;
+  color: var(--text-secondary);
+}
+
+/* Tables */
+.tiptap table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.75em 0;
+  overflow: hidden;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.tiptap table td,
+.tiptap table th {
+  border: 1px solid var(--border);
+  padding: 0.5em 0.75em;
+  min-width: 100px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.tiptap table th {
+  background: rgba(255, 255, 255, 0.05);
+  font-weight: 600;
+  font-size: 0.9em;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-secondary);
+}
+
+.tiptap table td {
+  background: transparent;
+}
+
+.tiptap table .selectedCell {
+  background: rgba(233, 69, 96, 0.15);
+}
+
+.tiptap table .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--accent);
+  pointer-events: none;
+}
+
+/* Images */
+.tiptap img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 0.75em 0;
+  display: block;
+}
+
+.tiptap img.ProseMirror-selectednode {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Callout Blocks */
+.tiptap .callout {
+  display: flex;
+  gap: 0.75em;
+  padding: 1em;
+  margin: 0.75em 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border-left: 3px solid var(--accent);
+}
+
+.tiptap .callout-emoji {
+  font-size: 1.25em;
+  line-height: 1.75;
+  flex-shrink: 0;
+}
+
+.tiptap .callout-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.tiptap .callout-content p:last-child {
+  margin-bottom: 0;
+}
+
+/* Highlighted Text */
+.tiptap mark {
+  background: rgba(233, 69, 96, 0.3);
+  border-radius: 2px;
+  padding: 0.1em 0.2em;
+}
+
+/* Links */
+.tiptap a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-color: rgba(233, 69, 96, 0.4);
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.tiptap a:hover {
+  text-decoration-color: var(--accent);
+}
+
+/* Underline */
+.tiptap u {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Slash Command Menu */
+.slash-menu {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  padding: 4px;
+  min-width: 240px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.slash-menu-empty {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.slash-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+  font-size: 13px;
+}
+
+.slash-menu-item:hover,
+.slash-menu-item.is-selected {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.slash-menu-icon {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 13px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.slash-menu-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.slash-menu-title {
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.slash-menu-description {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* Bubble Toolbar */
+.bubble-toolbar {
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.bubble-toolbar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 28px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.bubble-toolbar-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+.bubble-toolbar-btn.is-active {
+  background: rgba(233, 69, 96, 0.2);
+  color: var(--accent);
+}
+
+/* tippy.js theme override for slash menu */
+.tippy-box[data-theme~="slash-menu"] {
+  background: transparent;
+  padding: 0;
+  border: none;
+  box-shadow: none;
+}
+
+.tippy-box[data-theme~="slash-menu"] .tippy-content {
+  padding: 0;
+}

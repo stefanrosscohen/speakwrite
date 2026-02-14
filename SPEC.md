@@ -7811,3 +7811,271 @@ The following limitations are inherent to the Speakwrite approach and cannot be 
 ---
 
 *End of Section 15: Rebuttals and Limitations.*
+
+---
+
+## 16. Device Attestation
+
+### 16.1 Motivation
+
+Section 3 identifies Observer Trust (TA-1) as the protocol's most critical trust assumption. The base protocol cannot prove that the Observer software has not been modified to fabricate behavioral data. Section 15.2.3 acknowledges this openly: a modified binary can produce valid commitment chains over entirely fabricated keystroke data.
+
+Device attestation addresses this by leveraging hardware-backed trust anchors — cryptographic keys embedded in tamper-resistant silicon — to prove that:
+
+1. The Observer is running on a genuine device (not an emulator).
+2. The Observer binary has not been modified (code integrity).
+3. The keystroke data was signed by hardware that the device manufacturer vouches for.
+
+This does not close the gap entirely (see Section 16.6), but it raises the cost of Observer compromise from "fork the repo and change a function" to "jailbreak a device or build custom hardware."
+
+### 16.2 Trust Hierarchy
+
+Device attestation introduces a four-layer trust hierarchy. Each layer independently strengthens the proof; all layers together provide the strongest available assurance.
+
+```
+Layer 4: Behavioral Analysis          (Is this human typing?)
+   ↑
+Layer 3: Device Attestation           (Is this a real device running genuine code?)
+   ↑
+Layer 2: Session Biometric Binding    (Was a real person present?)
+   ↑
+Layer 1: Cryptographic Commitment     (Is the data tamper-evident?)
+```
+
+**Layer 1 (base protocol):** The commitment chain, content binding, and signatures ensure data integrity. This is what the protocol provides today.
+
+**Layer 2 (biometric gate):** At session start, the device's biometric system (Face ID, Touch ID, Windows Hello) authenticates the user. The session signing key is locked behind biometric authorization — it literally cannot produce signatures without the user's biometric confirmation.
+
+**Layer 3 (device attestation):** A hardware-backed attestation proves the signing key was generated on a genuine device running unmodified Speakwrite code. The device manufacturer (Apple, Google) acts as the root of trust.
+
+**Layer 4 (behavioral analysis):** The existing Behavioral Feature Vector provides statistical evidence that the keystroke timing patterns are consistent with human motor behavior.
+
+### 16.3 Platform-Specific Mechanisms
+
+#### 16.3.1 Apple Devices (iOS / macOS)
+
+Apple provides two complementary mechanisms, both backed by the Secure Enclave:
+
+**App Attest (`DCAppAttestService`)**
+
+App Attest generates a P-256 key pair inside the Secure Enclave. Apple's attestation servers issue a certificate chain proving:
+
+- The key was generated on a genuine Apple device with a Secure Enclave (A7 chip or later).
+- The key is bound to a specific app identified by Bundle ID.
+- The device has not been flagged by Apple for fraud.
+
+After one-time attestation, the key can sign arbitrary data via `generateAssertion()`, producing cryptographic assertions over SHA-256 hashes of payloads. Each assertion includes a monotonic counter that prevents replay.
+
+**Secure Enclave Signing (`SecureEnclave.P256.Signing`)**
+
+CryptoKit provides direct access to Secure Enclave P-256 signing keys with biometric access control:
+
+```swift
+let accessControl = SecAccessControlCreateWithFlags(
+    kCFAllocatorDefault,
+    kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+    [.privateKeyUsage, .biometryCurrentSet],
+    nil
+)!
+
+let privateKey = try SecureEnclave.P256.Signing.PrivateKey(
+    accessControl: accessControl
+)
+
+// This key can ONLY sign when Face ID / Touch ID confirms the enrolled user
+let signature = try privateKey.signature(for: keystrokeBatchData)
+```
+
+The `dataRepresentation` of a Secure Enclave key is an encrypted blob that only the originating device's Secure Enclave can decrypt. The private key material never exists in main memory.
+
+**Availability:**
+
+| Mechanism | iOS | macOS | Web/PWA |
+|-----------|-----|-------|---------|
+| App Attest | 14+ | 14+ (Apple Silicon) | No |
+| Secure Enclave (CryptoKit) | 13+ | 10.15+ (T2/Apple Silicon) | No |
+| Biometric gate (LAContext) | 8+ | 10.12.2+ | No (WebAuthn partial) |
+
+**Limitation:** App Attest returns `isSupported = false` in app extensions (including keyboard extensions). The attestation key must be generated in the containing app and shared via a keychain access group.
+
+#### 16.3.2 Android Devices
+
+**Play Integrity API**
+
+The successor to SafetyNet provides device verdicts:
+
+- `MEETS_DEVICE_INTEGRITY`: Genuine Android device with Google Play Services, verified bootloader.
+- `MEETS_BASIC_INTEGRITY`: Device passes basic checks (may be rooted but not emulated).
+- `MEETS_STRONG_INTEGRITY`: Hardware-backed key attestation available.
+
+**Android Keystore with StrongBox**
+
+Android 9+ devices with dedicated secure hardware (StrongBox) support hardware-bound signing keys:
+
+```kotlin
+val keyGenerator = KeyPairGenerator.getInstance(
+    KeyProperties.KEY_ALGORITHM_EC, "AndroidKeyStore"
+)
+keyGenerator.initialize(
+    KeyGenParameterSpec.Builder("speakwrite_session_key", PURPOSE_SIGN)
+        .setDigests(KeyProperties.DIGEST_SHA256)
+        .setAlgorithmParameterSpec(ECGenParameterSpec("secp256r1"))
+        .setIsStrongBoxBacked(true)
+        .setUserAuthenticationRequired(true)
+        .setUserAuthenticationParameters(0, AUTH_BIOMETRIC_STRONG)
+        .build()
+)
+val keyPair = keyGenerator.generateKeyPair()
+```
+
+**Availability:**
+
+| Mechanism | Android | Web/PWA |
+|-----------|---------|---------|
+| Play Integrity | 5.0+ (with Play Services) | No |
+| StrongBox Keystore | 9+ (hardware dependent) | No |
+| Biometric (BiometricPrompt) | 9+ | No (WebAuthn partial) |
+
+#### 16.3.3 Web Browsers
+
+No browser API currently provides hardware-backed device attestation suitable for content signing. The strongest available mechanism is WebAuthn with a hardware security key:
+
+| Signal | Strength | Notes |
+|--------|----------|-------|
+| WebAuthn (hardware key, e.g. YubiKey) | Strong | Returns `fmt: "packed"` with device attestation certificate |
+| WebAuthn (platform authenticator, synced passkey) | Weak | Returns `fmt: "none"` — no device binding |
+| WebCrypto (non-extractable key) | Minimal | Software-bound, not hardware-bound |
+
+**Recommendation:** Web clients should support WebAuthn for user binding but MUST NOT claim device attestation unless a hardware security key with a verifiable attestation certificate is used. The proof bundle should indicate the attestation level honestly.
+
+### 16.4 Attestation Protocol
+
+#### 16.4.1 Session Lifecycle with Attestation
+
+```
+1. APP LAUNCH (one-time setup)
+   ├── Generate Secure Enclave key pair (with biometric access control)
+   ├── Attest the key with platform service (App Attest / Play Integrity)
+   └── Store attestation certificate and key ID
+
+2. SESSION START
+   ├── Require biometric authentication (Face ID / Touch ID / fingerprint)
+   ├── Unlock Secure Enclave signing key
+   ├── Generate session nonce
+   └── Sign session-start record: SE_Sign(session_id ∥ timestamp ∥ nonce)
+
+3. DURING COMPOSITION (every commitment checkpoint)
+   ├── Compute commitment_hash per base protocol
+   ├── Compute behavioral feature vector for this batch
+   ├── Sign the checkpoint: SE_Sign(commitment_hash ∥ bfv_hash ∥ sequence_num)
+   └── Store signature in commitment entry
+
+4. SESSION END / PUBLISH
+   ├── Compute content binding per base protocol
+   ├── Sign final binding: SE_Sign(content_hash ∥ binding_hash ∥ chain_root)
+   ├── Assemble proof bundle with attestation envelope
+   └── Include: attestation certificate, all checkpoint signatures, device metadata
+```
+
+#### 16.4.2 Attestation Envelope
+
+The proof bundle is extended with an optional `device_attestation` field:
+
+```json
+{
+  "protocol_version": "0.2",
+  "content_hash": "sha256:...",
+  "binding_hash": "sha256:...",
+  "commitments": [ ... ],
+  "behavioral_summary": { ... },
+
+  "device_attestation": {
+    "platform": "apple",
+    "attestation_type": "app_attest",
+    "attestation_level": "hardware",
+
+    "device_public_key": "base64(P-256 public key)",
+    "attestation_certificate": "base64(App Attest certificate chain)",
+    "app_id": "com.speakwrite.ios",
+
+    "session_binding": {
+      "session_id": "uuid",
+      "biometric_gate": true,
+      "session_start_signature": "base64(SE signature over session start)",
+      "session_start_timestamp": "2026-02-14T12:00:00Z"
+    },
+
+    "checkpoint_signatures": [
+      {
+        "sequence_num": 0,
+        "commitment_hash": "sha256:...",
+        "signature": "base64(SE signature)"
+      },
+      {
+        "sequence_num": 1,
+        "commitment_hash": "sha256:...",
+        "signature": "base64(SE signature)"
+      }
+    ],
+
+    "final_signature": "base64(SE signature over content binding)"
+  }
+}
+```
+
+#### 16.4.3 Attestation Levels
+
+| Level | Label | Requirements | Trust Signal |
+|-------|-------|-------------|-------------|
+| 0 | `none` | Base protocol only | Commitment chain is tamper-evident |
+| 1 | `software` | WebCrypto non-extractable key | Signed by browser-bound key (software) |
+| 2 | `hardware_unverified` | WebAuthn passkey (synced) | User authenticated biometrically; device not attested |
+| 3 | `hardware_verified` | WebAuthn with hardware key attestation | Device certificate chain verified |
+| 4 | `platform_attested` | App Attest / Play Integrity + Secure Enclave | Platform manufacturer vouches for device + app integrity |
+
+The verification widget (Section 9) should display the attestation level alongside the behavioral confidence score.
+
+### 16.5 Verification of Device Attestations
+
+#### 16.5.1 Apple App Attest Verification
+
+Verification of an App Attest attestation requires:
+
+1. **Certificate chain validation.** The attestation certificate chain roots to Apple's App Attest Root CA (`Apple App Attestation Root CA`). The verifier checks that the certificate is not expired or revoked.
+
+2. **App ID binding.** The attestation contains the SHA-256 hash of the app's App ID (`team_id.bundle_id`). The verifier confirms this matches the expected Speakwrite app identifier.
+
+3. **Key binding.** The attestation binds the public key to the device's Secure Enclave. The verifier extracts the public key and uses it to verify all subsequent assertion signatures.
+
+4. **Assertion verification.** Each checkpoint signature and the final binding signature are ECDSA P-256 signatures. The verifier checks each signature against the attested public key and confirms the signed data matches the commitment chain.
+
+5. **Counter monotonicity.** Each assertion includes a monotonic counter. The verifier checks that counters increase sequentially, preventing replay of individual assertions.
+
+#### 16.5.2 Degraded Verification
+
+If device attestation is present but unverifiable (e.g., the verifier cannot reach Apple's OCSP responder, or the attestation format is from an unrecognized platform), the verifier SHOULD:
+
+1. Verify the base protocol (commitment chain, content binding) as normal.
+2. Verify checkpoint signatures against the provided public key (signature math is platform-independent).
+3. Note in the verification result that device attestation is present but the certificate chain could not be validated.
+4. Assign an intermediate confidence level between "no attestation" and "fully attested."
+
+### 16.6 Limitations of Device Attestation
+
+Device attestation strengthens the proof significantly but does not provide absolute guarantees. The following limitations are inherent:
+
+**L-DA-1: Attestation proves the envelope, not the content.** App Attest proves that data was signed by a genuine Speakwrite app on a genuine Apple device. It does NOT prove that the data being signed reflects real keystroke observations. A subtle code-level exploit within the genuine app (e.g., a malicious library dependency) could fabricate keystroke data before signing.
+
+**L-DA-2: Jailbroken / rooted devices.** A jailbroken iOS device or rooted Android device may be able to intercept Secure Enclave operations or inject data before signing. App Attest includes a fraud risk score, and Play Integrity checks bootloader status, but determined attackers with physical device access may circumvent these checks.
+
+**L-DA-3: Platform trust dependency.** Device attestation transfers trust from "trust the user's software" to "trust the device manufacturer." This is pragmatically useful (Apple and Google have strong incentives to maintain their attestation infrastructure) but is not a decentralized trust model. If Apple's attestation servers are compromised or Apple changes its attestation policies, the trust model changes.
+
+**L-DA-4: Native app requirement.** The strongest attestation (Level 4) requires a native app. This is unavailable to the PWA and desktop Electron/Tauri implementations. The protocol MUST remain functional without device attestation; it is an additive trust signal, not a requirement.
+
+**L-DA-5: Keyboard input gap.** No platform provides a mechanism for the OS keyboard to cryptographically sign its own output. Device attestation proves the app is genuine; behavioral analysis provides evidence the input was human; but there is no cryptographic link between the physical keyboard press and the signed data. This gap can only be closed by future OS-level changes that neither Apple nor Google currently offer.
+
+**Design philosophy:** Device attestation moves the trust boundary from "trust the user's software" to "trust the user's hardware and OS vendor." This is a meaningful improvement for the vast majority of threat scenarios. A user running genuine Speakwrite on a genuine iPhone with Face ID is providing substantially stronger evidence than a user running the web app in a browser. The protocol should reward this with higher attestation levels while remaining honest about what those levels mean.
+
+---
+
+*End of Section 16: Device Attestation.*
