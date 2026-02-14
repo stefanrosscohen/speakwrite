@@ -70,6 +70,21 @@ main {
   margin-bottom: 0.8rem;
 }
 
+.hero .cta {
+  margin-top: 1rem;
+}
+
+.hero .cta a {
+  color: var(--fg);
+  text-decoration: none;
+  border-bottom: 1px solid var(--fg);
+  padding-bottom: 0.1em;
+}
+
+.hero .cta a:hover {
+  border-bottom-color: var(--fg-muted);
+}
+
 /* ── Sections ── */
 section { padding: 1.5rem 0; }
 section + section { border-top: 1px dashed var(--border); }

@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Speakwrite — Prove a human wrote it</title>
-  <meta name="description" content="An open protocol that proves a human wrote a document. Not by analyzing the output — by witnessing the process.">
+  <meta name="description" content="An iPhone app that proves a human typed a post. Not by analyzing the output — by witnessing the process.">
   <meta property="og:title" content="Speakwrite — Prove a human wrote it">
-  <meta property="og:description" content="An open protocol that proves a human wrote a document. Not by analyzing the output — by witnessing the process.">
+  <meta property="og:description" content="An iPhone app that proves a human typed a post. Not by analyzing the output — by witnessing the process.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://speakwrite.io">
   <link rel="stylesheet" href="styles.css">
@@ -24,7 +24,8 @@
     <section class="hero">
       <h1>Prove a human wrote it.</h1>
       <p class="subtitle">Not by analyzing the output &mdash; by witnessing the process.</p>
-      <p class="lede">Speakwrite is an open protocol that proves a human wrote a document.</p>
+      <p class="lede">Speakwrite is an iPhone app that proves a human typed a post.</p>
+      <p class="cta"><a href="/app/">Open the app</a></p>
     </section>
 
     <section id="problem">
@@ -34,7 +35,8 @@
 
     <section id="approach">
       <h2>The Approach</h2>
-      <p>Speakwrite takes a fundamentally different approach: instead of analyzing what was written, it instruments <em>how</em> it was written. The protocol captures keystroke dynamics &mdash; timing, rhythm, pauses, corrections &mdash; during composition, and cryptographically binds that behavioral evidence to the resulting document.</p>
+      <p>Speakwrite takes a fundamentally different approach: instead of analyzing what was written, it instruments <em>how</em> it was written. The app captures keystroke dynamics &mdash; timing, rhythm, pauses, corrections &mdash; as you type, and cryptographically binds that behavioral evidence to the resulting post.</p>
+      <p>On iPhone, every session is authenticated by Face ID and backed by hardware attestation (Apple App Attest + Secure Enclave). The proof isn't just software &mdash; it's tied to a real device and a real person.</p>
       <p>The result is a <strong>proof bundle</strong>: a portable, verifiable artifact that anyone can independently check. No central authority. No API keys. No trust required.</p>
     </section>
 
@@ -42,20 +44,20 @@
       <h2>How It Works</h2>
       <ol class="steps">
         <li>
-          <strong>Write</strong>
-          <span>Use the Speakwrite editor or any compatible observer. Your keystroke dynamics are captured locally &mdash; nothing leaves your device until you publish.</span>
+          <strong>Open</strong>
+          <span>Launch Speakwrite on your iPhone. Face ID authenticates you and unlocks your Secure Enclave signing key.</span>
         </li>
         <li>
-          <strong>Prove</strong>
-          <span>When you're ready, Speakwrite generates a cryptographic commitment chain binding your behavioral evidence to your document. This is your proof bundle.</span>
+          <strong>Write</strong>
+          <span>Type your post. Keystroke dynamics are captured locally &mdash; nothing leaves your device until you publish.</span>
         </li>
         <li>
           <strong>Publish</strong>
-          <span>Post your proof to the AT Protocol (Bluesky, self-hosted PDS, or any compatible network). Or export the JSON bundle and share it however you want.</span>
+          <span>Speakwrite generates a cryptographic commitment chain binding your behavioral evidence to your post, signs it with the Secure Enclave, and publishes to Bluesky.</span>
         </li>
         <li>
           <strong>Verify</strong>
-          <span>Anyone with the document and the proof bundle can verify it in their browser. The verifier is open source and runs entirely client-side.</span>
+          <span>Anyone can verify the proof bundle in their browser. The verifier is open source and runs entirely client-side.</span>
         </li>
       </ol>
     </section>
@@ -65,7 +67,7 @@
       <div class="two-col">
         <div>
           <h3>It proves</h3>
-          <p>A document was produced through a physical typing process exhibiting characteristics consistent with human motor behavior.</p>
+          <p>A post was composed through physical typing on a genuine Apple device, authenticated by Face ID, with keystroke behavior consistent with human motor patterns.</p>
         </div>
         <div>
           <h3>It doesn't prove</h3>
@@ -78,8 +80,11 @@
     <section id="properties">
       <h2>Key Properties</h2>
       <dl>
+        <dt>Hardware-attested</dt>
+        <dd>Apple App Attest + Secure Enclave + Face ID. Proofs are tied to a real device and a real person.</dd>
+
         <dt>Open protocol</dt>
-        <dd>The proof bundle JSON format is the protocol. Anyone can build an observer, a verifier, or a publishing tool.</dd>
+        <dd>The proof bundle JSON format is the protocol. Anyone can build a verifier or a compatible app.</dd>
 
         <dt>Privacy-preserving</dt>
         <dd>Raw keystrokes never leave your device. Only aggregate statistical features are committed.</dd>
@@ -90,37 +95,35 @@
         <dt>Progressive trust</dt>
         <dd>A single proof is weak evidence. A corpus of proofs from the same identity, exhibiting consistent behavioral patterns over time, is strong evidence.</dd>
 
-        <dt>AT Protocol native</dt>
-        <dd>Publish proofs to any AT Protocol PDS. Resolve and verify from any federated node.</dd>
+        <dt>Bluesky native</dt>
+        <dd>Posts publish directly to your Bluesky account as standard posts with proof metadata.</dd>
       </dl>
     </section>
 
     <section id="for-whom">
       <h2>For Whom</h2>
       <ul>
-        <li><strong>Journalists</strong> establishing that reporting was composed by a human author</li>
-        <li><strong>Students</strong> providing evidence of their own writing process</li>
-        <li><strong>Writers</strong> who want provenance for works where human authorship matters</li>
-        <li><strong>Publishers</strong> building trust signals into their content</li>
-        <li><strong>Anyone</strong> who wants to say "I wrote this" and have it mean something</li>
+        <li><strong>Anyone on Bluesky</strong> who wants to say "I typed this" and have it mean something</li>
+        <li><strong>Journalists</strong> posting reporting they want attributed to a human author</li>
+        <li><strong>Writers</strong> who want provenance for posts where human authorship matters</li>
+        <li><strong>Anyone</strong> tired of wondering if the thing they're reading was written by a person</li>
       </ul>
     </section>
 
     <section id="open-source">
       <h2>Open Source</h2>
-      <p>Speakwrite is open source under CC BY-SA 4.0. The protocol spec, editor, verifier, and core library are all public.</p>
+      <p>Speakwrite is open source under CC BY-SA 4.0. The protocol spec, app, verifier, and core library are all public.</p>
       <ul class="repo-list">
-        <li>Protocol specification</li>
+        <li>Protocol specification: <code>SPEC-v1.md</code></li>
         <li>Core library: <code>@speakwrite/core</code> (TypeScript, Web Crypto API)</li>
-        <li>Editor: PWA with offline support</li>
+        <li>iPhone app: Capacitor + native Swift (App Attest, Secure Enclave)</li>
         <li>Verifier: Standalone client-side verification page</li>
-        <li>AT Protocol integration: Custom lexicon <code>io.speakwrite.proof</code></li>
       </ul>
     </section>
 
     <section id="status">
       <h2>Status</h2>
-      <p>Working draft. The protocol spec, web editor, and verifier are functional. Self-hosted PDS support is built in. The proof bundle format is stable enough to build on.</p>
+      <p>Working draft. The iPhone app, protocol spec, and verifier are functional. Proofs publish as Bluesky posts. The proof bundle format is stable enough to build on.</p>
     </section>
 
   </main>
@@ -128,7 +131,7 @@
   <footer>
     <p>Speakwrite does not solve the AI problem. It creates a new kind of evidence that didn't exist before.</p>
     <p class="links">
-      <a href="https://github.com/StefCo/speakwrite">GitHub</a>
+      <a href="https://github.com/stefanrosscohen/speakwrite">GitHub</a>
     </p>
   </footer>
 
