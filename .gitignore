@@ -6,6 +6,7 @@ apps/desktop/src-tauri/target/
 apps/desktop/dist/
 apps/web/dist/
 apps/verifier/dist/
+apps/reader/dist/
 packages/core/dist/
 *.tsbuildinfo
 
