@@ -42,13 +42,22 @@ export async function initOAuth(): Promise<{
     const { session } = result;
     agent = new Agent(session);
 
-    // Resolve handle from DID
-    const profile = await agent.getProfile({ actor: session.did });
-
-    return {
-      did: session.did,
-      handle: profile.data.handle,
-    };
+    // Resolve handle from DID using describeRepo (works on any PDS)
+    try {
+      const desc = await agent.com.atproto.repo.describeRepo({
+        repo: session.did,
+      });
+      return {
+        did: session.did,
+        handle: desc.data.handle,
+      };
+    } catch {
+      // Fallback: use DID as display name
+      return {
+        did: session.did,
+        handle: session.did,
+      };
+    }
   }
 
   return null;
