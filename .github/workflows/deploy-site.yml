@@ -34,14 +34,16 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # Build the web app (builds core first)
+      # Build the web app + reader (builds core first)
       - run: pnpm build:web
+      - run: pnpm build:reader
 
-      # Assemble the deployment: site at root, app at /app/
+      # Assemble the deployment: site at root, app at /app/, reader at /reader/
       - run: |
-          mkdir -p _deploy/app
+          mkdir -p _deploy/app _deploy/reader
           cp -r apps/site/* _deploy/
           cp -r apps/web/dist/* _deploy/app/
+          cp -r apps/reader/dist/* _deploy/reader/
 
       - uses: actions/configure-pages@v5
 

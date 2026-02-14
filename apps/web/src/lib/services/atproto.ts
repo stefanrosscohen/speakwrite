@@ -153,5 +153,25 @@ export async function publishProofPost(
     record,
   });
 
+  // Also write a companion io.speakwrite.proof record so the reader can
+  // fetch the full proof bundle and cryptographically verify it.
+  try {
+    await agent.com.atproto.repo.createRecord({
+      repo: agent.did,
+      collection: "io.speakwrite.proof",
+      record: {
+        $type: "io.speakwrite.proof",
+        proof: JSON.stringify(bundle),
+        postUri: response.data.uri,
+        createdAt: new Date().toISOString(),
+      },
+    });
+  } catch {
+    // Best-effort — the post was already published successfully.
+    // If the proof record fails (e.g., PDS doesn't recognise the lexicon
+    // for validated writes), the reader will still show footer-only status.
+    console.warn("Failed to write io.speakwrite.proof record");
+  }
+
   return { uri: response.data.uri, cid: response.data.cid };
 }

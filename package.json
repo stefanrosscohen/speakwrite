@@ -9,6 +9,8 @@
     "build:core": "pnpm --filter @speakwrite/core build",
     "build:web": "pnpm run build:core && pnpm --filter @speakwrite/web build",
     "build:verifier": "pnpm run build:core && pnpm --filter @speakwrite/verifier build",
+    "dev:reader": "pnpm --filter @speakwrite/reader dev",
+    "build:reader": "pnpm run build:core && pnpm --filter @speakwrite/reader build",
     "test": "pnpm --filter @speakwrite/core test",
     "dev:site": "open apps/site/index.html"
   }
