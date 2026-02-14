@@ -2,23 +2,43 @@
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
-  --fg: #111;
-  --fg-mid: #444;
-  --fg-muted: #666;
-  --bg: #f4f1ea;
-  --border: #aaa;
+  --bg-primary: #0a0a0a;
+  --bg-secondary: #111111;
+  --bg-surface: #1a1a1a;
+  --text-primary: #d4d4d4;
+  --text-secondary: #666666;
+  --accent: #00ff41;
+  --accent-dim: #00cc33;
+  --accent-glow: rgba(0, 255, 65, 0.15);
+  --border: #222222;
+  --font: "JetBrains Mono", "SF Mono", "Fira Code", "Cascadia Code", "Consolas", monospace;
   --max-width: 580px;
-  --font: "Courier New", Courier, monospace;
 }
 
-html { font-size: 15px; }
+html { font-size: 14px; }
 
 body {
   font-family: var(--font);
-  color: var(--fg);
-  background: var(--bg);
-  line-height: 1.55;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  line-height: 1.7;
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 0, 0, 0.03) 2px,
+      rgba(0, 0, 0, 0.03) 4px
+    );
+  background-attachment: fixed;
 }
+
+::selection {
+  background: var(--accent);
+  color: var(--bg-primary);
+}
+
+a { color: var(--accent); }
 
 /* ── Nav ── */
 nav {
@@ -31,20 +51,14 @@ nav {
 }
 
 .wordmark {
-  font-weight: bold;
+  font-weight: 600;
   text-decoration: none;
-  color: var(--fg);
+  color: var(--accent);
   text-transform: uppercase;
   letter-spacing: 0.15em;
   font-size: 0.8rem;
+  text-shadow: 0 0 20px rgba(0, 255, 65, 0.3);
 }
-
-.nav-links a {
-  font-size: 0.8rem;
-  color: var(--fg-muted);
-  text-decoration: none;
-}
-.nav-links a:hover { color: var(--fg); }
 
 /* ── Main ── */
 main {
@@ -58,55 +72,71 @@ main {
 
 .hero h1 {
   font-size: 1.4rem;
-  font-weight: bold;
+  font-weight: 700;
   line-height: 1.25;
   margin-bottom: 0.6rem;
   text-transform: uppercase;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  text-shadow: 0 0 20px rgba(0, 255, 65, 0.3);
 }
 
 .hero .subtitle {
-  color: var(--fg-mid);
+  color: var(--text-secondary);
   margin-bottom: 0.8rem;
+  font-style: italic;
 }
 
 .hero .cta {
-  margin-top: 1rem;
+  margin-top: 1.25rem;
 }
 
 .hero .cta a {
-  color: var(--fg);
+  display: inline-block;
+  padding: 0.6rem 1.2rem;
+  font-family: var(--font);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   text-decoration: none;
-  border-bottom: 1px solid var(--fg);
-  padding-bottom: 0.1em;
+  color: var(--bg-primary);
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  cursor: pointer;
 }
 
 .hero .cta a:hover {
-  border-bottom-color: var(--fg-muted);
+  background: transparent;
+  color: var(--accent);
 }
 
 /* ── Sections ── */
 section { padding: 1.5rem 0; }
-section + section { border-top: 1px dashed var(--border); }
+section + section { border-top: 1px solid var(--border); }
 
 h2 {
-  font-weight: bold;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: var(--fg-mid);
+  color: var(--accent);
   margin-bottom: 0.75rem;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
 }
 
 h3 {
-  font-weight: bold;
+  font-weight: 600;
   margin-bottom: 0.3rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  color: var(--text-primary);
 }
 
 p { margin-bottom: 0.6rem; }
 p:last-child { margin-bottom: 0; }
+
+em { color: var(--text-secondary); }
+strong { color: #fff; font-weight: 700; }
 
 /* ── Steps ── */
 .steps {
@@ -125,12 +155,14 @@ p:last-child { margin-bottom: 0; }
   content: counter(step) ".";
   position: absolute;
   left: 0;
-  font-weight: bold;
+  font-weight: 600;
+  color: var(--accent);
 }
 
 .steps li strong {
   text-transform: uppercase;
   letter-spacing: 0.03em;
+  color: #fff;
 }
 
 .steps li span { display: block; margin-top: 0.15rem; }
@@ -149,20 +181,21 @@ p:last-child { margin-bottom: 0; }
 
 .aside {
   font-style: italic;
-  color: var(--fg-muted);
+  color: var(--text-secondary);
 }
 
 /* ── Definition List ── */
 dl { display: grid; gap: 0.6rem; }
 
 dt {
-  font-weight: bold;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  color: #fff;
   margin-bottom: -0.1rem;
 }
 
-dd { color: var(--fg); }
+dd { color: var(--text-primary); }
 
 /* ── Lists ── */
 ul { list-style: none; }
@@ -174,10 +207,11 @@ ul { list-style: none; }
 }
 
 #for-whom ul li::before {
-  content: "--";
+  content: ">";
   position: absolute;
   left: 0;
-  color: var(--fg-mid);
+  color: var(--accent);
+  font-weight: 600;
 }
 
 .repo-list li {
@@ -190,11 +224,17 @@ ul { list-style: none; }
   content: "*";
   position: absolute;
   left: 0.25rem;
+  color: var(--accent);
 }
 
 code {
   font-family: var(--font);
   font-size: 1em;
+  color: var(--accent);
+  background: rgba(0, 255, 65, 0.08);
+  border: 1px solid rgba(0, 255, 65, 0.15);
+  padding: 0.1em 0.3em;
+  border-radius: 2px;
 }
 
 /* ── Footer ── */
@@ -202,8 +242,8 @@ footer {
   max-width: var(--max-width);
   margin: 0 auto;
   padding: 1.5rem 1.5rem 3rem;
-  border-top: 1px dashed var(--border);
-  color: var(--fg-muted);
+  border-top: 1px solid var(--border);
+  color: var(--text-secondary);
   font-style: italic;
 }
 
@@ -212,10 +252,10 @@ footer .links { font-style: normal; }
 
 footer .links a {
   font-size: 0.8rem;
-  color: var(--fg-muted);
+  color: var(--text-secondary);
   text-decoration: none;
 }
-footer .links a:hover { color: var(--fg); }
+footer .links a:hover { color: var(--accent); }
 
 /* ── Responsive ── */
 @media (max-width: 480px) {
