@@ -1,0 +1,210 @@
+/* ── Reset ── */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --fg: #111;
+  --fg-mid: #444;
+  --fg-muted: #666;
+  --bg: #f4f1ea;
+  --border: #aaa;
+  --max-width: 580px;
+  --font: "Courier New", Courier, monospace;
+}
+
+html { font-size: 15px; }
+
+body {
+  font-family: var(--font);
+  color: var(--fg);
+  background: var(--bg);
+  line-height: 1.55;
+}
+
+/* ── Nav ── */
+nav {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 1.5rem 1.5rem 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.wordmark {
+  font-weight: bold;
+  text-decoration: none;
+  color: var(--fg);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-size: 0.8rem;
+}
+
+.nav-links a {
+  font-size: 0.8rem;
+  color: var(--fg-muted);
+  text-decoration: none;
+}
+.nav-links a:hover { color: var(--fg); }
+
+/* ── Main ── */
+main {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+/* ── Hero ── */
+.hero { padding: 3rem 0 2rem; }
+
+.hero h1 {
+  font-size: 1.4rem;
+  font-weight: bold;
+  line-height: 1.25;
+  margin-bottom: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.hero .subtitle {
+  color: var(--fg-mid);
+  margin-bottom: 0.8rem;
+}
+
+/* ── Sections ── */
+section { padding: 1.5rem 0; }
+section + section { border-top: 1px dashed var(--border); }
+
+h2 {
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--fg-mid);
+  margin-bottom: 0.75rem;
+  font-size: 0.8rem;
+}
+
+h3 {
+  font-weight: bold;
+  margin-bottom: 0.3rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+p { margin-bottom: 0.6rem; }
+p:last-child { margin-bottom: 0; }
+
+/* ── Steps ── */
+.steps {
+  list-style: none;
+  counter-reset: step;
+}
+
+.steps li {
+  counter-increment: step;
+  position: relative;
+  padding-left: 2rem;
+  margin-bottom: 0.8rem;
+}
+
+.steps li::before {
+  content: counter(step) ".";
+  position: absolute;
+  left: 0;
+  font-weight: bold;
+}
+
+.steps li strong {
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.steps li span { display: block; margin-top: 0.15rem; }
+
+/* ── Two Column ── */
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-bottom: 0.8rem;
+}
+
+@media (max-width: 500px) {
+  .two-col { grid-template-columns: 1fr; gap: 0.8rem; }
+}
+
+.aside {
+  font-style: italic;
+  color: var(--fg-muted);
+}
+
+/* ── Definition List ── */
+dl { display: grid; gap: 0.6rem; }
+
+dt {
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: -0.1rem;
+}
+
+dd { color: var(--fg); }
+
+/* ── Lists ── */
+ul { list-style: none; }
+
+#for-whom ul li {
+  position: relative;
+  padding-left: 1.5rem;
+  margin-bottom: 0.35rem;
+}
+
+#for-whom ul li::before {
+  content: "--";
+  position: absolute;
+  left: 0;
+  color: var(--fg-mid);
+}
+
+.repo-list li {
+  padding-left: 1.5rem;
+  position: relative;
+  margin-bottom: 0.25rem;
+}
+
+.repo-list li::before {
+  content: "*";
+  position: absolute;
+  left: 0.25rem;
+}
+
+code {
+  font-family: var(--font);
+  font-size: 1em;
+}
+
+/* ── Footer ── */
+footer {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 1.5rem 1.5rem 3rem;
+  border-top: 1px dashed var(--border);
+  color: var(--fg-muted);
+  font-style: italic;
+}
+
+footer p { margin-bottom: 0.5rem; }
+footer .links { font-style: normal; }
+
+footer .links a {
+  font-size: 0.8rem;
+  color: var(--fg-muted);
+  text-decoration: none;
+}
+footer .links a:hover { color: var(--fg); }
+
+/* ── Responsive ── */
+@media (max-width: 480px) {
+  .hero { padding: 2.5rem 0 1.5rem; }
+  .hero h1 { font-size: 1.15rem; }
+  section { padding: 1.25rem 0; }
+}

@@ -3,6 +3,13 @@
   "private": true,
   "scripts": {
     "dev": "pnpm --filter @speakwrite/desktop tauri dev",
-    "build": "pnpm --filter @speakwrite/desktop tauri build"
+    "dev:web": "pnpm --filter @speakwrite/web dev",
+    "dev:verifier": "pnpm --filter @speakwrite/verifier dev",
+    "build": "pnpm --filter @speakwrite/desktop tauri build",
+    "build:core": "pnpm --filter @speakwrite/core build",
+    "build:web": "pnpm run build:core && pnpm --filter @speakwrite/web build",
+    "build:verifier": "pnpm run build:core && pnpm --filter @speakwrite/verifier build",
+    "test": "pnpm --filter @speakwrite/core test",
+    "dev:site": "open apps/site/index.html"
   }
 }

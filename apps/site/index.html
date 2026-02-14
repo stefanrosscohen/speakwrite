@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Speakwrite — Prove a human wrote it</title>
+  <meta name="description" content="An open protocol that proves a human wrote a document. Not by analyzing the output — by witnessing the process.">
+  <meta property="og:title" content="Speakwrite — Prove a human wrote it">
+  <meta property="og:description" content="An open protocol that proves a human wrote a document. Not by analyzing the output — by witnessing the process.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://speakwrite.io">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <header>
+    <nav>
+      <a href="/" class="wordmark">speakwrite</a>
+    </nav>
+  </header>
+
+  <main>
+
+    <section class="hero">
+      <h1>Prove a human wrote it.</h1>
+      <p class="subtitle">Not by analyzing the output &mdash; by witnessing the process.</p>
+      <p class="lede">Speakwrite is an open protocol that proves a human wrote a document.</p>
+    </section>
+
+    <section id="problem">
+      <h2>The Problem</h2>
+      <p>AI can now produce text indistinguishable from human writing. Every detection tool that analyzes the <em>output</em> is losing an arms race it can never win. The next model will always evade the last detector.</p>
+    </section>
+
+    <section id="approach">
+      <h2>The Approach</h2>
+      <p>Speakwrite takes a fundamentally different approach: instead of analyzing what was written, it instruments <em>how</em> it was written. The protocol captures keystroke dynamics &mdash; timing, rhythm, pauses, corrections &mdash; during composition, and cryptographically binds that behavioral evidence to the resulting document.</p>
+      <p>The result is a <strong>proof bundle</strong>: a portable, verifiable artifact that anyone can independently check. No central authority. No API keys. No trust required.</p>
+    </section>
+
+    <section id="how-it-works">
+      <h2>How It Works</h2>
+      <ol class="steps">
+        <li>
+          <strong>Write</strong>
+          <span>Use the Speakwrite editor or any compatible observer. Your keystroke dynamics are captured locally &mdash; nothing leaves your device until you publish.</span>
+        </li>
+        <li>
+          <strong>Prove</strong>
+          <span>When you're ready, Speakwrite generates a cryptographic commitment chain binding your behavioral evidence to your document. This is your proof bundle.</span>
+        </li>
+        <li>
+          <strong>Publish</strong>
+          <span>Post your proof to the AT Protocol (Bluesky, self-hosted PDS, or any compatible network). Or export the JSON bundle and share it however you want.</span>
+        </li>
+        <li>
+          <strong>Verify</strong>
+          <span>Anyone with the document and the proof bundle can verify it in their browser. The verifier is open source and runs entirely client-side.</span>
+        </li>
+      </ol>
+    </section>
+
+    <section id="what-it-proves">
+      <h2>What It Proves (and What It Doesn't)</h2>
+      <div class="two-col">
+        <div>
+          <h3>It proves</h3>
+          <p>A document was produced through a physical typing process exhibiting characteristics consistent with human motor behavior.</p>
+        </div>
+        <div>
+          <h3>It doesn't prove</h3>
+          <p>That the ideas are original, that no AI was consulted, or that the author didn't transcribe AI output. It raises the cost of deception by orders of magnitude &mdash; it doesn't make it impossible.</p>
+        </div>
+      </div>
+      <p class="aside">This honesty is a design choice, not a limitation. Speakwrite produces forensic evidence, not mathematical certainty.</p>
+    </section>
+
+    <section id="properties">
+      <h2>Key Properties</h2>
+      <dl>
+        <dt>Open protocol</dt>
+        <dd>The proof bundle JSON format is the protocol. Anyone can build an observer, a verifier, or a publishing tool.</dd>
+
+        <dt>Privacy-preserving</dt>
+        <dd>Raw keystrokes never leave your device. Only aggregate statistical features are committed.</dd>
+
+        <dt>Decentralized</dt>
+        <dd>No central server, no trusted authority. Verification is pure client-side cryptography (SHA-256).</dd>
+
+        <dt>Progressive trust</dt>
+        <dd>A single proof is weak evidence. A corpus of proofs from the same identity, exhibiting consistent behavioral patterns over time, is strong evidence.</dd>
+
+        <dt>AT Protocol native</dt>
+        <dd>Publish proofs to any AT Protocol PDS. Resolve and verify from any federated node.</dd>
+      </dl>
+    </section>
+
+    <section id="for-whom">
+      <h2>For Whom</h2>
+      <ul>
+        <li><strong>Journalists</strong> establishing that reporting was composed by a human author</li>
+        <li><strong>Students</strong> providing evidence of their own writing process</li>
+        <li><strong>Writers</strong> who want provenance for works where human authorship matters</li>
+        <li><strong>Publishers</strong> building trust signals into their content</li>
+        <li><strong>Anyone</strong> who wants to say "I wrote this" and have it mean something</li>
+      </ul>
+    </section>
+
+    <section id="open-source">
+      <h2>Open Source</h2>
+      <p>Speakwrite is open source under CC BY-SA 4.0. The protocol spec, editor, verifier, and core library are all public.</p>
+      <ul class="repo-list">
+        <li>Protocol specification</li>
+        <li>Core library: <code>@speakwrite/core</code> (TypeScript, Web Crypto API)</li>
+        <li>Editor: PWA with offline support</li>
+        <li>Verifier: Standalone client-side verification page</li>
+        <li>AT Protocol integration: Custom lexicon <code>io.speakwrite.proof</code></li>
+      </ul>
+    </section>
+
+    <section id="status">
+      <h2>Status</h2>
+      <p>Working draft. The protocol spec, web editor, and verifier are functional. Self-hosted PDS support is built in. The proof bundle format is stable enough to build on.</p>
+    </section>
+
+  </main>
+
+  <footer>
+    <p>Speakwrite does not solve the AI problem. It creates a new kind of evidence that didn't exist before.</p>
+    <p class="links">
+      <a href="https://github.com/StefCo/speakwrite">GitHub</a>
+    </p>
+  </footer>
+
+</body>
+</html>
