@@ -71,3 +71,23 @@ export interface VerifyResult {
   actual_content_hash: string;
   message: string;
 }
+
+export interface ProofBundleCommitment {
+  sequence_num: number;
+  commitment_hash: string;
+  previous_hash: string | null;
+  nonce: string;
+  timestamp_ms: number;
+  commitment_type: string;
+  content_hash: string | null;
+}
+
+export interface ProofBundle {
+  version: string;
+  document_id: string;
+  content_hash: string;
+  commitments: ProofBundleCommitment[];
+  binding_hash: string;
+  total_keystroke_count: number;
+  created_at: string;
+}

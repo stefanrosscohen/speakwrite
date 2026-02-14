@@ -8,6 +8,7 @@ import type {
   DocumentListItem,
   PublishResult,
   VerifyResult,
+  ProofBundle,
 } from "./types";
 
 export async function recordKeystrokeBatch(events: KeystrokeEvent[]): Promise<void> {
@@ -74,4 +75,15 @@ export async function exportHtml(): Promise<string> {
 
 export async function verifyContentBinding(content: string): Promise<VerifyResult> {
   return invoke("verify_content_binding", { content });
+}
+
+export async function exportProofBundle(): Promise<ProofBundle> {
+  return invoke("export_proof_bundle");
+}
+
+export async function verifyProofBundle(
+  bundleJson: string,
+  content: string,
+): Promise<VerifyResult> {
+  return invoke("verify_proof_bundle", { bundleJson, content });
 }

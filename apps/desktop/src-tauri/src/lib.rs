@@ -28,6 +28,8 @@ pub fn run() {
             commands::publish::publish_to_substack,
             commands::publish::export_html,
             commands::publish::verify_content_binding,
+            commands::publish::export_proof_bundle,
+            commands::publish::verify_proof_bundle,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

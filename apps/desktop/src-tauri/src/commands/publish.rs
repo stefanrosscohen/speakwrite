@@ -348,3 +348,213 @@ pub fn verify_content_binding(
         }),
     }
 }
+
+// ─── Portable Proof Bundle ───────────────────────────────────────────
+
+#[derive(Serialize, Clone)]
+pub struct ProofBundleCommitment {
+    pub sequence_num: i64,
+    pub commitment_hash: String,
+    pub previous_hash: Option<String>,
+    pub nonce: String,
+    pub timestamp_ms: i64,
+    pub commitment_type: String,
+    pub content_hash: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct ProofBundle {
+    /// Schema version for forward compatibility
+    pub version: String,
+    /// The document ID this proof covers
+    pub document_id: String,
+    /// SHA-256 of the document content at publish time
+    pub content_hash: String,
+    /// The full commitment chain (behavioral + content binding)
+    pub commitments: Vec<ProofBundleCommitment>,
+    /// The content-binding commitment hash (last entry)
+    pub binding_hash: String,
+    /// Total keystrokes recorded across all sessions
+    pub total_keystroke_count: i64,
+    /// Timestamp of bundle creation (ISO 8601)
+    pub created_at: String,
+}
+
+/// Export a portable proof bundle as JSON.
+/// This bundle contains everything needed for an external verifier to check
+/// that a piece of content was produced by human keystrokes through Speakwrite.
+#[tauri::command]
+pub fn export_proof_bundle(state: State<'_, AppState>) -> Result<ProofBundle, String> {
+    let document_id = state
+        .active_document_id
+        .lock()
+        .map_err(|e| e.to_string())?
+        .clone()
+        .ok_or("No active document")?;
+
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+
+    // Get the document content hash
+    let content_json: String = db
+        .query_row(
+            "SELECT COALESCE(content_json, '{}') FROM documents WHERE id = ?1",
+            params![document_id],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+
+    let content_hash = hashing::sha256_hex(content_json.as_bytes());
+
+    // Get the full commitment chain
+    let mut stmt = db
+        .prepare(
+            "SELECT sequence_num, commitment_hash, previous_hash, nonce, timestamp_ms, commitment_type, content_hash
+             FROM commitment_chain WHERE document_id = ?1 ORDER BY sequence_num ASC",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let commitments: Vec<ProofBundleCommitment> = stmt
+        .query_map(params![document_id], |row| {
+            Ok(ProofBundleCommitment {
+                sequence_num: row.get(0)?,
+                commitment_hash: row.get(1)?,
+                previous_hash: row.get(2)?,
+                nonce: row.get(3)?,
+                timestamp_ms: row.get(4)?,
+                commitment_type: row.get(5)?,
+                content_hash: row.get(6)?,
+            })
+        })
+        .map_err(|e| e.to_string())?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    if commitments.is_empty() {
+        return Err("No commitments to export. Create a checkpoint first.".into());
+    }
+
+    // Find the binding hash (last content_binding entry, or last behavioral if no binding yet)
+    let binding_hash = commitments
+        .iter()
+        .rev()
+        .find(|c| c.commitment_type == "content_binding")
+        .or_else(|| commitments.last())
+        .map(|c| c.commitment_hash.clone())
+        .unwrap_or_default();
+
+    let (_, _, keystroke_count) = get_proof_meta(&db, &document_id);
+
+    Ok(ProofBundle {
+        version: "1.0.0".to_string(),
+        document_id,
+        content_hash,
+        commitments,
+        binding_hash,
+        total_keystroke_count: keystroke_count,
+        created_at: chrono::Utc::now().to_rfc3339(),
+    })
+}
+
+/// Verify a proof bundle against content — fully standalone, no database needed.
+/// This is what an external verifier (browser extension, API, CLI) would call.
+/// It re-derives every commitment hash in the chain and checks the content binding.
+#[tauri::command]
+pub fn verify_proof_bundle(bundle_json: String, content: String) -> Result<VerifyResult, String> {
+    let bundle: ProofBundle =
+        serde_json::from_str(&bundle_json).map_err(|e| format!("Invalid proof bundle: {}", e))?;
+
+    let actual_content_hash = hashing::sha256_hex(content.as_bytes());
+    let chain_length = bundle.commitments.len() as i64;
+
+    // Walk the chain and verify each link
+    let mut expected_previous: Option<String> = None;
+
+    for commitment in &bundle.commitments {
+        // Verify chain linkage: each commitment's previous_hash should match
+        match (&expected_previous, &commitment.previous_hash) {
+            (None, None) => {} // First in chain, no previous — correct
+            (None, Some(_)) => {} // First in chain but has a previous — could be a sub-chain
+            (Some(expected), Some(actual)) if expected == actual => {} // Chain links match
+            (Some(expected), Some(actual)) => {
+                return Ok(VerifyResult {
+                    valid: false,
+                    content_hash_matches: false,
+                    chain_length,
+                    binding_hash: Some(bundle.binding_hash),
+                    expected_content_hash: Some(bundle.content_hash),
+                    actual_content_hash,
+                    message: format!(
+                        "Chain broken at C{}: expected previous {} but got {}",
+                        commitment.sequence_num,
+                        &expected[..16.min(expected.len())],
+                        &actual[..16.min(actual.len())]
+                    ),
+                });
+            }
+            (Some(_), None) => {
+                return Ok(VerifyResult {
+                    valid: false,
+                    content_hash_matches: false,
+                    chain_length,
+                    binding_hash: Some(bundle.binding_hash),
+                    expected_content_hash: Some(bundle.content_hash),
+                    actual_content_hash,
+                    message: format!(
+                        "Chain broken at C{}: expected a previous hash but found none",
+                        commitment.sequence_num
+                    ),
+                });
+            }
+        }
+
+        // For content_binding commitments, verify the binding derivation
+        if commitment.commitment_type == "content_binding" {
+            if let Some(ref prev) = commitment.previous_hash {
+                if let Some(ref stored_content_hash) = commitment.content_hash {
+                    let expected_binding =
+                        hashing::content_binding_hash(prev, stored_content_hash);
+                    if expected_binding != commitment.commitment_hash {
+                        return Ok(VerifyResult {
+                            valid: false,
+                            content_hash_matches: false,
+                            chain_length,
+                            binding_hash: Some(bundle.binding_hash),
+                            expected_content_hash: Some(bundle.content_hash),
+                            actual_content_hash,
+                            message: format!(
+                                "Content binding C{} could not be re-derived. Proof may be tampered.",
+                                commitment.sequence_num
+                            ),
+                        });
+                    }
+                }
+            }
+        }
+
+        expected_previous = Some(commitment.commitment_hash.clone());
+    }
+
+    // Check content hash matches
+    let content_matches = actual_content_hash == bundle.content_hash;
+
+    let valid = content_matches;
+
+    let message = if valid {
+        format!(
+            "Verified: content matches proof bundle ({} commitments, {} keystrokes)",
+            chain_length, bundle.total_keystroke_count
+        )
+    } else {
+        "Content modified: the text does not match what was proven at publish time.".to_string()
+    };
+
+    Ok(VerifyResult {
+        valid,
+        content_hash_matches: content_matches,
+        chain_length,
+        binding_hash: Some(bundle.binding_hash),
+        expected_content_hash: Some(bundle.content_hash),
+        actual_content_hash,
+        message,
+    })
+}

@@ -3,6 +3,7 @@ import {
   publishToNotion,
   publishToSubstack,
   exportHtml,
+  exportProofBundle,
 } from "../lib/commands";
 
 type Tab = "notion" | "substack" | "export";
@@ -183,10 +184,31 @@ export function PublishPanel() {
       {tab === "export" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
           <p style={{ fontSize: "11px", color: "var(--text-secondary)", margin: 0 }}>
-            Copy your document as HTML with proof metadata. Paste into any platform.
+            Export your document or proof bundle for external verification.
           </p>
           <button style={buttonStyle} onClick={handleExportHtml}>
             Copy HTML to Clipboard
+          </button>
+          <button
+            style={{
+              ...buttonStyle,
+              background: publishing ? "var(--border)" : "var(--bg-surface)",
+              color: "var(--text-primary)",
+              border: "1px solid var(--border)",
+            }}
+            onClick={async () => {
+              clearStatus();
+              try {
+                const bundle = await exportProofBundle();
+                const json = JSON.stringify(bundle, null, 2);
+                await navigator.clipboard.writeText(json);
+                setResult(`Proof bundle copied (${bundle.commitments.length} commitments, ${bundle.total_keystroke_count} keystrokes)`);
+              } catch (e) {
+                setError(String(e));
+              }
+            }}
+          >
+            Copy Proof Bundle (JSON)
           </button>
         </div>
       )}
