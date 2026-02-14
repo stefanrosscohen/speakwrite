@@ -41,7 +41,7 @@ export function PostBar() {
 
       setStatus({
         type: "success",
-        message: `Posted with ${bundle.commitments.length} commitments and ${bundle.total_keystroke_count} keystrokes`,
+        message: `TRANSMITTED // ${bundle.commitments.length} commitments // ${bundle.total_keystroke_count} keystrokes`,
       });
     } catch (e) {
       setStatus({
@@ -64,15 +64,20 @@ export function PostBar() {
       {/* Status message */}
       {status && (
         <div
-          className="px-4 py-2 text-xs"
           style={{
-            color: status.type === "success" ? "var(--success)" : "#ef4444",
+            padding: "8px 16px",
+            fontFamily: "var(--font-mono)",
+            fontSize: "10px",
+            letterSpacing: "0.05em",
+            color: status.type === "success" ? "var(--accent)" : "var(--danger)",
             background:
               status.type === "success"
-                ? "rgba(72, 187, 120, 0.1)"
-                : "rgba(239, 68, 68, 0.1)",
+                ? "rgba(0, 255, 65, 0.05)"
+                : "rgba(255, 51, 51, 0.05)",
+            borderBottom: "1px solid var(--border)",
           }}
         >
+          {status.type === "success" ? "> " : "ERR: "}
           {status.message}
         </div>
       )}
@@ -80,26 +85,45 @@ export function PostBar() {
       {/* Post bar */}
       <div className="flex items-center justify-between px-4 py-3">
         <span
-          className="text-xs"
-          style={{ color: "var(--text-secondary)" }}
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: "10px",
+            color: "var(--text-secondary)",
+            letterSpacing: "0.05em",
+          }}
         >
           {wordCount > 0
-            ? `${wordCount.toLocaleString()} word${wordCount !== 1 ? "s" : ""}`
-            : "Start writing..."}
+            ? `${wordCount.toLocaleString()} words`
+            : "_ _"}
         </span>
         <button
           onClick={handlePost}
           disabled={publishing || wordCount === 0}
-          className="px-6 py-2 rounded-full text-sm font-semibold transition-opacity"
           style={{
-            background: "var(--accent)",
-            color: "#fff",
-            border: "none",
-            opacity: publishing || wordCount === 0 ? 0.4 : 1,
+            fontFamily: "var(--font-mono)",
+            fontSize: "11px",
+            fontWeight: 600,
+            letterSpacing: "0.1em",
+            textTransform: "uppercase",
+            padding: "8px 20px",
+            background:
+              publishing || wordCount === 0
+                ? "transparent"
+                : "var(--accent)",
+            color:
+              publishing || wordCount === 0
+                ? "var(--text-secondary)"
+                : "var(--bg-primary)",
+            border:
+              publishing || wordCount === 0
+                ? "1px solid var(--border)"
+                : "1px solid var(--accent)",
+            borderRadius: "0",
             cursor: publishing || wordCount === 0 ? "default" : "pointer",
+            transition: "all 0.15s",
           }}
         >
-          {publishing ? "Posting..." : "Post"}
+          {publishing ? "transmitting..." : "publish"}
         </button>
       </div>
     </div>

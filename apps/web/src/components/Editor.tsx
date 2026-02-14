@@ -53,7 +53,7 @@ export function Editor() {
     extensions: [
       StarterKit,
       Placeholder.configure({
-        placeholder: 'Start writing... Type "/" for commands',
+        placeholder: "begin typing...",
       }),
       KeystrokeObserver.configure({
         onKeystrokesBatched: handleKeystrokesBatched,

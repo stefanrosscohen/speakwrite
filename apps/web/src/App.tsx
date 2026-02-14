@@ -5,46 +5,65 @@ import { PostBar } from "./components/PostBar";
 import { useAppStore } from "./stores/app-store";
 import { isNativeShell } from "./lib/services/device-attestation";
 
+/* ================================================================
+   SPEAKWRITE — Cypherpunk Typewriter UI
+   "Every keystroke was a confession."
+   ================================================================ */
+
 function RequiresIOSScreen() {
   return (
     <div
       className="flex flex-col items-center justify-center h-screen px-6 text-center"
       style={{ background: "var(--bg-primary)" }}
     >
-      <div className="text-5xl mb-6" role="img" aria-label="iPhone">
-        &#x1F4F1;
-      </div>
-      <h1
-        className="text-2xl font-bold mb-3"
-        style={{ color: "var(--text-primary)" }}
-      >
-        Speakwrite requires iPhone
-      </h1>
-      <p
-        className="text-sm max-w-md mb-6 leading-relaxed"
-        style={{ color: "var(--text-secondary)" }}
-      >
-        Speakwrite v1 runs exclusively on iOS to provide full human-authorship
-        proofs — including Face ID biometric gating, Secure Enclave signing,
-        and Apple Device Attestation. These hardware guarantees aren't available
-        in a browser.
-      </p>
       <div
-        className="text-xs px-4 py-2 rounded-lg"
         style={{
-          background: "var(--bg-secondary)",
+          fontFamily: "var(--font-mono)",
+          fontSize: "11px",
           color: "var(--text-secondary)",
-          border: "1px solid var(--border)",
+          maxWidth: "360px",
+          lineHeight: "1.8",
         }}
       >
-        Looking to <strong>verify</strong> a proof? The{" "}
-        <a
-          href="https://speakwrite.io/verify"
-          style={{ color: "var(--accent)", textDecoration: "underline" }}
+        <div
+          style={{
+            color: "var(--accent)",
+            fontSize: "14px",
+            fontWeight: 700,
+            letterSpacing: "0.15em",
+            textTransform: "uppercase",
+            marginBottom: "24px",
+          }}
         >
-          verifier
-        </a>{" "}
-        works in any browser.
+          [ACCESS DENIED]
+        </div>
+        <p style={{ marginBottom: "16px" }}>
+          SPEAKWRITE v1 requires iOS for full human-authorship proofs &mdash;
+          Face ID biometric gating, Secure Enclave signing, and Apple Device
+          Attestation. These hardware guarantees are unavailable in a browser.
+        </p>
+        <div
+          style={{
+            marginTop: "24px",
+            padding: "12px",
+            border: "1px solid var(--border)",
+            background: "var(--bg-surface)",
+          }}
+        >
+          <span style={{ color: "var(--text-secondary)" }}>
+            &gt; To <strong style={{ color: "var(--text-primary)" }}>verify</strong> a proof:{" "}
+          </span>
+          <a
+            href="https://speakwrite.io/verify"
+            style={{
+              color: "var(--accent)",
+              textDecoration: "none",
+              borderBottom: "1px dashed var(--accent)",
+            }}
+          >
+            speakwrite.io/verify
+          </a>
+        </div>
       </div>
     </div>
   );
@@ -74,28 +93,63 @@ function LoginScreen({ authError }: { authError?: string | null }) {
       style={{ background: "var(--bg-primary)" }}
     >
       <div className="w-full max-w-sm">
-        {/* Logo / Title */}
-        <div className="text-center mb-10">
+        {/* Title — brutalist, monospaced */}
+        <div className="text-center mb-12">
           <h1
-            className="text-3xl font-bold mb-2"
-            style={{ color: "var(--accent)" }}
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: "28px",
+              fontWeight: 700,
+              letterSpacing: "0.2em",
+              textTransform: "uppercase",
+              color: "var(--accent)",
+              marginBottom: "16px",
+              textShadow: "0 0 20px rgba(0, 255, 65, 0.3)",
+            }}
           >
             Speakwrite
           </h1>
+          <div
+            style={{
+              width: "60px",
+              height: "1px",
+              background: "var(--accent)",
+              margin: "0 auto 16px",
+              opacity: 0.5,
+            }}
+          />
           <p
-            className="text-sm leading-relaxed"
-            style={{ color: "var(--text-secondary)" }}
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: "11px",
+              lineHeight: "1.8",
+              color: "var(--text-secondary)",
+              maxWidth: "280px",
+              margin: "0 auto",
+            }}
           >
-            Write with proof. Every keystroke is cryptographically committed,
-            device-attested, and published to the AT Protocol.
+            Every keystroke cryptographically committed.
+            Every word device-attested. Every proof published.
           </p>
         </div>
 
-        {/* Sign in form */}
+        {/* Sign in form — terminal style */}
         <div className="flex flex-col gap-3">
+          <div
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: "10px",
+              textTransform: "uppercase",
+              letterSpacing: "0.1em",
+              color: "var(--text-secondary)",
+              marginBottom: "4px",
+            }}
+          >
+            &gt; identify
+          </div>
           <input
             type="text"
-            placeholder="yourname.bsky.social"
+            placeholder="handle.bsky.social"
             value={handle}
             onChange={(e) => setHandle(e.target.value)}
             onKeyDown={(e) => {
@@ -104,47 +158,74 @@ function LoginScreen({ authError }: { authError?: string | null }) {
             autoCapitalize="none"
             autoCorrect="off"
             spellCheck={false}
-            className="w-full px-4 py-3 rounded-xl text-base outline-none"
             style={{
-              background: "var(--bg-secondary)",
+              width: "100%",
+              padding: "12px 16px",
+              fontFamily: "var(--font-mono)",
+              fontSize: "14px",
+              background: "var(--bg-surface)",
               color: "var(--text-primary)",
               border: "1px solid var(--border)",
+              borderRadius: "0",
+              outline: "none",
+              caretColor: "var(--accent)",
+              boxSizing: "border-box",
             }}
           />
           <button
             onClick={handleSignIn}
             disabled={signingIn || !handle.trim()}
-            className="w-full py-3 rounded-xl text-base font-semibold transition-opacity"
             style={{
-              background: "var(--accent)",
-              color: "#fff",
-              border: "none",
-              opacity: signingIn || !handle.trim() ? 0.5 : 1,
+              width: "100%",
+              padding: "12px",
+              fontFamily: "var(--font-mono)",
+              fontSize: "12px",
+              fontWeight: 600,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              background: signingIn || !handle.trim() ? "var(--bg-surface)" : "var(--accent)",
+              color: signingIn || !handle.trim() ? "var(--text-secondary)" : "var(--bg-primary)",
+              border: signingIn || !handle.trim()
+                ? "1px solid var(--border)"
+                : "1px solid var(--accent)",
+              borderRadius: "0",
               cursor: signingIn || !handle.trim() ? "default" : "pointer",
+              transition: "all 0.15s",
             }}
           >
-            {signingIn ? "Signing in..." : "Sign in with Bluesky"}
+            {signingIn ? "[ AUTHENTICATING... ]" : "[ SIGN IN ]"}
           </button>
         </div>
 
         {error && (
           <div
-            className="mt-4 p-3 rounded-lg text-sm text-center"
             style={{
-              background: "rgba(239, 68, 68, 0.1)",
-              color: "#ef4444",
+              marginTop: "16px",
+              padding: "12px",
+              fontFamily: "var(--font-mono)",
+              fontSize: "11px",
+              color: "var(--danger)",
+              background: "rgba(255, 51, 51, 0.08)",
+              border: "1px solid rgba(255, 51, 51, 0.2)",
+              lineHeight: "1.6",
             }}
           >
-            {error}
+            ERROR: {error}
           </div>
         )}
 
         <p
-          className="text-xs text-center mt-8 leading-relaxed"
-          style={{ color: "var(--text-secondary)" }}
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: "10px",
+            textAlign: "center",
+            marginTop: "32px",
+            lineHeight: "1.8",
+            color: "#444",
+          }}
         >
-          Sign in with your AT Protocol handle to start writing.
-          Your proofs will be published to your PDS.
+          Authenticate via AT Protocol.
+          Your proofs are published to your PDS.
         </p>
       </div>
     </div>
@@ -157,15 +238,30 @@ function LoadingScreen() {
       className="flex flex-col items-center justify-center h-screen"
       style={{ background: "var(--bg-primary)" }}
     >
-      <h1
-        className="text-2xl font-bold mb-3"
-        style={{ color: "var(--accent)" }}
+      <div
+        style={{
+          fontFamily: "var(--font-mono)",
+          fontSize: "14px",
+          fontWeight: 700,
+          letterSpacing: "0.2em",
+          textTransform: "uppercase",
+          color: "var(--accent)",
+          marginBottom: "16px",
+          textShadow: "0 0 20px rgba(0, 255, 65, 0.3)",
+        }}
       >
         Speakwrite
-      </h1>
-      <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-        Loading...
-      </p>
+      </div>
+      <div
+        style={{
+          fontFamily: "var(--font-mono)",
+          fontSize: "11px",
+          color: "var(--text-secondary)",
+          animation: "blink 1s infinite",
+        }}
+      >
+        initializing_
+      </div>
     </div>
   );
 }
@@ -225,28 +321,39 @@ export default function App() {
   // Logged in — editor with post bar
   return (
     <div className="flex flex-col h-screen" style={{ background: "var(--bg-primary)" }}>
-      {/* Header */}
+      {/* Header — minimal terminal bar */}
       <header
-        className="flex items-center justify-between px-4 py-3 flex-shrink-0"
+        className="flex items-center justify-between px-4 py-2 flex-shrink-0"
         style={{
           borderBottom: "1px solid var(--border)",
           background: "var(--bg-secondary)",
         }}
       >
-        <span className="text-sm font-semibold" style={{ color: "var(--accent)" }}>
-          Speakwrite
+        <span
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: "11px",
+            fontWeight: 600,
+            letterSpacing: "0.15em",
+            textTransform: "uppercase",
+            color: "var(--accent)",
+          }}
+        >
+          speakwrite
         </span>
         <button
           onClick={async () => {
             await logout();
             clearATProto();
           }}
-          className="text-xs"
           style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: "10px",
             color: "var(--text-secondary)",
             background: "none",
             border: "none",
             cursor: "pointer",
+            letterSpacing: "0.03em",
           }}
         >
           @{atprotoHandle}
