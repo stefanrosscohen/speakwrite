@@ -27,6 +27,7 @@ pub fn run() {
             commands::publish::publish_to_notion,
             commands::publish::publish_to_substack,
             commands::publish::export_html,
+            commands::publish::verify_content_binding,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

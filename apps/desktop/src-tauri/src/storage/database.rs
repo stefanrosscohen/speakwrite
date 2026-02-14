@@ -84,11 +84,21 @@ fn run_migrations(conn: &Connection) -> Result<()> {
             previous_hash TEXT,
             nonce TEXT NOT NULL,
             timestamp_ms INTEGER NOT NULL,
+            commitment_type TEXT NOT NULL DEFAULT 'behavioral',
+            content_hash TEXT,
             UNIQUE(document_id, sequence_num),
             FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
         );
         ",
     )?;
+
+    // Migration: add columns if they don't exist (for existing databases)
+    let _ = conn.execute_batch(
+        "ALTER TABLE commitment_chain ADD COLUMN commitment_type TEXT NOT NULL DEFAULT 'behavioral';",
+    );
+    let _ = conn.execute_batch(
+        "ALTER TABLE commitment_chain ADD COLUMN content_hash TEXT;",
+    );
 
     Ok(())
 }

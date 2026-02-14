@@ -58,4 +58,16 @@ export interface DocumentListItem {
 export interface PublishResult {
   url: string;
   platform: string;
+  content_binding_hash: string;
+  content_hash: string;
+}
+
+export interface VerifyResult {
+  valid: boolean;
+  content_hash_matches: boolean;
+  chain_length: number;
+  binding_hash: string | null;
+  expected_content_hash: string | null;
+  actual_content_hash: string;
+  message: string;
 }

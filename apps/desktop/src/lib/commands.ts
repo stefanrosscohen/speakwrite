@@ -7,6 +7,7 @@ import type {
   DocumentInfo,
   DocumentListItem,
   PublishResult,
+  VerifyResult,
 } from "./types";
 
 export async function recordKeystrokeBatch(events: KeystrokeEvent[]): Promise<void> {
@@ -69,4 +70,8 @@ export async function publishToSubstack(
 
 export async function exportHtml(): Promise<string> {
   return invoke("export_html");
+}
+
+export async function verifyContentBinding(content: string): Promise<VerifyResult> {
+  return invoke("verify_content_binding", { content });
 }

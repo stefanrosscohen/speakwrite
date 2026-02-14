@@ -20,6 +20,19 @@ pub fn commitment_hash(previous: Option<&str>, nonce: &[u8], data: &[u8]) -> Str
     hex_encode(&result)
 }
 
+/// Compute content-binding commitment: SHA-256(chain_tip || "CONTENT_BINDING" || content_hash)
+/// This binds the entire commitment chain to the final document content.
+/// A verifier checks: does this content hash match the published text?
+/// If yes, the chain of behavioral commitments covers exactly this output.
+pub fn content_binding_hash(chain_tip: &str, content_hash: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(hex_decode(chain_tip));
+    hasher.update(b"CONTENT_BINDING");
+    hasher.update(hex_decode(content_hash));
+    let result = hasher.finalize();
+    hex_encode(&result)
+}
+
 /// Generate a random 256-bit nonce.
 pub fn random_nonce() -> [u8; 32] {
     let mut nonce = [0u8; 32];
