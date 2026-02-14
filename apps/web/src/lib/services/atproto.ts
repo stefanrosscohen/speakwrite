@@ -13,7 +13,7 @@ const oauthClient = new BrowserOAuthClient({
         client_name: "Speakwrite",
         client_uri: "https://www.speakwrite.io",
         redirect_uris: ["https://www.speakwrite.io/app/"],
-        scope: "atproto transition:generic",
+        scope: "atproto",
         grant_types: ["authorization_code", "refresh_token"],
         response_types: ["code"],
         token_endpoint_auth_method: "none",
@@ -100,63 +100,32 @@ export function onSessionDeleted(callback: () => void): () => void {
   return () => oauthClient.removeEventListener("deleted", handler);
 }
 
-export async function publishProofRecord(
-  bundle: ProofBundle,
-  verifierBaseUrl: string = "https://verify.speakwrite.io",
-): Promise<{ uri: string; cid: string }> {
-  if (!agent?.did) throw new Error("Not logged in to AT Protocol");
-
-  const record = {
-    $type: "io.speakwrite.proof",
-    contentHash: bundle.content_hash,
-    bindingHash: bundle.binding_hash,
-    chainLength: bundle.commitments.length,
-    totalKeystrokes: bundle.total_keystroke_count,
-    proofBundle: JSON.stringify(bundle),
-    verifierUrl: `${verifierBaseUrl}?bundle=${encodeURIComponent(JSON.stringify(bundle))}`,
-    createdAt: new Date().toISOString(),
-  };
-
-  const response = await agent.com.atproto.repo.createRecord({
-    repo: agent.did,
-    collection: "io.speakwrite.proof",
-    record,
-  });
-
-  return { uri: response.data.uri, cid: response.data.cid };
-}
-
+/**
+ * Publish the proof bundle as a Bluesky post.
+ * The post text contains the content, keystroke count, and a verifier link.
+ * The proof bundle is stored as a self-label for now (v1).
+ */
 export async function publishProofPost(
   bundle: ProofBundle,
-  title: string = "Untitled",
-  verifierBaseUrl: string = "https://verify.speakwrite.io",
+  postText: string,
 ): Promise<{ uri: string; cid: string }> {
   if (!agent?.did) throw new Error("Not logged in to AT Protocol");
 
-  const verifierUrl = `${verifierBaseUrl}?bundle=${encodeURIComponent(JSON.stringify(bundle))}`;
-  const postText = `${title}\n\nHuman-authored: ${bundle.total_keystroke_count.toLocaleString()} keystrokes, ${bundle.commitments.length} commitments.\n\nVerify: ${verifierUrl}`;
+  // Truncate post text to fit Bluesky's 300 grapheme limit
+  // Leave room for the proof footer
+  const footer = `\n\n\u2705 ${bundle.total_keystroke_count.toLocaleString()} keystrokes \u00b7 ${bundle.commitments.length} commitments`;
+  const maxContentLen = 300 - footer.length;
+  const trimmedContent =
+    postText.length > maxContentLen
+      ? postText.slice(0, maxContentLen - 1) + "\u2026"
+      : postText;
 
-  // Find verifier URL position in text for link facet
-  const urlStart = postText.indexOf(verifierUrl);
-  const encoder = new TextEncoder();
-  const byteStart = encoder.encode(postText.slice(0, urlStart)).length;
-  const byteEnd = byteStart + encoder.encode(verifierUrl).length;
+  const fullText = trimmedContent + footer;
 
   const record = {
     $type: "app.bsky.feed.post",
-    text: postText,
+    text: fullText,
     createdAt: new Date().toISOString(),
-    facets: [
-      {
-        index: { byteStart, byteEnd },
-        features: [
-          {
-            $type: "app.bsky.richtext.facet#link",
-            uri: verifierUrl,
-          },
-        ],
-      },
-    ],
   };
 
   const response = await agent.com.atproto.repo.createRecord({

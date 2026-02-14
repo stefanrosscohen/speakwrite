@@ -5,7 +5,6 @@ import { createContentBinding, exportProofBundle } from "../lib/services/proof";
 import {
   signIn,
   logout,
-  publishProofRecord,
   publishProofPost,
 } from "../lib/services/atproto";
 import type { ProofBundle } from "@speakwrite/core";
@@ -72,10 +71,9 @@ export function PublishPanel() {
       }
 
       const bundle = await ensureBundleReady(content);
-      const record = await publishProofRecord(bundle);
-      await publishProofPost(bundle, "Speakwrite Proof");
+      const result = await publishProofPost(bundle, content);
 
-      setResult(`Proof published! AT URI: ${record.uri}`);
+      setResult(`Proof published! AT URI: ${result.uri}`);
     } catch (e) {
       setError(String(e));
     } finally {

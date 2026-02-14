@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useAppStore } from "../stores/app-store";
 import { checkpointSession } from "../lib/services/session";
 import { createContentBinding, exportProofBundle } from "../lib/services/proof";
-import { publishProofRecord, publishProofPost } from "../lib/services/atproto";
+import { publishProofPost } from "../lib/services/atproto";
 
 export function PostBar() {
   const [publishing, setPublishing] = useState(false);
@@ -36,9 +36,8 @@ export function PostBar() {
       // 3. Export proof bundle (includes device attestation on iOS)
       const bundle = await exportProofBundle();
 
-      // 4. Publish to AT Protocol
-      await publishProofRecord(bundle);
-      await publishProofPost(bundle, "Speakwrite Proof");
+      // 4. Publish as a Bluesky post
+      await publishProofPost(bundle, content);
 
       setStatus({
         type: "success",
