@@ -13,7 +13,7 @@ const oauthClient = new BrowserOAuthClient({
         client_name: "Speakwrite",
         client_uri: "https://www.speakwrite.io",
         redirect_uris: ["https://www.speakwrite.io/app/"],
-        scope: "atproto",
+        scope: "atproto transition:generic",
         grant_types: ["authorization_code", "refresh_token"],
         response_types: ["code"],
         token_endpoint_auth_method: "none",
