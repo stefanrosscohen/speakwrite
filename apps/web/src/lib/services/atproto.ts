@@ -75,6 +75,7 @@ export async function signIn(handle: string): Promise<void> {
 
 /**
  * Clears the current agent, revokes OAuth session, and cleans up storage.
+ * Reloads the page to ensure a clean state.
  */
 export async function logout(): Promise<void> {
   // Revoke the OAuth session (clears tokens from IndexedDB)
@@ -95,18 +96,8 @@ export async function logout(): Promise<void> {
     // ignore
   }
 
-  // Nuclear option: clear all OAuth storage from IndexedDB
-  // This ensures a clean re-auth even if revoke() didn't fully clean up
-  try {
-    const dbs = await indexedDB.databases();
-    for (const dbInfo of dbs) {
-      if (dbInfo.name && dbInfo.name.includes("atproto")) {
-        indexedDB.deleteDatabase(dbInfo.name);
-      }
-    }
-  } catch {
-    // ignore — older browsers may not support databases()
-  }
+  // Reload to get a clean OAuthClient state
+  window.location.reload();
 }
 
 /**
