@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Speakwrite — Prove a human wrote it</title>
-  <meta name="description" content="An iPhone app that proves a human typed a post. Not by analyzing the output — by witnessing the process.">
+  <meta name="description" content="A web app that proves a human typed a post. Not by analyzing the output — by witnessing the process.">
   <meta property="og:title" content="Speakwrite — Prove a human wrote it">
-  <meta property="og:description" content="An iPhone app that proves a human typed a post. Not by analyzing the output — by witnessing the process.">
+  <meta property="og:description" content="A web app that proves a human typed a post. Not by analyzing the output — by witnessing the process.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://speakwrite.io">
   <meta name="theme-color" content="#0a0a0a">
@@ -20,6 +20,7 @@
   <header>
     <nav>
       <a href="/" class="wordmark">speakwrite</a>
+      <a href="https://github.com/stefanrosscohen/speakwrite" class="nav-link">GitHub</a>
     </nav>
   </header>
 
@@ -28,7 +29,7 @@
     <section class="hero">
       <h1>Prove a human wrote it.</h1>
       <p class="subtitle">Not by analyzing the output &mdash; by witnessing the process.</p>
-      <p class="lede">Speakwrite is an iPhone app that proves a human typed a post.</p>
+      <p class="lede">Speakwrite is a web app that proves a human typed a post.</p>
       <p class="cta"><a href="/app/">Open the app</a></p>
     </section>
 
@@ -40,7 +41,6 @@
     <section id="approach">
       <h2>The Approach</h2>
       <p>Speakwrite takes a fundamentally different approach: instead of analyzing what was written, it instruments <em>how</em> it was written. The app captures keystroke dynamics &mdash; timing, rhythm, pauses, corrections &mdash; as you type, and cryptographically binds that behavioral evidence to the resulting post.</p>
-      <p>On iPhone, every session is authenticated by Face ID and backed by hardware attestation (Apple App Attest + Secure Enclave). The proof isn't just software &mdash; it's tied to a real device and a real person.</p>
       <p>The result is a <strong>proof bundle</strong>: a portable, verifiable artifact that anyone can independently check. No central authority. No API keys. No trust required.</p>
     </section>
 
@@ -49,7 +49,7 @@
       <ol class="steps">
         <li>
           <strong>Open</strong>
-          <span>Launch Speakwrite on your iPhone. Face ID authenticates you and unlocks your Secure Enclave signing key.</span>
+          <span>Launch Speakwrite in your browser and sign in with your Bluesky handle.</span>
         </li>
         <li>
           <strong>Write</strong>
@@ -57,7 +57,7 @@
         </li>
         <li>
           <strong>Publish</strong>
-          <span>Speakwrite generates a cryptographic commitment chain binding your behavioral evidence to your post, signs it with the Secure Enclave, and publishes to Bluesky.</span>
+          <span>Speakwrite generates a cryptographic commitment chain binding your behavioral evidence to your post and publishes to Bluesky.</span>
         </li>
         <li>
           <strong>Verify</strong>
@@ -71,7 +71,7 @@
       <div class="two-col">
         <div>
           <h3>It proves</h3>
-          <p>A post was composed through physical typing on a genuine Apple device, authenticated by Face ID, with keystroke behavior consistent with human motor patterns.</p>
+          <p>A post was composed through a physical typing process with keystroke behavior consistent with human motor patterns.</p>
         </div>
         <div>
           <h3>It doesn't prove</h3>
@@ -84,14 +84,11 @@
     <section id="properties">
       <h2>Key Properties</h2>
       <dl>
-        <dt>Hardware-attested</dt>
-        <dd>Apple App Attest + Secure Enclave + Face ID. Proofs are tied to a real device and a real person.</dd>
-
         <dt>Open protocol</dt>
         <dd>The proof bundle JSON format is the protocol. Anyone can build a verifier or a compatible app.</dd>
 
-        <dt>Privacy-preserving</dt>
-        <dd>Raw keystrokes never leave your device. Only aggregate statistical features are committed.</dd>
+        <dt>Client-side</dt>
+        <dd>Everything runs in your browser. No server sees your keystrokes. Only aggregate statistical features are committed.</dd>
 
         <dt>Decentralized</dt>
         <dd>No central server, no trusted authority. Verification is pure client-side cryptography (SHA-256).</dd>
@@ -120,20 +117,21 @@
       <ul class="repo-list">
         <li>Protocol specification: <code>SPEC-v1.md</code></li>
         <li>Core library: <code>@speakwrite/core</code> (TypeScript, Web Crypto API)</li>
-        <li>iPhone app: Capacitor + native Swift (App Attest, Secure Enclave)</li>
+        <li>Web app: client-side PWA</li>
         <li>Verifier: Standalone client-side verification page</li>
       </ul>
     </section>
 
     <section id="status">
       <h2>Status</h2>
-      <p>Working draft. The iPhone app, protocol spec, and verifier are functional. Proofs publish as Bluesky posts. The proof bundle format is stable enough to build on.</p>
+      <p>Working draft. The web app, protocol spec, and verifier are functional. Proofs publish as Bluesky posts. The proof bundle format is stable enough to build on.</p>
     </section>
 
   </main>
 
   <footer>
     <p>Speakwrite does not solve the AI problem. It creates a new kind of evidence that didn't exist before.</p>
+    <p>This document was not written by a human.</p>
     <p class="links">
       <a href="https://github.com/stefanrosscohen/speakwrite">GitHub</a>
     </p>

@@ -60,6 +60,14 @@ nav {
   text-shadow: 0 0 20px rgba(0, 255, 65, 0.3);
 }
 
+.nav-link {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  letter-spacing: 0.05em;
+}
+.nav-link:hover { color: var(--accent); }
+
 /* ── Main ── */
 main {
   max-width: var(--max-width);
