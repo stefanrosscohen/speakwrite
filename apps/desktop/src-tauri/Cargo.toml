@@ -1,0 +1,28 @@
+[package]
+name = "speakwrite"
+version = "0.1.0"
+description = "Prove human keystroke origin of written content"
+authors = ["Stefan Cohen"]
+license = "MIT"
+edition = "2021"
+
+[lib]
+name = "speakwrite_lib"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rusqlite = { version = "0.31", features = ["bundled"] }
+sha2 = "0.10"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4"] }
+rand = "0.8"
+dirs = "5"
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+tokio = { version = "1", features = ["macros"] }

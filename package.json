@@ -1,0 +1,8 @@
+{
+  "name": "speakwrite",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter @speakwrite/desktop tauri dev",
+    "build": "pnpm --filter @speakwrite/desktop tauri build"
+  }
+}
