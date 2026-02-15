@@ -331,11 +331,19 @@ struct PostDetailView: View {
     private func toggleLike() async {
         if isLiked, let uri = likeUri {
             isLiked = false; localLikeCount -= 1; likeUri = nil
-            try? await viewModel.atproto.unlikePost(likeUri: uri)
+            do {
+                try await viewModel.atproto.unlikePost(likeUri: uri)
+            } catch {
+                isLiked = true; localLikeCount += 1; likeUri = uri
+                print("[Speakwrite] Unlike failed: \(error)")
+            }
         } else {
             isLiked = true; localLikeCount += 1
-            if let resultUri = try? await viewModel.atproto.likePost(uri: nav.uri, cid: nav.cid) {
-                likeUri = resultUri
+            do {
+                likeUri = try await viewModel.atproto.likePost(uri: nav.uri, cid: nav.cid)
+            } catch {
+                isLiked = false; localLikeCount -= 1
+                print("[Speakwrite] Like failed: \(error)")
             }
         }
     }
@@ -343,11 +351,19 @@ struct PostDetailView: View {
     private func toggleRepost() async {
         if isReposted, let uri = repostUri {
             isReposted = false; localRepostCount -= 1; repostUri = nil
-            try? await viewModel.atproto.unrepost(repostUri: uri)
+            do {
+                try await viewModel.atproto.unrepost(repostUri: uri)
+            } catch {
+                isReposted = true; localRepostCount += 1; repostUri = uri
+                print("[Speakwrite] Unrepost failed: \(error)")
+            }
         } else {
             isReposted = true; localRepostCount += 1
-            if let resultUri = try? await viewModel.atproto.repost(uri: nav.uri, cid: nav.cid) {
-                repostUri = resultUri
+            do {
+                repostUri = try await viewModel.atproto.repost(uri: nav.uri, cid: nav.cid)
+            } catch {
+                isReposted = false; localRepostCount -= 1
+                print("[Speakwrite] Repost failed: \(error)")
             }
         }
     }

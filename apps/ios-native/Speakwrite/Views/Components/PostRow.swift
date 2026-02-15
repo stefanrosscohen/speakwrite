@@ -214,11 +214,21 @@ struct PostRow<Post: PostDisplayable>: View {
     private func toggleLike() async {
         if isLiked, let uri = likeUri {
             isLiked = false; localLikeCount -= 1; likeUri = nil
-            try? await viewModel.atproto.unlikePost(likeUri: uri)
+            do {
+                try await viewModel.atproto.unlikePost(likeUri: uri)
+            } catch {
+                // Rollback on failure
+                isLiked = true; localLikeCount += 1; likeUri = uri
+                print("[Speakwrite] Unlike failed: \(error)")
+            }
         } else {
             isLiked = true; localLikeCount += 1
-            if let uri = try? await viewModel.atproto.likePost(uri: post.uri, cid: post.cid) {
-                likeUri = uri
+            do {
+                likeUri = try await viewModel.atproto.likePost(uri: post.uri, cid: post.cid)
+            } catch {
+                // Rollback on failure
+                isLiked = false; localLikeCount -= 1
+                print("[Speakwrite] Like failed: \(error)")
             }
         }
     }
@@ -226,11 +236,21 @@ struct PostRow<Post: PostDisplayable>: View {
     private func toggleRepost() async {
         if isReposted, let uri = repostUri {
             isReposted = false; localRepostCount -= 1; repostUri = nil
-            try? await viewModel.atproto.unrepost(repostUri: uri)
+            do {
+                try await viewModel.atproto.unrepost(repostUri: uri)
+            } catch {
+                // Rollback on failure
+                isReposted = true; localRepostCount += 1; repostUri = uri
+                print("[Speakwrite] Unrepost failed: \(error)")
+            }
         } else {
             isReposted = true; localRepostCount += 1
-            if let uri = try? await viewModel.atproto.repost(uri: post.uri, cid: post.cid) {
-                repostUri = uri
+            do {
+                repostUri = try await viewModel.atproto.repost(uri: post.uri, cid: post.cid)
+            } catch {
+                // Rollback on failure
+                isReposted = false; localRepostCount -= 1
+                print("[Speakwrite] Repost failed: \(error)")
             }
         }
     }

@@ -18,6 +18,7 @@ final class ATProtoService {
     private var dpopKeyPair: P256.Signing.PrivateKey?
     private var dpopNonce: String? // Server-provided nonce for DPoP
     private var authSession: ASWebAuthenticationSession? // Keep strong reference during OAuth
+    private var presentationProvider: PresentationContextProvider? // Keep strong reference during OAuth
 
     // MARK: - Session Persistence
 
@@ -31,6 +32,9 @@ final class ATProtoService {
         }
         if let token = refreshToken {
             KeychainHelper.save(key: "sw_refresh_token", value: token)
+        }
+        if let key = dpopKeyPair {
+            KeychainHelper.saveData(key: "sw_dpop_key", value: key.rawRepresentation)
         }
     }
 
@@ -48,7 +52,18 @@ final class ATProtoService {
         pdsURL = p
         accessToken = at
         refreshToken = KeychainHelper.load(key: "sw_refresh_token")
-        dpopKeyPair = P256.Signing.PrivateKey() // Fresh DPoP key each launch
+
+        // Restore the DPoP key pair that was used during token exchange
+        if let keyData = KeychainHelper.loadData(key: "sw_dpop_key"),
+           let key = try? P256.Signing.PrivateKey(rawRepresentation: keyData) {
+            dpopKeyPair = key
+        } else {
+            // No persisted key — tokens are bound to the old key, so session is invalid.
+            // Clean up partial restore.
+            handle = nil; did = nil; pdsURL = nil; accessToken = nil; refreshToken = nil
+            return false
+        }
+
         isLoggedIn = true
         return true
     }
@@ -119,6 +134,7 @@ final class ATProtoService {
         let callbackURL = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, Error>) in
             let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: "io.speakwrite.www") { [weak self] url, error in
                 self?.authSession = nil
+                self?.presentationProvider = nil
                 if let error {
                     continuation.resume(throwing: error)
                 } else if let url {
@@ -127,7 +143,8 @@ final class ATProtoService {
                     continuation.resume(throwing: ATProtoError.authCancelled)
                 }
             }
-            session.presentationContextProvider = PresentationContextProvider(anchor: presentationAnchor)
+            self.presentationProvider = PresentationContextProvider(anchor: presentationAnchor)
+            session.presentationContextProvider = self.presentationProvider
             session.prefersEphemeralWebBrowserSession = false
             self.authSession = session
             session.start()
@@ -205,28 +222,46 @@ final class ATProtoService {
         code: String, codeVerifier: String, redirectURI: String,
         clientId: String, tokenEndpoint: String, pds: String
     ) async throws {
-        var request = URLRequest(url: URL(string: tokenEndpoint)!)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        if let dpopHeader = try createDPoPProof(method: "POST", url: tokenEndpoint) {
-            request.setValue(dpopHeader, forHTTPHeaderField: "DPoP")
-        }
-
-        let body: [String: String] = [
+        let bodyDict: [String: String] = [
             "grant_type": "authorization_code",
             "code": code,
             "redirect_uri": redirectURI,
             "client_id": clientId,
             "code_verifier": codeVerifier,
         ]
-        request.httpBody = try JSONEncoder().encode(body)
+        let bodyData = try JSONEncoder().encode(bodyDict)
 
+        func buildRequest() throws -> URLRequest {
+            var request = URLRequest(url: URL(string: tokenEndpoint)!)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            if let dpopHeader = try createDPoPProof(method: "POST", url: tokenEndpoint) {
+                request.setValue(dpopHeader, forHTTPHeaderField: "DPoP")
+            }
+            request.httpBody = bodyData
+            return request
+        }
+
+        let request = try buildRequest()
         let (data, response) = try await URLSession.shared.data(for: request)
 
         if let httpResponse = response as? HTTPURLResponse,
            let nonce = httpResponse.value(forHTTPHeaderField: "DPoP-Nonce") {
             dpopNonce = nonce
+
+            // Retry with nonce if we got a 400 (DPoP nonce challenge)
+            if httpResponse.statusCode == 400 {
+                let retryRequest = try buildRequest()
+                let (retryData, retryResponse) = try await URLSession.shared.data(for: retryRequest)
+                if let retryHttp = retryResponse as? HTTPURLResponse,
+                   let retryNonce = retryHttp.value(forHTTPHeaderField: "DPoP-Nonce") {
+                    dpopNonce = retryNonce
+                }
+                let tokens = try JSONDecoder().decode(TokenResponse.self, from: retryData)
+                accessToken = tokens.accessToken
+                refreshToken = tokens.refreshToken
+                return
+            }
         }
 
         let tokens = try JSONDecoder().decode(TokenResponse.self, from: data)
@@ -274,17 +309,12 @@ final class ATProtoService {
     // MARK: - Feed (Global Verified Posts)
 
     func fetchVerifiedFeed(cursor: String? = nil) async throws -> (posts: [VerifiedPost], cursor: String?) {
-        let publicAPI = "https://public.api.bsky.app"
+        let publicAPI = "https://api.bsky.app"
 
         var urlString = "\(publicAPI)/xrpc/app.bsky.feed.searchPosts?q=%E2%9C%85%20keystrokes%20%C2%B7%20commitments&limit=25"
         if let cursor { urlString += "&cursor=\(cursor)" }
 
-        let data: Data
-        if accessToken != nil {
-            (data, _) = try await authenticatedRequest(url: urlString, method: "GET")
-        } else {
-            (data, _) = try await URLSession.shared.data(from: URL(string: urlString)!)
-        }
+        let (data, _) = try await URLSession.shared.data(from: URL(string: urlString)!)
 
         let result = try JSONDecoder().decode(SearchPostsResponse.self, from: data)
 
@@ -303,7 +333,7 @@ final class ATProtoService {
     // MARK: - Timeline (Bluesky Discover Feed)
 
     func fetchTimeline(cursor: String? = nil) async throws -> (posts: [TimelinePost], cursor: String?) {
-        let publicAPI = "https://public.api.bsky.app"
+        let publicAPI = "https://api.bsky.app"
 
         let feedURI = "at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.generator/whats-hot"
         let encodedFeed = feedURI.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? feedURI
@@ -311,12 +341,7 @@ final class ATProtoService {
         var urlString = "\(publicAPI)/xrpc/app.bsky.feed.getFeed?feed=\(encodedFeed)&limit=30"
         if let cursor { urlString += "&cursor=\(cursor)" }
 
-        let data: Data
-        if accessToken != nil {
-            (data, _) = try await authenticatedRequest(url: urlString, method: "GET")
-        } else {
-            (data, _) = try await URLSession.shared.data(from: URL(string: urlString)!)
-        }
+        let (data, _) = try await URLSession.shared.data(from: URL(string: urlString)!)
 
         let result = try JSONDecoder().decode(FeedResponse.self, from: data)
 
@@ -340,33 +365,23 @@ final class ATProtoService {
     // MARK: - Profile
 
     func getProfile(actor: String) async throws -> ProfileViewDetailed {
-        let publicAPI = "https://public.api.bsky.app"
+        let publicAPI = "https://api.bsky.app"
         let encoded = actor.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? actor
         let urlString = "\(publicAPI)/xrpc/app.bsky.actor.getProfile?actor=\(encoded)"
 
-        let data: Data
-        if accessToken != nil {
-            (data, _) = try await authenticatedRequest(url: urlString, method: "GET")
-        } else {
-            (data, _) = try await URLSession.shared.data(from: URL(string: urlString)!)
-        }
+        let (data, _) = try await URLSession.shared.data(from: URL(string: urlString)!)
 
         return try JSONDecoder().decode(ProfileViewDetailed.self, from: data)
     }
 
     func getAuthorFeed(actor: String, cursor: String? = nil) async throws -> (posts: [TimelinePost], cursor: String?) {
-        let publicAPI = "https://public.api.bsky.app"
+        let publicAPI = "https://api.bsky.app"
         let encoded = actor.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? actor
 
         var urlString = "\(publicAPI)/xrpc/app.bsky.feed.getAuthorFeed?actor=\(encoded)&limit=30"
         if let cursor { urlString += "&cursor=\(cursor)" }
 
-        let data: Data
-        if accessToken != nil {
-            (data, _) = try await authenticatedRequest(url: urlString, method: "GET")
-        } else {
-            (data, _) = try await URLSession.shared.data(from: URL(string: urlString)!)
-        }
+        let (data, _) = try await URLSession.shared.data(from: URL(string: urlString)!)
 
         let result = try JSONDecoder().decode(FeedResponse.self, from: data)
 
@@ -461,16 +476,11 @@ final class ATProtoService {
     // MARK: - Post Thread
 
     func getPostThread(uri: String) async throws -> PostThreadResponse {
-        let publicAPI = "https://public.api.bsky.app"
+        let publicAPI = "https://api.bsky.app"
         let encoded = uri.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? uri
         let urlString = "\(publicAPI)/xrpc/app.bsky.feed.getPostThread?uri=\(encoded)&depth=10"
 
-        let data: Data
-        if accessToken != nil {
-            (data, _) = try await authenticatedRequest(url: urlString, method: "GET")
-        } else {
-            (data, _) = try await URLSession.shared.data(from: URL(string: urlString)!)
-        }
+        let (data, _) = try await URLSession.shared.data(from: URL(string: urlString)!)
 
         return try JSONDecoder().decode(PostThreadResponse.self, from: data)
     }
@@ -517,22 +527,55 @@ final class ATProtoService {
     private func authenticatedRequest(url: String, method: String, body: Data? = nil) async throws -> (Data, URLResponse) {
         guard let accessToken else { throw ATProtoError.notLoggedIn }
 
-        var request = URLRequest(url: URL(string: url)!)
-        request.httpMethod = method
-        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        func buildRequest() throws -> URLRequest {
+            var request = URLRequest(url: URL(string: url)!)
+            request.httpMethod = method
+            request.setValue("DPoP \(accessToken)", forHTTPHeaderField: "Authorization")
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        if let dpopHeader = try createDPoPProof(method: method, url: url) {
-            request.setValue(dpopHeader, forHTTPHeaderField: "DPoP")
+            if let dpopHeader = try createDPoPProof(method: method, url: url, accessToken: accessToken) {
+                request.setValue(dpopHeader, forHTTPHeaderField: "DPoP")
+            }
+
+            if let body { request.httpBody = body }
+            return request
         }
 
-        if let body { request.httpBody = body }
+        func captureNonce(from httpResponse: HTTPURLResponse) {
+            if let nonce = httpResponse.value(forHTTPHeaderField: "DPoP-Nonce") {
+                dpopNonce = nonce
+            }
+        }
 
+        let request = try buildRequest()
         let (data, response) = try await URLSession.shared.data(for: request)
 
-        if let httpResponse = response as? HTTPURLResponse,
-           let nonce = httpResponse.value(forHTTPHeaderField: "DPoP-Nonce") {
-            dpopNonce = nonce
+        guard let httpResponse = response as? HTTPURLResponse else {
+            return (data, response)
+        }
+
+        captureNonce(from: httpResponse)
+
+        // Retry on 401 (DPoP nonce challenge) — server sends fresh nonce, retry with it
+        if httpResponse.statusCode == 401 {
+            let retryRequest = try buildRequest()
+            let (retryData, retryResponse) = try await URLSession.shared.data(for: retryRequest)
+            if let retryHttp = retryResponse as? HTTPURLResponse {
+                captureNonce(from: retryHttp)
+                if retryHttp.statusCode >= 200 && retryHttp.statusCode < 300 {
+                    return (retryData, retryResponse)
+                }
+                // Retry also failed — throw the error
+                let errorBody = String(data: retryData, encoding: .utf8) ?? "HTTP \(retryHttp.statusCode)"
+                throw ATProtoError.oauthError("http_\(retryHttp.statusCode)", errorBody)
+            }
+            return (retryData, retryResponse)
+        }
+
+        // Throw on non-2xx responses
+        if httpResponse.statusCode < 200 || httpResponse.statusCode >= 300 {
+            let errorBody = String(data: data, encoding: .utf8) ?? "HTTP \(httpResponse.statusCode)"
+            throw ATProtoError.oauthError("http_\(httpResponse.statusCode)", errorBody)
         }
 
         return (data, response)
@@ -559,7 +602,7 @@ final class ATProtoService {
 
     // MARK: - DPoP
 
-    private func createDPoPProof(method: String, url: String) throws -> String? {
+    private func createDPoPProof(method: String, url: String, accessToken: String? = nil) throws -> String? {
         guard let key = dpopKeyPair else { return nil }
 
         let header: [String: Any] = [
@@ -576,6 +619,11 @@ final class ATProtoService {
             "htu": url, "iat": Int(Date().timeIntervalSince1970),
         ]
         if let nonce = dpopNonce { payload["nonce"] = nonce }
+        // Include access token hash when presenting a DPoP-bound token (RFC 9449 §4.2)
+        if let token = accessToken {
+            let tokenHash = SHA256.hash(data: Data(token.utf8))
+            payload["ath"] = Data(tokenHash).base64URLEncoded
+        }
 
         let headerData = try JSONSerialization.data(withJSONObject: header)
         let payloadData = try JSONSerialization.data(withJSONObject: payload)
@@ -597,6 +645,7 @@ final class ATProtoService {
         UserDefaults.standard.removeObject(forKey: "sw_pds")
         KeychainHelper.delete(key: "sw_access_token")
         KeychainHelper.delete(key: "sw_refresh_token")
+        KeychainHelper.delete(key: "sw_dpop_key")
 
         accessToken = nil
         refreshToken = nil
