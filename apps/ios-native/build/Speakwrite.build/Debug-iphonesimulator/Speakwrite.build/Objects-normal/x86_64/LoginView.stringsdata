@@ -1,0 +1,40 @@
+{
+  "source": "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/Speakwrite/Views/LoginView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "speakwrite",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 14
+        }
+      },
+      {
+        "comment": "",
+        "key": "prove a human wrote it",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 18
+        }
+      },
+      {
+        "comment": "",
+        "key": "your.bsky.handle",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 26
+        }
+      },
+      {
+        "comment": "",
+        "key": "Sign in with Bluesky",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 40
+        }
+      }
+    ]
+  },
+  "version": 1
+}

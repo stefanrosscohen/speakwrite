@@ -1,0 +1,128 @@
+{
+  "source": "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/Speakwrite/Views/ProofSidebarView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Proof",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 80
+        }
+      },
+      {
+        "comment": "",
+        "key": "Session",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 10
+        }
+      },
+      {
+        "comment": "",
+        "key": "Commitment Chain",
+        "location": {
+          "startingColumn": 29,
+          "startingLine": 33
+        }
+      },
+      {
+        "comment": "",
+        "key": "Device Attestation",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 67
+        }
+      },
+      {
+        "comment": "",
+        "key": "No active session",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 27
+        }
+      },
+      {
+        "comment": "",
+        "key": "Status",
+        "location": {
+          "startingColumn": 40,
+          "startingLine": 12
+        }
+      },
+      {
+        "comment": "",
+        "key": "Keystrokes",
+        "location": {
+          "startingColumn": 40,
+          "startingLine": 17
+        }
+      },
+      {
+        "comment": "",
+        "key": "Commitments",
+        "location": {
+          "startingColumn": 40,
+          "startingLine": 22
+        }
+      },
+      {
+        "comment": "",
+        "key": "Capturing",
+        "location": {
+          "startingColumn": 58,
+          "startingLine": 13
+        }
+      },
+      {
+        "comment": "",
+        "key": "Idle",
+        "location": {
+          "startingColumn": 72,
+          "startingLine": 13
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 18
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 23
+        }
+      },
+      {
+        "comment": "",
+        "key": "#%lld",
+        "location": {
+          "startingColumn": 42,
+          "startingLine": 37
+        }
+      },
+      {
+        "comment": "",
+        "key": "App Attest",
+        "location": {
+          "startingColumn": 36,
+          "startingLine": 69
+        }
+      },
+      {
+        "comment": "",
+        "key": "Secure Enclave",
+        "location": {
+          "startingColumn": 36,
+          "startingLine": 73
+        }
+      }
+    ]
+  },
+  "version": 1
+}

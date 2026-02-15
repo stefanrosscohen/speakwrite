@@ -1,0 +1,573 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A10001010000000000000001 /* SpeakwriteApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000001 /* SpeakwriteApp.swift */; };
+		A10001010000000000000002 /* Hashing.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000002 /* Hashing.swift */; };
+		A10001010000000000000003 /* HexEncoding.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000003 /* HexEncoding.swift */; };
+		A10001010000000000000004 /* Document.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000004 /* Document.swift */; };
+		A10001010000000000000005 /* Session.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000005 /* Session.swift */; };
+		A10001010000000000000006 /* Keystroke.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000006 /* Keystroke.swift */; };
+		A10001010000000000000007 /* Commitment.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000007 /* Commitment.swift */; };
+		A10001010000000000000008 /* FeatureVector.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000008 /* FeatureVector.swift */; };
+		A10001010000000000000009 /* StatsUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000009 /* StatsUtils.swift */; };
+		A10001010000000000000010 /* Tier1Features.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000010 /* Tier1Features.swift */; };
+		A10001010000000000000011 /* Tier2Features.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000011 /* Tier2Features.swift */; };
+		A10001010000000000000012 /* DeviceAttestation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000012 /* DeviceAttestation.swift */; };
+		A10001010000000000000013 /* KeystrokeCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000013 /* KeystrokeCapture.swift */; };
+		A10001010000000000000014 /* SessionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000014 /* SessionService.swift */; };
+		A10001010000000000000015 /* ProofService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000015 /* ProofService.swift */; };
+		A10001010000000000000016 /* ATProtoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000016 /* ATProtoService.swift */; };
+		A10001010000000000000017 /* AppViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000017 /* AppViewModel.swift */; };
+		A10001010000000000000018 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000018 /* LoginView.swift */; };
+		A10001010000000000000019 /* EditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000019 /* EditorView.swift */; };
+		A10001010000000000000020 /* PostBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000020 /* PostBarView.swift */; };
+		A10001010000000000000021 /* ProofSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000021 /* ProofSidebarView.swift */; };
+		A10001010000000000000022 /* PublishView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000022 /* PublishView.swift */; };
+		A10001010000000000000023 /* FeedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000023 /* FeedView.swift */; };
+		A10001010000000000000024 /* TimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000024 /* TimelineView.swift */; };
+		A10001010000000000000025 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000025 /* Assets.xcassets */; };
+		A10001010000000000000026 /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000026 /* KeychainHelper.swift */; };
+		A10001010000000000000027 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000027 /* ProfileView.swift */; };
+		A10001010000000000000028 /* MyProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000028 /* MyProfileView.swift */; };
+		A10001010000000000000029 /* ReplyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000029 /* ReplyView.swift */; };
+		A10001010000000000000030 /* AvatarButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000030 /* AvatarButton.swift */; };
+		A10001010000000000000031 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000031 /* Theme.swift */; };
+		A10001010000000000000032 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000032 /* SettingsView.swift */; };
+		A10001010000000000000033 /* PostRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000033 /* PostRow.swift */; };
+		A10001010000000000000034 /* AvatarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000034 /* AvatarView.swift */; };
+		A10001010000000000000035 /* StatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000035 /* StatView.swift */; };
+		A10001010000000000000036 /* PostDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000036 /* PostDetailView.swift */; };
+		A10001010000000000000037 /* QuotePostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000037 /* QuotePostView.swift */; };
+		A10003010000000000000001 /* CryptoKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A10004010000000000000001 /* CryptoKit.framework */; };
+		A10003010000000000000002 /* DeviceCheck.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A10004010000000000000002 /* DeviceCheck.framework */; };
+		A10003010000000000000003 /* LocalAuthentication.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A10004010000000000000003 /* LocalAuthentication.framework */; };
+		A10003010000000000000004 /* AuthenticationServices.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A10004010000000000000004 /* AuthenticationServices.framework */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A10002010000000000000001 /* SpeakwriteApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeakwriteApp.swift; sourceTree = "<group>"; };
+		A10002010000000000000002 /* Hashing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Hashing.swift; sourceTree = "<group>"; };
+		A10002010000000000000003 /* HexEncoding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HexEncoding.swift; sourceTree = "<group>"; };
+		A10002010000000000000004 /* Document.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Document.swift; sourceTree = "<group>"; };
+		A10002010000000000000005 /* Session.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Session.swift; sourceTree = "<group>"; };
+		A10002010000000000000006 /* Keystroke.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Keystroke.swift; sourceTree = "<group>"; };
+		A10002010000000000000007 /* Commitment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Commitment.swift; sourceTree = "<group>"; };
+		A10002010000000000000008 /* FeatureVector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureVector.swift; sourceTree = "<group>"; };
+		A10002010000000000000009 /* StatsUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsUtils.swift; sourceTree = "<group>"; };
+		A10002010000000000000010 /* Tier1Features.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tier1Features.swift; sourceTree = "<group>"; };
+		A10002010000000000000011 /* Tier2Features.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tier2Features.swift; sourceTree = "<group>"; };
+		A10002010000000000000012 /* DeviceAttestation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceAttestation.swift; sourceTree = "<group>"; };
+		A10002010000000000000013 /* KeystrokeCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeystrokeCapture.swift; sourceTree = "<group>"; };
+		A10002010000000000000014 /* SessionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionService.swift; sourceTree = "<group>"; };
+		A10002010000000000000015 /* ProofService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProofService.swift; sourceTree = "<group>"; };
+		A10002010000000000000016 /* ATProtoService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ATProtoService.swift; sourceTree = "<group>"; };
+		A10002010000000000000017 /* AppViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppViewModel.swift; sourceTree = "<group>"; };
+		A10002010000000000000018 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		A10002010000000000000019 /* EditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorView.swift; sourceTree = "<group>"; };
+		A10002010000000000000020 /* PostBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostBarView.swift; sourceTree = "<group>"; };
+		A10002010000000000000021 /* ProofSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProofSidebarView.swift; sourceTree = "<group>"; };
+		A10002010000000000000022 /* PublishView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublishView.swift; sourceTree = "<group>"; };
+		A10002010000000000000023 /* FeedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedView.swift; sourceTree = "<group>"; };
+		A10002010000000000000024 /* TimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineView.swift; sourceTree = "<group>"; };
+		A10002010000000000000025 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A10002010000000000000026 /* KeychainHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainHelper.swift; sourceTree = "<group>"; };
+		A10002010000000000000027 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		A10002010000000000000028 /* MyProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyProfileView.swift; sourceTree = "<group>"; };
+		A10002010000000000000029 /* ReplyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyView.swift; sourceTree = "<group>"; };
+		A10002010000000000000030 /* AvatarButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvatarButton.swift; sourceTree = "<group>"; };
+		A10002010000000000000031 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		A10002010000000000000032 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		A10002010000000000000033 /* PostRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostRow.swift; sourceTree = "<group>"; };
+		A10002010000000000000034 /* AvatarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvatarView.swift; sourceTree = "<group>"; };
+		A10002010000000000000035 /* StatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatView.swift; sourceTree = "<group>"; };
+		A10002010000000000000036 /* PostDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostDetailView.swift; sourceTree = "<group>"; };
+		A10002010000000000000037 /* QuotePostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuotePostView.swift; sourceTree = "<group>"; };
+		A10004010000000000000001 /* CryptoKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CryptoKit.framework; path = System/Library/Frameworks/CryptoKit.framework; sourceTree = SDKROOT; };
+		A10004010000000000000002 /* DeviceCheck.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = DeviceCheck.framework; path = System/Library/Frameworks/DeviceCheck.framework; sourceTree = SDKROOT; };
+		A10004010000000000000003 /* LocalAuthentication.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = LocalAuthentication.framework; path = System/Library/Frameworks/LocalAuthentication.framework; sourceTree = SDKROOT; };
+		A10004010000000000000004 /* AuthenticationServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AuthenticationServices.framework; path = System/Library/Frameworks/AuthenticationServices.framework; sourceTree = SDKROOT; };
+		A10005010000000000000001 /* Speakwrite.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Speakwrite.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10006010000000000000001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A10006010000000000000002 /* Speakwrite.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Speakwrite.entitlements; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A10007010000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10003010000000000000001 /* CryptoKit.framework in Frameworks */,
+				A10003010000000000000002 /* DeviceCheck.framework in Frameworks */,
+				A10003010000000000000003 /* LocalAuthentication.framework in Frameworks */,
+				A10003010000000000000004 /* AuthenticationServices.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A10008010000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				A10008010000000000000002 /* Speakwrite */,
+				A10008010000000000000009 /* Frameworks */,
+				A10008010000000000000010 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A10008010000000000000002 /* Speakwrite */ = {
+			isa = PBXGroup;
+			children = (
+				A10002010000000000000001 /* SpeakwriteApp.swift */,
+				A10002010000000000000031 /* Theme.swift */,
+				A10002010000000000000025 /* Assets.xcassets */,
+				A10006010000000000000001 /* Info.plist */,
+				A10006010000000000000002 /* Speakwrite.entitlements */,
+				A10008010000000000000003 /* Crypto */,
+				A10008010000000000000004 /* Models */,
+				A10008010000000000000005 /* Features */,
+				A10008010000000000000006 /* Services */,
+				A10008010000000000000007 /* ViewModels */,
+				A10008010000000000000008 /* Views */,
+			);
+			path = Speakwrite;
+			sourceTree = "<group>";
+		};
+		A10008010000000000000003 /* Crypto */ = {
+			isa = PBXGroup;
+			children = (
+				A10002010000000000000002 /* Hashing.swift */,
+				A10002010000000000000003 /* HexEncoding.swift */,
+			);
+			path = Crypto;
+			sourceTree = "<group>";
+		};
+		A10008010000000000000004 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				A10002010000000000000004 /* Document.swift */,
+				A10002010000000000000005 /* Session.swift */,
+				A10002010000000000000006 /* Keystroke.swift */,
+				A10002010000000000000007 /* Commitment.swift */,
+				A10002010000000000000008 /* FeatureVector.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		A10008010000000000000005 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				A10002010000000000000009 /* StatsUtils.swift */,
+				A10002010000000000000010 /* Tier1Features.swift */,
+				A10002010000000000000011 /* Tier2Features.swift */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		A10008010000000000000006 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				A10002010000000000000012 /* DeviceAttestation.swift */,
+				A10002010000000000000013 /* KeystrokeCapture.swift */,
+				A10002010000000000000014 /* SessionService.swift */,
+				A10002010000000000000015 /* ProofService.swift */,
+				A10002010000000000000016 /* ATProtoService.swift */,
+				A10002010000000000000026 /* KeychainHelper.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		A10008010000000000000007 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				A10002010000000000000017 /* AppViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		A10008010000000000000008 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				A10008010000000000000011 /* Components */,
+				A10002010000000000000018 /* LoginView.swift */,
+				A10002010000000000000019 /* EditorView.swift */,
+				A10002010000000000000020 /* PostBarView.swift */,
+				A10002010000000000000021 /* ProofSidebarView.swift */,
+				A10002010000000000000022 /* PublishView.swift */,
+				A10002010000000000000023 /* FeedView.swift */,
+				A10002010000000000000024 /* TimelineView.swift */,
+				A10002010000000000000027 /* ProfileView.swift */,
+				A10002010000000000000028 /* MyProfileView.swift */,
+				A10002010000000000000029 /* ReplyView.swift */,
+				A10002010000000000000030 /* AvatarButton.swift */,
+				A10002010000000000000032 /* SettingsView.swift */,
+				A10002010000000000000036 /* PostDetailView.swift */,
+				A10002010000000000000037 /* QuotePostView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		A10008010000000000000011 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				A10002010000000000000033 /* PostRow.swift */,
+				A10002010000000000000034 /* AvatarView.swift */,
+				A10002010000000000000035 /* StatView.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
+		A10008010000000000000009 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				A10004010000000000000001 /* CryptoKit.framework */,
+				A10004010000000000000002 /* DeviceCheck.framework */,
+				A10004010000000000000003 /* LocalAuthentication.framework */,
+				A10004010000000000000004 /* AuthenticationServices.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		A10008010000000000000010 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A10005010000000000000001 /* Speakwrite.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A10009010000000000000001 /* Speakwrite */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A1000B010000000000000001 /* Build configuration list for PBXNativeTarget "Speakwrite" */;
+			buildPhases = (
+				A1000A010000000000000001 /* Sources */,
+				A10007010000000000000001 /* Frameworks */,
+				A1000A010000000000000002 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Speakwrite;
+			productName = Speakwrite;
+			productReference = A10005010000000000000001 /* Speakwrite.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A1000C010000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1540;
+				LastUpgradeCheck = 1540;
+				TargetAttributes = {
+					A10009010000000000000001 = {
+						CreatedOnToolsVersion = 15.4;
+					};
+				};
+			};
+			buildConfigurationList = A1000B010000000000000003 /* Build configuration list for PBXProject "Speakwrite" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A10008010000000000000001;
+			productRefGroup = A10008010000000000000010 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A10009010000000000000001 /* Speakwrite */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A1000A010000000000000002 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10001010000000000000025 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A1000A010000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10001010000000000000001 /* SpeakwriteApp.swift in Sources */,
+				A10001010000000000000002 /* Hashing.swift in Sources */,
+				A10001010000000000000003 /* HexEncoding.swift in Sources */,
+				A10001010000000000000004 /* Document.swift in Sources */,
+				A10001010000000000000005 /* Session.swift in Sources */,
+				A10001010000000000000006 /* Keystroke.swift in Sources */,
+				A10001010000000000000007 /* Commitment.swift in Sources */,
+				A10001010000000000000008 /* FeatureVector.swift in Sources */,
+				A10001010000000000000009 /* StatsUtils.swift in Sources */,
+				A10001010000000000000010 /* Tier1Features.swift in Sources */,
+				A10001010000000000000011 /* Tier2Features.swift in Sources */,
+				A10001010000000000000012 /* DeviceAttestation.swift in Sources */,
+				A10001010000000000000013 /* KeystrokeCapture.swift in Sources */,
+				A10001010000000000000014 /* SessionService.swift in Sources */,
+				A10001010000000000000015 /* ProofService.swift in Sources */,
+				A10001010000000000000016 /* ATProtoService.swift in Sources */,
+				A10001010000000000000017 /* AppViewModel.swift in Sources */,
+				A10001010000000000000018 /* LoginView.swift in Sources */,
+				A10001010000000000000019 /* EditorView.swift in Sources */,
+				A10001010000000000000020 /* PostBarView.swift in Sources */,
+				A10001010000000000000021 /* ProofSidebarView.swift in Sources */,
+				A10001010000000000000022 /* PublishView.swift in Sources */,
+				A10001010000000000000023 /* FeedView.swift in Sources */,
+				A10001010000000000000024 /* TimelineView.swift in Sources */,
+				A10001010000000000000026 /* KeychainHelper.swift in Sources */,
+				A10001010000000000000027 /* ProfileView.swift in Sources */,
+				A10001010000000000000028 /* MyProfileView.swift in Sources */,
+				A10001010000000000000029 /* ReplyView.swift in Sources */,
+				A10001010000000000000030 /* AvatarButton.swift in Sources */,
+				A10001010000000000000031 /* Theme.swift in Sources */,
+				A10001010000000000000032 /* SettingsView.swift in Sources */,
+				A10001010000000000000033 /* PostRow.swift in Sources */,
+				A10001010000000000000034 /* AvatarView.swift in Sources */,
+				A10001010000000000000035 /* StatView.swift in Sources */,
+				A10001010000000000000036 /* PostDetailView.swift in Sources */,
+				A10001010000000000000037 /* QuotePostView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		A1000D010000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		A1000D010000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_VERSION = 5.0;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		A1000D010000000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Speakwrite/Speakwrite.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = J3Y68ZC9L2;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Speakwrite/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = speakwriteio;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = io.speakwrite.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		A1000D010000000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Speakwrite/Speakwrite.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = J3Y68ZC9L2;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Speakwrite/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = speakwriteio;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = io.speakwrite.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A1000B010000000000000001 /* Build configuration list for PBXNativeTarget "Speakwrite" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A1000D010000000000000003 /* Debug */,
+				A1000D010000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A1000B010000000000000003 /* Build configuration list for PBXProject "Speakwrite" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A1000D010000000000000001 /* Debug */,
+				A1000D010000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = A1000C010000000000000001 /* Project object */;
+}

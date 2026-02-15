@@ -1,0 +1,239 @@
+{
+  "" : {
+    "diagnostics" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Speakwrite-primary.dia",
+    "emit-module-dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Speakwrite-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Speakwrite-primary-emit-module.dia",
+    "pch" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Speakwrite-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Speakwrite-primary.swiftdeps"
+  },
+  "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/Speakwrite/Crypto/Hashing.swift" : {
+    "const-values" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Hashing.swiftconstvalues",
+    "dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Hashing.d",
+    "diagnostics" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Hashing.dia",
+    "index-unit-output-path" : "/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Hashing.o",
+    "llvm-bc" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Hashing.bc",
+    "object" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Hashing.o",
+    "swift-dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Hashing.swiftdeps",
+    "swiftmodule" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Hashing~partial.swiftmodule"
+  },
+  "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/Speakwrite/Crypto/HexEncoding.swift" : {
+    "const-values" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/HexEncoding.swiftconstvalues",
+    "dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/HexEncoding.d",
+    "diagnostics" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/HexEncoding.dia",
+    "index-unit-output-path" : "/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/HexEncoding.o",
+    "llvm-bc" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/HexEncoding.bc",
+    "object" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/HexEncoding.o",
+    "swift-dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/HexEncoding.swiftdeps",
+    "swiftmodule" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/HexEncoding~partial.swiftmodule"
+  },
+  "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/Speakwrite/Features/StatsUtils.swift" : {
+    "const-values" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/StatsUtils.swiftconstvalues",
+    "dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/StatsUtils.d",
+    "diagnostics" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/StatsUtils.dia",
+    "index-unit-output-path" : "/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/StatsUtils.o",
+    "llvm-bc" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/StatsUtils.bc",
+    "object" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/StatsUtils.o",
+    "swift-dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/StatsUtils.swiftdeps",
+    "swiftmodule" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/StatsUtils~partial.swiftmodule"
+  },
+  "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/Speakwrite/Features/Tier1Features.swift" : {
+    "const-values" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Tier1Features.swiftconstvalues",
+    "dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Tier1Features.d",
+    "diagnostics" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Tier1Features.dia",
+    "index-unit-output-path" : "/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Tier1Features.o",
+    "llvm-bc" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Tier1Features.bc",
+    "object" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Tier1Features.o",
+    "swift-dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Tier1Features.swiftdeps",
+    "swiftmodule" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Tier1Features~partial.swiftmodule"
+  },
+  "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/Speakwrite/Features/Tier2Features.swift" : {
+    "const-values" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Tier2Features.swiftconstvalues",
+    "dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Tier2Features.d",
+    "diagnostics" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Tier2Features.dia",
+    "index-unit-output-path" : "/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Tier2Features.o",
+    "llvm-bc" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Tier2Features.bc",
+    "object" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Tier2Features.o",
+    "swift-dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Tier2Features.swiftdeps",
+    "swiftmodule" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Tier2Features~partial.swiftmodule"
+  },
+  "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/Speakwrite/Models/Commitment.swift" : {
+    "const-values" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Commitment.swiftconstvalues",
+    "dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Commitment.d",
+    "diagnostics" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Commitment.dia",
+    "index-unit-output-path" : "/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Commitment.o",
+    "llvm-bc" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Commitment.bc",
+    "object" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Commitment.o",
+    "swift-dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Commitment.swiftdeps",
+    "swiftmodule" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Commitment~partial.swiftmodule"
+  },
+  "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/Speakwrite/Models/Document.swift" : {
+    "const-values" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Document.swiftconstvalues",
+    "dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Document.d",
+    "diagnostics" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Document.dia",
+    "index-unit-output-path" : "/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Document.o",
+    "llvm-bc" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Document.bc",
+    "object" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Document.o",
+    "swift-dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Document.swiftdeps",
+    "swiftmodule" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Document~partial.swiftmodule"
+  },
+  "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/Speakwrite/Models/FeatureVector.swift" : {
+    "const-values" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/FeatureVector.swiftconstvalues",
+    "dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/FeatureVector.d",
+    "diagnostics" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/FeatureVector.dia",
+    "index-unit-output-path" : "/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/FeatureVector.o",
+    "llvm-bc" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/FeatureVector.bc",
+    "object" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/FeatureVector.o",
+    "swift-dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/FeatureVector.swiftdeps",
+    "swiftmodule" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/FeatureVector~partial.swiftmodule"
+  },
+  "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/Speakwrite/Models/Keystroke.swift" : {
+    "const-values" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Keystroke.swiftconstvalues",
+    "dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Keystroke.d",
+    "diagnostics" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Keystroke.dia",
+    "index-unit-output-path" : "/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Keystroke.o",
+    "llvm-bc" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Keystroke.bc",
+    "object" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Keystroke.o",
+    "swift-dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Keystroke.swiftdeps",
+    "swiftmodule" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Keystroke~partial.swiftmodule"
+  },
+  "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/Speakwrite/Models/Session.swift" : {
+    "const-values" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Session.swiftconstvalues",
+    "dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Session.d",
+    "diagnostics" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Session.dia",
+    "index-unit-output-path" : "/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Session.o",
+    "llvm-bc" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Session.bc",
+    "object" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Session.o",
+    "swift-dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Session.swiftdeps",
+    "swiftmodule" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/Session~partial.swiftmodule"
+  },
+  "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/Speakwrite/Services/ATProtoService.swift" : {
+    "const-values" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/ATProtoService.swiftconstvalues",
+    "dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/ATProtoService.d",
+    "diagnostics" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/ATProtoService.dia",
+    "index-unit-output-path" : "/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/ATProtoService.o",
+    "llvm-bc" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/ATProtoService.bc",
+    "object" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/ATProtoService.o",
+    "swift-dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/ATProtoService.swiftdeps",
+    "swiftmodule" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/ATProtoService~partial.swiftmodule"
+  },
+  "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/Speakwrite/Services/DeviceAttestation.swift" : {
+    "const-values" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/DeviceAttestation.swiftconstvalues",
+    "dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/DeviceAttestation.d",
+    "diagnostics" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/DeviceAttestation.dia",
+    "index-unit-output-path" : "/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/DeviceAttestation.o",
+    "llvm-bc" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/DeviceAttestation.bc",
+    "object" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/DeviceAttestation.o",
+    "swift-dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/DeviceAttestation.swiftdeps",
+    "swiftmodule" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/DeviceAttestation~partial.swiftmodule"
+  },
+  "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/Speakwrite/Services/KeystrokeCapture.swift" : {
+    "const-values" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/KeystrokeCapture.swiftconstvalues",
+    "dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/KeystrokeCapture.d",
+    "diagnostics" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/KeystrokeCapture.dia",
+    "index-unit-output-path" : "/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/KeystrokeCapture.o",
+    "llvm-bc" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/KeystrokeCapture.bc",
+    "object" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/KeystrokeCapture.o",
+    "swift-dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/KeystrokeCapture.swiftdeps",
+    "swiftmodule" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/KeystrokeCapture~partial.swiftmodule"
+  },
+  "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/Speakwrite/Services/ProofService.swift" : {
+    "const-values" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/ProofService.swiftconstvalues",
+    "dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/ProofService.d",
+    "diagnostics" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/ProofService.dia",
+    "index-unit-output-path" : "/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/ProofService.o",
+    "llvm-bc" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/ProofService.bc",
+    "object" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/ProofService.o",
+    "swift-dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/ProofService.swiftdeps",
+    "swiftmodule" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/ProofService~partial.swiftmodule"
+  },
+  "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/Speakwrite/Services/SessionService.swift" : {
+    "const-values" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/SessionService.swiftconstvalues",
+    "dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/SessionService.d",
+    "diagnostics" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/SessionService.dia",
+    "index-unit-output-path" : "/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/SessionService.o",
+    "llvm-bc" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/SessionService.bc",
+    "object" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/SessionService.o",
+    "swift-dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/SessionService.swiftdeps",
+    "swiftmodule" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/SessionService~partial.swiftmodule"
+  },
+  "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/Speakwrite/SpeakwriteApp.swift" : {
+    "const-values" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/SpeakwriteApp.swiftconstvalues",
+    "dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/SpeakwriteApp.d",
+    "diagnostics" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/SpeakwriteApp.dia",
+    "index-unit-output-path" : "/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/SpeakwriteApp.o",
+    "llvm-bc" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/SpeakwriteApp.bc",
+    "object" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/SpeakwriteApp.o",
+    "swift-dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/SpeakwriteApp.swiftdeps",
+    "swiftmodule" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/SpeakwriteApp~partial.swiftmodule"
+  },
+  "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/Speakwrite/ViewModels/AppViewModel.swift" : {
+    "const-values" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/AppViewModel.swiftconstvalues",
+    "dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/AppViewModel.d",
+    "diagnostics" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/AppViewModel.dia",
+    "index-unit-output-path" : "/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/AppViewModel.o",
+    "llvm-bc" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/AppViewModel.bc",
+    "object" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/AppViewModel.o",
+    "swift-dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/AppViewModel.swiftdeps",
+    "swiftmodule" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/AppViewModel~partial.swiftmodule"
+  },
+  "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/Speakwrite/Views/EditorView.swift" : {
+    "const-values" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/EditorView.swiftconstvalues",
+    "dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/EditorView.d",
+    "diagnostics" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/EditorView.dia",
+    "index-unit-output-path" : "/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/EditorView.o",
+    "llvm-bc" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/EditorView.bc",
+    "object" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/EditorView.o",
+    "swift-dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/EditorView.swiftdeps",
+    "swiftmodule" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/EditorView~partial.swiftmodule"
+  },
+  "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/Speakwrite/Views/FeedView.swift" : {
+    "const-values" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/FeedView.swiftconstvalues",
+    "dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/FeedView.d",
+    "diagnostics" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/FeedView.dia",
+    "index-unit-output-path" : "/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/FeedView.o",
+    "llvm-bc" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/FeedView.bc",
+    "object" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/FeedView.o",
+    "swift-dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/FeedView.swiftdeps",
+    "swiftmodule" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/FeedView~partial.swiftmodule"
+  },
+  "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/Speakwrite/Views/LoginView.swift" : {
+    "const-values" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/LoginView.swiftconstvalues",
+    "dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/LoginView.d",
+    "diagnostics" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/LoginView.dia",
+    "index-unit-output-path" : "/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/LoginView.o",
+    "llvm-bc" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/LoginView.bc",
+    "object" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/LoginView.o",
+    "swift-dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/LoginView.swiftdeps",
+    "swiftmodule" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/LoginView~partial.swiftmodule"
+  },
+  "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/Speakwrite/Views/PostBarView.swift" : {
+    "const-values" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/PostBarView.swiftconstvalues",
+    "dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/PostBarView.d",
+    "diagnostics" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/PostBarView.dia",
+    "index-unit-output-path" : "/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/PostBarView.o",
+    "llvm-bc" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/PostBarView.bc",
+    "object" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/PostBarView.o",
+    "swift-dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/PostBarView.swiftdeps",
+    "swiftmodule" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/PostBarView~partial.swiftmodule"
+  },
+  "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/Speakwrite/Views/ProofSidebarView.swift" : {
+    "const-values" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/ProofSidebarView.swiftconstvalues",
+    "dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/ProofSidebarView.d",
+    "diagnostics" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/ProofSidebarView.dia",
+    "index-unit-output-path" : "/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/ProofSidebarView.o",
+    "llvm-bc" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/ProofSidebarView.bc",
+    "object" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/ProofSidebarView.o",
+    "swift-dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/ProofSidebarView.swiftdeps",
+    "swiftmodule" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/ProofSidebarView~partial.swiftmodule"
+  },
+  "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/Speakwrite/Views/PublishView.swift" : {
+    "const-values" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/PublishView.swiftconstvalues",
+    "dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/PublishView.d",
+    "diagnostics" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/PublishView.dia",
+    "index-unit-output-path" : "/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/PublishView.o",
+    "llvm-bc" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/PublishView.bc",
+    "object" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/PublishView.o",
+    "swift-dependencies" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/PublishView.swiftdeps",
+    "swiftmodule" : "/Users/stefancohen/Projects/Authentic Content/apps/ios-native/build/Speakwrite.build/Debug-iphonesimulator/Speakwrite.build/Objects-normal/arm64/PublishView~partial.swiftmodule"
+  }
+}

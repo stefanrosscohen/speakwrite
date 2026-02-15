@@ -9,11 +9,15 @@
 
 ## 1. What This Is
 
-Speakwrite is a protocol that lets you prove you typed something on a real iPhone. You write a post in the Speakwrite app, it captures your keystroke timing, and when you publish, the proof goes with the post. Anyone can verify it.
+Speakwrite is a native iOS app for writing and reading human-verified posts. It is two things in one:
 
-**Scope of v1:** iPhone app. Short-form posts (think Bluesky-length, up to ~5,000 chars). Published via AT Protocol. Verified via an open JSON bundle.
+1. **A writing tool** that captures keystroke dynamics as you type, cryptographically signs each checkpoint with the iPhone's Secure Enclave, and publishes the proof alongside the post.
 
-**What it proves:** A specific post was composed through physical typing on a genuine Apple device, authenticated by Face ID, with behavioral keystroke patterns consistent with human typing.
+2. **A reader** that shows a global feed of all human-verified posts across the Bluesky network — one place where everything was typed by a person.
+
+**Scope of v1:** Native SwiftUI iOS app. Short-form posts (up to ~5,000 chars). Published via AT Protocol. Verified via an open JSON bundle. Hardware attestation via Apple App Attest + Secure Enclave on every proof. Global verified feed for reading.
+
+**What it proves:** A specific post was composed through physical typing on a genuine Apple device, authenticated by biometrics, with keystroke behavior consistent with human motor patterns.
 
 **What it doesn't prove:** That the ideas are original, that no AI was consulted, or that the person didn't read something from another screen and retype it.
 
@@ -30,7 +34,7 @@ Speakwrite is a protocol that lets you prove you typed something on a real iPhon
 ├─────────────────────────────────────────────┤
 │  Layer 2: Device Attestation                │
 │  Apple App Attest + Secure Enclave          │
-│  Face ID biometric gate                     │
+│  Face ID / Touch ID biometric gate          │
 ├─────────────────────────────────────────────┤
 │  Layer 1: Cryptographic Commitment Chain    │
 │  SHA-256 hash chain → tamper-evident        │
@@ -39,24 +43,25 @@ Speakwrite is a protocol that lets you prove you typed something on a real iPhon
 
 **Layer 1** makes it tamper-evident. Each checkpoint during writing creates a hash that includes the previous hash, forming a chain. You can't edit the chain after the fact without breaking it.
 
-**Layer 2** makes it hardware-backed. The iPhone's Secure Enclave (a separate chip on the device) holds a signing key that never leaves the silicon. Apple's App Attest service certifies the key was generated on a real iPhone running your unmodified app. Face ID gates every session — no face, no signing.
+**Layer 2** makes it hardware-backed. The iPhone's Secure Enclave holds a signing key that never leaves the silicon. Apple's App Attest service certifies the key was generated on a real device running the unmodified app. Biometrics gate every session.
 
-**Layer 3** makes it behaviorally credible. Human typing has distinct statistical properties: variable inter-key timing, characteristic digraph patterns (the time between specific key pairs), natural pause distributions, error-and-correct patterns. The protocol captures these and includes them in the proof.
+**Layer 3** makes it behaviorally credible. Human typing has distinct statistical properties: variable inter-key timing, characteristic digraph patterns, natural pause distributions, error-and-correct patterns. The protocol captures these and includes them in the proof.
 
 ### 2.2 Session Lifecycle
 
 ```
-1. User opens app → Face ID prompt → Secure Enclave key unlocked
-2. User starts typing → Observer captures keystroke events
-3. Every ~60 seconds → Checkpoint:
+1. User opens app → signs in with Bluesky handle (OAuth)
+2. Face ID prompt → Secure Enclave key unlocked
+3. User starts typing → Observer captures keystroke events
+4. Periodically → Checkpoint:
    - Extract behavioral features from keystrokes
    - Compute commitment hash (chained to previous)
    - Sign commitment with Secure Enclave key
-4. User hits "Publish" →
+5. User hits "Publish" →
    - Final content binding: SHA-256(content) bound to chain tip
    - Sign final binding with Secure Enclave key
    - Assemble proof bundle (JSON)
-   - Publish to AT Protocol (Bluesky)
+   - Publish to AT Protocol
 ```
 
 ### 2.3 The Proof Bundle
@@ -120,17 +125,14 @@ The proof bundle is a JSON object. This IS the protocol — anyone who can compu
         "sequence_num": 0,
         "commitment_hash": "sha256:...",
         "signature": "base64(P-256 ECDSA)..."
-      },
-      {
-        "sequence_num": 1,
-        "commitment_hash": "sha256:...",
-        "signature": "base64(P-256 ECDSA)..."
       }
     ],
     "final_signature": "base64(P-256 ECDSA over content_hash|binding_hash)..."
   }
 }
 ```
+
+Every proof from Speakwrite includes `device_attestation` because the entire app is native iOS. There is no web fallback.
 
 ---
 
@@ -141,39 +143,13 @@ Anyone can verify a proof bundle. No server, no API key, no trust required.
 ### 3.1 Steps
 
 1. **Content hash:** Compute `SHA-256(post_content)`. Compare to `content_hash` in bundle.
-2. **Chain integrity:** Walk the commitment chain. Each `commitment_hash` at position N should reference `commitment_hash` at position N-1 as its `previous_hash`. The chain must be monotonically increasing in `timestamp_ms`.
-3. **Content binding:** The final commitment (type `content_binding`) must reference the content hash and the chain tip.
-4. **Device attestation (if present):**
+2. **Chain integrity:** Walk the commitment chain. Each `commitment_hash` at position N must reference the hash at position N-1 as its `previous_hash`. Timestamps must be monotonically increasing.
+3. **Content binding:** The final commitment (type `content_binding`) must bind the content hash to the chain tip via `SHA-256(chain_tip || "CONTENT_BINDING" || content_hash)`.
+4. **Device attestation:**
    - Verify the `attestation_certificate` chains to Apple's App Attest Root CA.
-   - Extract the public key from the certificate.
-   - Verify each `checkpoint_signature` against the public key and the corresponding `commitment_hash`.
+   - Verify each `checkpoint_signature` against the public key and corresponding `commitment_hash`.
    - Verify the `final_signature` against the public key and `content_hash|binding_hash`.
-5. **Behavioral plausibility (optional):** Check that `total_keystroke_count` is plausible for the content length. A 500-word post with 3 keystrokes is suspicious.
-
-### 3.2 Attestation Levels
-
-| Level | Label | What It Means |
-|-------|-------|--------------|
-| 0 | `none` | Commitment chain only. Tamper-evident but no device proof. |
-| 4 | `platform_attested` | Apple App Attest + Secure Enclave + Face ID. Strongest available. |
-
-v1 only ships levels 0 (web fallback) and 4 (iPhone app). No middle ground.
-
-### 3.3 What Verification Tells You
-
-A valid proof with `platform_attested` means:
-
-- The post content has not been modified since signing.
-- The commitment chain was built incrementally over time (not fabricated all at once).
-- Each checkpoint was signed by a Secure Enclave key on a genuine Apple device.
-- Apple certifies the signing key belongs to the unmodified Speakwrite app.
-- Face ID confirmed a real person was present at session start.
-- The keystroke count is consistent with the content length.
-
-A valid proof does NOT tell you:
-- Whether the author was reading from another screen.
-- Whether AI helped with ideation.
-- Whether the content is true or well-reasoned.
+5. **Behavioral plausibility (optional):** Check that `total_keystroke_count` is plausible for the content length.
 
 ---
 
@@ -184,7 +160,6 @@ A valid proof does NOT tell you:
 - Open protocol — no platform lock-in.
 - User-owned data — proofs live in the author's Personal Data Server (PDS).
 - Federation — any PDS can host proofs, any client can verify them.
-- Bluesky is the primary social layer with ~25M users.
 
 ### 4.2 Custom Lexicon
 
@@ -195,61 +170,50 @@ Proofs are stored as records in the author's AT Protocol repo under a custom col
 ```json
 {
   "$type": "io.speakwrite.proof",
-  "contentHash": "sha256:...",
-  "bindingHash": "sha256:...",
-  "chainLength": 3,
-  "totalKeystrokes": 847,
-  "proofBundle": "{...json string...}",
-  "verifierUrl": "https://verify.speakwrite.io?bundle=...",
+  "proof": "{...json string of full proof bundle...}",
+  "postUri": "at://did:plc:xxx/app.bsky.feed.post/rkey",
   "createdAt": "2026-02-14T12:00:00Z"
 }
 ```
 
 ### 4.3 Social Post
 
-When publishing, the app also creates a `app.bsky.feed.post` record with:
-- The post text.
-- A link facet pointing to the verification URL.
-- A reference to the proof record.
-
-Readers see a normal Bluesky post with a "Verify" link.
+When publishing, the app creates an `app.bsky.feed.post` record with the post text and a keystroke/commitment count footer. A companion `io.speakwrite.proof` record stores the full proof bundle.
 
 ### 4.4 Authentication
 
-OAuth 2.0 with PKCE + DPoP per the AT Protocol specification. The user signs in with their Bluesky handle — the app redirects to their PDS authorization page and receives tokens automatically. No app passwords.
+OAuth 2.0 with PKCE + DPoP per the AT Protocol specification, via ASWebAuthenticationSession. The user signs in with their Bluesky handle.
+
+### 4.5 Verified Feed (Reader)
+
+The app includes a global feed of all Speakwrite-verified posts across the AT Protocol network. This is the reader half of the app — a single place where every post was typed by a person on a real device. The feed uses `app.bsky.feed.searchPosts` to find posts with the Speakwrite keystroke/commitment footer pattern, then displays them in reverse chronological order with author info, verification badges, and keystroke/commitment counts.
 
 ---
 
 ## 5. Device Attestation: Apple Implementation
 
-### 5.1 Hardware
+### 5.1 How It Works
 
-Every iPhone since the 5s (2013) has a Secure Enclave — a dedicated security coprocessor with its own encrypted memory, hardware random number generator, and AES engine. Private keys generated in the Secure Enclave never exist in main memory.
+On first launch, the app generates two keys in the Secure Enclave:
 
-### 5.2 Key Generation
+1. **App Attest key** — Apple's attestation service issues a certificate chain proving the key is on a real device running the unmodified app.
+2. **Session signing key** — A biometric-gated P-256 key that can only sign when Face ID / Touch ID confirms the user.
 
-On first app launch:
+Every checkpoint and the final content binding are signed with the biometric-gated key. The signature covers `sequence_num|commitment_hash` for checkpoints and `content_hash|binding_hash` for the final binding.
 
-1. **App Attest key:** `DCAppAttestService.shared.generateKey()` creates a P-256 key pair in the Secure Enclave. Apple's attestation service issues a certificate chain proving the key is on a real device running unmodified Speakwrite.
+### 5.2 Why Native
 
-2. **Session signing key:** `SecureEnclave.P256.Signing.PrivateKey(accessControl:)` creates a biometric-gated key. The `accessControl` flags require `.biometryCurrentSet` — the key can only sign when the currently enrolled Face ID/Touch ID matches.
+Hardware attestation requires a native binary. A web app cannot do this because:
+- App Attest certifies a specific app binary — there is no web equivalent.
+- Secure Enclave signing requires native keychain access.
+- Any client can spoof web requests, making browser-based attestation meaningless.
 
-### 5.3 Session Signing
+The entire proof chain — from keystroke capture through Secure Enclave signing — happens inside the native binary. There is no JavaScript bridge or web wrapper.
 
-Every checkpoint and the final content binding are signed with the biometric-gated Secure Enclave key. The signature covers `sequence_num|commitment_hash` for checkpoints and `content_hash|binding_hash` for the final binding.
+### 5.3 Limitations
 
-### 5.4 What Apple Certifies
-
-The App Attest certificate chain proves:
-- The key was generated on a genuine Apple device with a Secure Enclave.
-- The key is bound to bundle ID `io.speakwrite.app`.
-- The device has not been flagged by Apple.
-
-### 5.5 Limitations
-
-- **Jailbroken devices** may be able to circumvent Secure Enclave protections.
-- **App Attest** proves the app is genuine, not that the keystrokes are genuine. A sophisticated attacker could theoretically inject programmatic keystrokes within the app's process before signing. This is where the behavioral analysis layer provides defense-in-depth.
-- **No keyboard attestation.** iOS does not provide a mechanism for the system keyboard to sign its own output. The gap between "physical key press" and "signed data" is bridged by behavioral analysis, not cryptography.
+- **Jailbroken devices** may circumvent Secure Enclave protections.
+- **No keyboard attestation.** iOS does not let the system keyboard sign its own output. The gap between "physical key press" and "signed data" is bridged by behavioral analysis, not cryptography.
 
 ---
 
@@ -257,197 +221,113 @@ The App Attest certificate chain proves:
 
 ### 6.1 What We Capture
 
-The Observer hooks into the TipTap editor's input events and records:
+A custom UITextView subclass captures keystroke events natively:
 
 | Event | Data | Purpose |
 |-------|------|---------|
-| keydown | key, code, timestamp, modifiers | Raw keystroke timing |
-| keyup | key, code, timestamp | Dwell time calculation |
-| input | inputType, data, timestamp | What actually changed in the editor |
-| paste | — | Flagged as non-typed content |
-| delete | — | Revision pattern tracking |
+| insertText / pressesBegan | key, code, timestamp, modifiers | Raw keystroke timing |
+| deleteBackward / pressesEnded | key, code, timestamp | Hold time / correction tracking |
+| setMarkedText / unmarkText | — | IME composition tracking |
 
-All timestamps use `performance.now()` for sub-millisecond resolution.
+Timestamps use `ProcessInfo.processInfo.systemUptime` for sub-millisecond resolution.
 
 ### 6.2 Feature Extraction
 
 From raw events, we compute two tiers of features:
 
-**Tier 1 (basic):**
-- Mean, median, stddev of inter-key intervals
-- Typing speed (chars/min, words/min)
-- Error rate (backspace ratio)
-- Pause distribution (short <300ms, medium 300ms-2s, long >2s)
-- Session duration
+**Tier 1 (biometric signature):**
+- Flight time (inter-key interval): mean, std, median
+- Hold time: mean, std
+- Digraph matrix: timing stats for every character pair
+- Overlap ratio (roll typing detection)
+- Typing speed (chars/min)
 
-**Tier 2 (advanced):**
-- Digraph timing: mean/stddev for frequent key pairs
-- Burst detection: sequences of fast typing followed by pauses
-- Revision patterns: delete-retype sequences
-- Typing rhythm regularity (coefficient of variation)
-
-### 6.3 What Human Typing Looks Like
-
-Human typing is messy in characteristic ways:
-- Inter-key intervals follow a log-normal distribution, not uniform or Gaussian.
-- Specific key pairs have consistent but individual timing (your `th` timing is different from mine).
-- Pauses cluster at linguistic boundaries (sentence ends, paragraph breaks).
-- Error rates correlate with typing speed (faster = more mistakes).
-- There are micro-pauses for thought that are absent in transcription.
-
-Programmatic text generation produces none of these patterns. A naive script produces perfectly uniform timing. A sophisticated script can approximate the distributions but struggles with the cross-correlations between features.
+**Tier 2 (error patterns):**
+- Backspace rate, delete rate
+- Error burst count and mean burst length
+- Immediate correction ratio
+- Revision ratio (corrections / total keystrokes)
 
 ---
 
 ## 7. Architecture
 
-### 7.1 Monorepo Structure
+### 7.1 Project Structure
 
 ```
 speakwrite/
-├── packages/core/     @speakwrite/core — shared TypeScript library
-│   ├── crypto/        SHA-256, commitment hashing, content binding
-│   ├── features/      Tier 1 + Tier 2 feature extraction
-│   ├── capture/       Event validation
-│   ├── verification/  Bundle + chain verification
-│   ├── atproto/       AT Protocol lexicon + client
-│   └── types/         ProofBundle, DeviceAttestation, etc.
+├── packages/core/         @speakwrite/core — reference TypeScript library
 │
-├── apps/web/          PWA — works in browser (attestation level 0)
-│   ├── components/    Editor, ProofSidebar, PublishPanel
-│   ├── lib/services/  session, proof, atproto, device-attestation
-│   └── stores/        Zustand state management
+├── apps/ios-native/       Native SwiftUI iOS app
+│   └── Speakwrite/
+│       ├── Crypto/        SHA-256, commitment hashing (CryptoKit)
+│       ├── Models/        SwiftData models
+│       ├── Features/      Tier 1 + Tier 2 feature extraction
+│       ├── Services/      DeviceAttestation, Session, Proof, ATProto
+│       ├── Views/         SwiftUI views (Login, Editor, Feed, Publish)
+│       └── ViewModels/    App state (@Observable)
 │
-├── apps/ios/          Capacitor iOS shell (attestation level 4)
-│   └── ios/App/       Swift native plugin for App Attest + Secure Enclave
-│
-└── apps/verifier/     Standalone verification page
-    └── components/    VerifyForm, VerifyResult, ChainVisualization
+└── apps/site/             Landing page (speakwrite.io)
 ```
 
 ### 7.2 Data Flow
 
 ```
-iPhone Keyboard → TipTap Editor → Keystroke Observer → IndexedDB
-                                         ↓
-                                  Feature Extraction
-                                         ↓
+iOS Keyboard → CaptureTextView → Keystroke Events → SwiftData
+                                        ↓
+                                 Feature Extraction
+                                        ↓
                               Commitment Chain (SHA-256)
-                                         ↓
+                                        ↓
                           Secure Enclave Signing (P-256)
-                                         ↓
-                               Proof Bundle (JSON)
-                                         ↓
-                           AT Protocol → Bluesky Post
-                                         ↓
-                          Anyone → Verify at verify.speakwrite.io
+                                        ↓
+                                Proof Bundle (JSON)
+                                        ↓
+                            AT Protocol → Bluesky Post
+                                        ↓
+                           Verified Feed in Speakwrite App
 ```
 
 ### 7.3 Storage
 
-All data is local-first. IndexedDB via Dexie.js stores:
-- Keystroke events (per session)
-- Commitment chain entries
-- Feature vectors
-- Document metadata
-
-Nothing leaves the device until the user explicitly publishes.
+All data is local-first. SwiftData stores keystroke events, commitment chain entries, feature vectors, and document metadata. Nothing leaves the device until the user explicitly publishes.
 
 ---
 
-## 8. Threat Model (Simplified)
+## 8. Threat Model
 
 ### 8.1 What We Defend Against
 
-| Attack | Difficulty | Defense |
-|--------|-----------|---------|
-| Copy-paste AI text | Trivial | Observer flags paste events. Zero keystroke count. |
-| Naive keystroke scripting | Low | Behavioral features detect uniform/Gaussian timing. |
-| Sophisticated simulation | High | High-dimensional feature space. Cross-feature correlations. Progressive consistency. |
-| Post-signing modification | Impossible | SHA-256 content hash binding. |
-| Modified app binary | Moderate | App Attest certificate proves unmodified code. |
-| Replay (reuse old proof) | Impossible | Content hash binding to specific text. |
+| Attack | Defense |
+|--------|---------|
+| Copy-paste AI text | Observer detects non-typed input. Zero keystroke count. |
+| Naive keystroke scripting | Behavioral features detect uniform timing. |
+| Sophisticated simulation | High-dimensional feature space. Cross-feature correlations. |
+| Post-signing modification | SHA-256 content hash binding. |
+| Modified app binary | App Attest certificate proves unmodified code. |
+| Spoofed attestation from web | Not possible — native binary only. No web wrapper. |
+| Replay (reuse old proof) | Content hash binding to specific text. |
 
 ### 8.2 What We Don't Defend Against
 
 | Attack | Why It Works |
 |--------|-------------|
-| Human transcription of AI text | Real human typing produces real behavioral patterns. Cost: must type at human speed. |
-| Jailbroken device | May circumvent Secure Enclave. Apple flags some jailbreaks but not all. |
-| Reading AI output and retyping from memory | Indistinguishable from original composition once internalized. |
+| Human transcription of AI text | Real typing produces real behavioral patterns. Cost: must type at human speed. |
+| Jailbroken device | May circumvent Secure Enclave. |
+| Reading AI output and retyping | Indistinguishable from original composition once internalized. |
 
 ### 8.3 Honest Assessment
 
-Speakwrite makes deception expensive. It does not make it impossible. The value proposition is that verifying a post costs the reader nothing, but faking a proof costs the attacker significantly more than just prompting an LLM.
+Speakwrite makes deception expensive. It does not make it impossible. Verifying a post costs the reader nothing, but faking a proof costs the attacker significantly more than just prompting an LLM.
 
 ---
 
-## 9. Integration with Blog Platforms
+## 9. Open Questions
 
-### 9.1 Verification Widget
-
-Any website can embed a verification widget. The widget:
-
-1. Fetches the proof bundle from the post's AT Protocol record.
-2. Runs SHA-256 verification client-side (zero server trust).
-3. Checks the device attestation certificate chain.
-4. Displays an attestation badge.
-
-### 9.2 Badge Levels
-
-For v1, two badges:
-
-**"iPhone Verified"** — Full device attestation. Apple Secure Enclave signed every checkpoint. Face ID confirmed.
-
-**"Keystroke Verified"** — Commitment chain valid, no device attestation. The web fallback.
-
-### 9.3 Embeddable Snippet
-
-Blog platforms can verify Speakwrite proofs with a single script tag:
-
-```html
-<script src="https://verify.speakwrite.io/widget.js"
-        data-at-uri="at://did:plc:xxx/io.speakwrite.proof/rkey"></script>
-```
-
-The widget resolves the AT URI, fetches the proof, verifies it client-side, and renders a badge inline. No server roundtrip.
-
-### 9.4 Platform Integration Path
-
-| Platform | Integration Method |
-|----------|-------------------|
-| Bluesky | Native — proofs stored in user's PDS, link in post |
-| Substack | Embed widget in post footer |
-| Ghost | Custom card or HTML embed |
-| WordPress | Shortcode or plugin |
-| Medium | Not possible (no custom HTML) — link to verifier instead |
-| Personal blog | Script tag embed |
+1. **Keystroke count threshold.** What's the minimum keystroke count for a credible proof?
+2. **Behavioral baseline.** We extract features but don't yet compare them to a population baseline. v1 ships without a "human plausibility score" — just the raw features in the commitment chain.
+3. **Progressive trust.** A single proof is weak evidence. A corpus of proofs from the same identity, exhibiting consistent behavioral patterns over time, is strong evidence.
 
 ---
 
-## 10. What's Not in v1
-
-The following are explicitly deferred:
-
-- **World ID / personhood verification.** Adds Sybil resistance but requires dependency on Worldcoin. Deferred to v2.
-- **Zero-knowledge behavioral proofs.** Would hide behavioral data from verifiers. Requires ZK circuit engineering. Research-stage.
-- **Collaborative writing.** Multi-author attribution. Achievable but not needed for short-form posts.
-- **Android support.** Play Integrity + StrongBox Keystore. Similar architecture, different native code.
-- **Voice input.** Fundamentally different behavioral signal. Needs separate feature extractor.
-- **Desktop hardware attestation.** TPM integration varies wildly across hardware.
-- **Long-form document support.** v1 targets posts, not essays.
-- **Decentralized timestamping.** OpenTimestamps or similar. Nice to have, not essential for v1.
-
----
-
-## 11. Open Questions
-
-1. **Keystroke count threshold.** What's the minimum keystroke count for a credible proof? 50? 100? Needs empirical data.
-2. **Checkpoint interval.** Currently ~60 seconds. Should this be adaptive (based on typing activity)?
-3. **Behavioral baseline model.** We extract features but don't yet compare them to a population baseline. v1 ships without a "human plausibility score" — just the raw features in the commitment chain.
-4. **App Store review.** Apple may scrutinize the DeviceCheck/App Attest usage. Need to ensure compliance with App Store guidelines on attestation APIs.
-5. **Post length limits.** Bluesky posts are 300 chars. Our proof records can be longer. Should we also support longer-form (1,000-5,000 char) posts via a different Bluesky record type or external hosting?
-
----
-
-*This spec describes what we're building. The full research spec is in SPEC.md.*
+*This spec describes what's built. Speakwrite is both a writing tool and a reader — one app for creating and consuming human-verified content. The protocol is the proof bundle JSON format — anyone can build a verifier or a compatible app.*

@@ -1,4 +1,4 @@
-name: Deploy Site + App
+name: Deploy Site
 
 on:
   push:
@@ -23,27 +23,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - run: pnpm install --frozen-lockfile
-
-      # Build the web app + reader (builds core first)
-      - run: pnpm build:web
-      - run: pnpm build:reader
-
-      # Assemble the deployment: site at root, app at /app/, reader at /reader/
+      # Deploy the static site (includes /app/client-metadata.json for AT Protocol OAuth)
       - run: |
-          mkdir -p _deploy/app _deploy/reader
+          mkdir -p _deploy
           cp -r apps/site/* _deploy/
-          cp -r apps/web/dist/* _deploy/app/
-          cp -r apps/reader/dist/* _deploy/reader/
 
       - uses: actions/configure-pages@v5
 

@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Speakwrite — Prove a human wrote it</title>
-  <meta name="description" content="A web app that proves a human typed a post. Not by analyzing the output — by witnessing the process.">
-  <meta property="og:title" content="Speakwrite — Prove a human wrote it">
-  <meta property="og:description" content="A web app that proves a human typed a post. Not by analyzing the output — by witnessing the process.">
+  <title>Speakwrite — Write human. Read human.</title>
+  <meta name="description" content="A Bluesky client that proves a human typed every post. Browse Discover, read a verified-only feed, compose with hardware-backed proof.">
+  <meta property="og:title" content="Speakwrite — Write human. Read human.">
+  <meta property="og:description" content="A Bluesky client that proves a human typed every post. Hardware-signed by the iPhone's Secure Enclave.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://speakwrite.io">
   <meta name="theme-color" content="#0a0a0a">
@@ -27,111 +27,107 @@
   <main>
 
     <section class="hero">
-      <h1>Prove a human wrote it.</h1>
-      <p class="subtitle">Not by analyzing the output &mdash; by witnessing the process.</p>
-      <p class="lede">Speakwrite is a web app that proves a human typed a post.</p>
-      <p class="cta"><a href="/app/">Open the app</a></p>
+      <h1>Write human. Read human.</h1>
+      <p class="subtitle">A Bluesky client that proves a human typed every post.</p>
+      <p class="lede">Speakwrite captures your keystroke dynamics as you type and cryptographically signs each checkpoint with the iPhone&rsquo;s Secure Enclave. When you publish, the proof goes with the post. When you read, you know it was typed by a person.</p>
     </section>
 
-    <section id="problem">
-      <h2>The Problem</h2>
-      <p>AI can now produce text indistinguishable from human writing. Every detection tool that analyzes the <em>output</em> is losing an arms race it can never win. The next model will always evade the last detector.</p>
-    </section>
-
-    <section id="approach">
-      <h2>The Approach</h2>
-      <p>Speakwrite takes a fundamentally different approach: instead of analyzing what was written, it instruments <em>how</em> it was written. The app captures keystroke dynamics &mdash; timing, rhythm, pauses, corrections &mdash; as you type, and cryptographically binds that behavioral evidence to the resulting post.</p>
-      <p>The result is a <strong>proof bundle</strong>: a portable, verifiable artifact that anyone can independently check. No central authority. No API keys. No trust required.</p>
+    <section id="the-app">
+      <h2>The App</h2>
+      <div class="tabs-preview">
+        <div class="tab-card">
+          <div class="tab-icon">&gt;_</div>
+          <h3>Feed</h3>
+          <p>Bluesky&rsquo;s Discover algorithm. Browse trending posts across the network. Speakwrite-verified posts get a green seal.</p>
+        </div>
+        <div class="tab-card accent-card">
+          <div class="tab-icon">[&check;]</div>
+          <h3>Verified</h3>
+          <p>A global feed where every post was typed by a human on a real device. Nothing else gets in.</p>
+        </div>
+        <div class="tab-card">
+          <div class="tab-icon">$ _</div>
+          <h3>Compose</h3>
+          <p>Write your post. Keystroke timing is captured, commitments are chained, and the Secure Enclave signs every checkpoint.</p>
+        </div>
+      </div>
     </section>
 
     <section id="how-it-works">
       <h2>How It Works</h2>
       <ol class="steps">
         <li>
-          <strong>Open</strong>
-          <span>Launch Speakwrite in your browser and sign in with your Bluesky handle.</span>
+          <strong>Sign in</strong>
+          <span>Use your Bluesky handle. Face ID unlocks the Secure Enclave signing key.</span>
         </li>
         <li>
-          <strong>Write</strong>
-          <span>Type your post. Keystroke dynamics are captured locally &mdash; nothing leaves your device until you publish.</span>
+          <strong>Type</strong>
+          <span>Keystroke dynamics &mdash; timing, rhythm, pauses, corrections &mdash; are captured natively as you write.</span>
         </li>
         <li>
           <strong>Publish</strong>
-          <span>Speakwrite generates a cryptographic commitment chain binding your behavioral evidence to your post and publishes to Bluesky.</span>
+          <span>A cryptographic commitment chain is signed by the Secure Enclave and attached to your Bluesky post.</span>
         </li>
         <li>
           <strong>Verify</strong>
-          <span>Anyone can verify the proof bundle in their browser. The verifier is open source and runs entirely client-side.</span>
+          <span>Anyone can check the proof. SHA-256 hash chain + P-256 ECDSA signatures. No server, no trust required.</span>
         </li>
       </ol>
     </section>
 
+    <section id="why-native">
+      <h2>Why a Native App</h2>
+      <p>A web app can&rsquo;t do this. Hardware attestation requires a native binary &mdash; Apple&rsquo;s App Attest certifies the app hasn&rsquo;t been tampered with, and the Secure Enclave holds a signing key that never leaves the silicon. No JavaScript bridge. No web wrapper. The entire proof chain happens inside the signed binary.</p>
+    </section>
+
     <section id="what-it-proves">
-      <h2>What It Proves (and What It Doesn't)</h2>
+      <h2>What It Proves</h2>
       <div class="two-col">
         <div>
           <h3>It proves</h3>
-          <p>A post was composed through a physical typing process with keystroke behavior consistent with human motor patterns.</p>
+          <p>A post was composed through physical typing on a genuine Apple device, authenticated by biometrics, with keystroke behavior consistent with human motor patterns.</p>
         </div>
         <div>
-          <h3>It doesn't prove</h3>
-          <p>That the ideas are original, that no AI was consulted, or that the author didn't transcribe AI output. It raises the cost of deception by orders of magnitude &mdash; it doesn't make it impossible.</p>
+          <h3>It doesn&rsquo;t prove</h3>
+          <p>That the ideas are original, that no AI was consulted, or that the author didn&rsquo;t transcribe AI output. It makes deception expensive &mdash; not impossible.</p>
         </div>
       </div>
-      <p class="aside">This honesty is a design choice, not a limitation. Speakwrite produces forensic evidence, not mathematical certainty.</p>
     </section>
 
     <section id="properties">
-      <h2>Key Properties</h2>
+      <h2>Properties</h2>
       <dl>
         <dt>Open protocol</dt>
-        <dd>The proof bundle JSON format is the protocol. Anyone can build a verifier or a compatible app.</dd>
+        <dd>The proof bundle is JSON. Anyone can build a verifier or a compatible client.</dd>
 
-        <dt>Client-side</dt>
-        <dd>Everything runs in your browser. No server sees your keystrokes. Only aggregate statistical features are committed.</dd>
+        <dt>Hardware-backed</dt>
+        <dd>Secure Enclave + App Attest on every proof. No web fallback.</dd>
 
-        <dt>Decentralized</dt>
-        <dd>No central server, no trusted authority. Verification is pure client-side cryptography (SHA-256).</dd>
-
-        <dt>Progressive trust</dt>
-        <dd>A single proof is weak evidence. A corpus of proofs from the same identity, exhibiting consistent behavioral patterns over time, is strong evidence.</dd>
+        <dt>On-device</dt>
+        <dd>No server sees your keystrokes. Only statistical features are committed.</dd>
 
         <dt>Bluesky native</dt>
-        <dd>Posts publish directly to your Bluesky account as standard posts with proof metadata.</dd>
-      </dl>
-    </section>
+        <dd>Full AT Protocol client. Discover feed, verified feed, compose &mdash; all in one app.</dd>
 
-    <section id="for-whom">
-      <h2>For Whom</h2>
-      <ul>
-        <li><strong>Anyone on Bluesky</strong> who wants to say "I typed this" and have it mean something</li>
-        <li><strong>Journalists</strong> posting reporting they want attributed to a human author</li>
-        <li><strong>Writers</strong> who want provenance for posts where human authorship matters</li>
-        <li><strong>Anyone</strong> tired of wondering if the thing they're reading was written by a person</li>
-      </ul>
+        <dt>Progressive trust</dt>
+        <dd>One proof is weak. A corpus from the same identity with consistent behavioral patterns is strong.</dd>
+      </dl>
     </section>
 
     <section id="open-source">
       <h2>Open Source</h2>
-      <p>Speakwrite is open source under CC BY-SA 4.0. The protocol spec, app, verifier, and core library are all public.</p>
+      <p>CC BY-SA 4.0. Everything is public.</p>
       <ul class="repo-list">
-        <li>Protocol specification: <code>SPEC-v1.md</code></li>
-        <li>Core library: <code>@speakwrite/core</code> (TypeScript, Web Crypto API)</li>
-        <li>Web app: client-side PWA</li>
-        <li>Verifier: Standalone client-side verification page</li>
+        <li>Protocol spec: <code>SPEC-v1.md</code></li>
+        <li>iOS app: Native SwiftUI</li>
+        <li>Reference lib: <code>@speakwrite/core</code></li>
       </ul>
-    </section>
-
-    <section id="status">
-      <h2>Status</h2>
-      <p>Working draft. The web app, protocol spec, and verifier are functional. Proofs publish as Bluesky posts. The proof bundle format is stable enough to build on.</p>
     </section>
 
   </main>
 
   <footer>
-    <p>Speakwrite does not solve the AI problem. It creates a new kind of evidence that didn't exist before.</p>
-    <p>This document was not written by a human.</p>
+    <p>Speakwrite does not solve the AI problem. It creates a new kind of evidence &mdash; and a place to go where that evidence matters.</p>
     <p class="links">
       <a href="https://github.com/stefanrosscohen/speakwrite">GitHub</a>
     </p>

@@ -175,6 +175,51 @@ strong { color: #fff; font-weight: 700; }
 
 .steps li span { display: block; margin-top: 0.15rem; }
 
+/* ── Tab Cards ── */
+.tabs-preview {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.75rem;
+}
+
+@media (max-width: 500px) {
+  .tabs-preview { grid-template-columns: 1fr; }
+}
+
+.tab-card {
+  border: 1px solid var(--border);
+  padding: 1rem;
+  background: var(--bg-secondary);
+}
+
+.tab-card.accent-card {
+  border-color: var(--accent-dim);
+  background: rgba(0, 255, 65, 0.04);
+}
+
+.tab-icon {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 0.5rem;
+  font-family: var(--font);
+}
+
+.accent-card .tab-icon {
+  text-shadow: 0 0 10px rgba(0, 255, 65, 0.4);
+}
+
+.tab-card h3 {
+  font-size: 0.85rem;
+  margin-bottom: 0.35rem;
+}
+
+.tab-card p {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
 /* ── Two Column ── */
 .two-col {
   display: grid;

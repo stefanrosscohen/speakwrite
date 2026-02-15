@@ -2,35 +2,41 @@
 
 ## One-liner
 
-Speakwrite is a web app that proves a human typed a post.
+Speakwrite is a native iOS app for writing and reading human-verified posts.
 
 ## Tagline
 
-Prove a human wrote it. Not by analyzing the output — by witnessing the process.
+Write human. Read human.
 
 ## The Problem
 
 AI can now produce text indistinguishable from human writing. Every detection tool that analyzes the *output* is losing an arms race it can never win. The next model will always evade the last detector.
 
+Meanwhile, there's no place to go where everything you see was provably written by a person.
+
 ## The Approach
 
-Speakwrite takes a fundamentally different approach: instead of analyzing what was written, it instruments *how* it was written. The app captures keystroke dynamics — timing, rhythm, pauses, corrections — as you type, and cryptographically binds that behavioral evidence to the resulting post.
+Speakwrite is two things in one app:
 
-The result is a **proof bundle**: a portable, verifiable artifact that anyone can independently check. No central authority. No API keys. No trust required.
+1. **A writing tool** that captures keystroke dynamics as you type and cryptographically signs each checkpoint with the iPhone's Secure Enclave. When you publish, the proof goes with the post.
+
+2. **A reader** that shows a feed of all human-verified posts across the Bluesky network. One place where everything was typed by a human.
+
+The result is a **proof bundle**: a portable, verifiable artifact that anyone can independently check. Hardware-backed by Apple's App Attest. No central authority. No API keys. No trust required.
 
 ## How It Works
 
-1. **Open** — Launch Speakwrite in your browser and sign in with your Bluesky handle.
+1. **Sign in** — Sign in with your Bluesky handle. Face ID unlocks the Secure Enclave signing key.
 
-2. **Write** — Type your post. Keystroke dynamics are captured locally — nothing leaves your device until you publish.
+2. **Write** — Type your post. Keystroke dynamics are captured natively — nothing leaves your device until you publish.
 
-3. **Publish** — Speakwrite generates a cryptographic commitment chain binding your behavioral evidence to your post and publishes to Bluesky.
+3. **Publish** — Speakwrite generates a cryptographic commitment chain signed by the Secure Enclave and publishes to Bluesky with the proof attached.
 
-4. **Verify** — Anyone can verify the proof bundle in their browser. The verifier is open source and runs entirely client-side.
+4. **Read** — Browse a global feed of all human-verified posts. Every post you see was typed by a person on a real device.
 
 ## What It Proves (and What It Doesn't)
 
-**It proves:** A post was composed through a physical typing process with keystroke behavior consistent with human motor patterns.
+**It proves:** A specific post was composed through physical typing on a genuine Apple device, authenticated by biometrics, with keystroke behavior consistent with human motor patterns.
 
 **It doesn't prove:** That the ideas are original, that no AI was consulted, or that the author didn't transcribe AI output. It raises the cost of deception by orders of magnitude — it doesn't make it impossible.
 
@@ -39,33 +45,33 @@ This honesty is a design choice, not a limitation. Speakwrite produces forensic 
 ## Key Properties
 
 - **Open protocol** — The proof bundle JSON format is the protocol. Anyone can build a verifier or a compatible app.
-- **Client-side** — Everything runs in your browser. No server sees your keystrokes. Only aggregate statistical features are committed.
-- **Decentralized** — No central server, no trusted authority. Verification is pure client-side cryptography (SHA-256).
+- **Hardware-backed** — Every proof is signed by the iPhone's Secure Enclave and certified by Apple's App Attest. No web fallback.
+- **On-device** — Everything runs on your iPhone. No server sees your keystrokes. Only aggregate statistical features are committed.
+- **Decentralized** — No central server, no trusted authority. Verification is pure cryptography (SHA-256 + P-256 ECDSA).
 - **Progressive trust** — A single proof is weak evidence. A corpus of proofs from the same identity, exhibiting consistent behavioral patterns over time, is strong evidence.
-- **Bluesky native** — Posts publish directly to your Bluesky account as standard posts with proof metadata.
+- **Bluesky native** — Posts publish directly to your Bluesky account. The verified feed pulls from the entire AT Protocol network.
 
 ## For Whom
 
-- **Anyone on Bluesky** who wants to say "I typed this" and have it mean something
+- **Writers** who want to say "I typed this" and have it mean something
+- **Readers** who want a feed where everything was written by a human
 - **Journalists** posting reporting they want attributed to a human author
-- **Writers** who want provenance for posts where human authorship matters
 - **Anyone** tired of wondering if the thing they're reading was written by a person
 
 ## Open Source
 
-Speakwrite is open source under CC BY-SA 4.0. The protocol spec, app, verifier, and core library are all public.
+Speakwrite is open source under CC BY-SA 4.0. The protocol spec, app, and core library are all public.
 
 - Protocol specification: `SPEC-v1.md`
-- Core library: `@speakwrite/core` (TypeScript, Web Crypto API)
-- Web app: client-side PWA
-- Verifier: Standalone client-side verification page
+- Reference library: `@speakwrite/core` (TypeScript, Web Crypto API)
+- iOS app: Native SwiftUI (iOS 17+)
 
 ## Status
 
-Working draft. The web app, protocol spec, and verifier are functional. Proofs publish as Bluesky posts. The proof bundle format is stable enough to build on.
+Working draft. The native iOS app and protocol spec are functional. The app writes verified posts and reads them in a global feed. The proof bundle format is stable enough to build on.
 
 ---
 
-*Speakwrite does not solve the AI problem. It creates a new kind of evidence that didn't exist before.*
+*Speakwrite does not solve the AI problem. It creates a new kind of evidence that didn't exist before — and a place to go where that evidence matters.*
 
 *This document was not written by a human.*
