@@ -83,7 +83,7 @@ final class ATProtoService {
         dpopKeyPair = P256.Signing.PrivateKey()
 
         let state = UUID().uuidString
-        let redirectURI = "io.speakwrite.app:/oauth/callback"
+        let redirectURI = "io.speakwrite.www:/oauth/callback"
         let clientId = "https://www.speakwrite.io/app/client-metadata.json"
 
         let authParams: [(String, String)] = [
@@ -117,7 +117,7 @@ final class ATProtoService {
         }
 
         let callbackURL = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, Error>) in
-            let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: "io.speakwrite.app") { [weak self] url, error in
+            let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: "io.speakwrite.www") { [weak self] url, error in
                 self?.authSession = nil
                 if let error {
                     continuation.resume(throwing: error)
