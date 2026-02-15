@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Speakwrite — Write human. Read human.</title>
-  <meta name="description" content="A Bluesky client that proves a human typed every post. Browse Discover, read a verified-only feed, compose with hardware-backed proof.">
-  <meta property="og:title" content="Speakwrite — Write human. Read human.">
-  <meta property="og:description" content="A Bluesky client that proves a human typed every post. Hardware-signed by the iPhone's Secure Enclave.">
+  <title>Speakwrite — Prove a human wrote it</title>
+  <meta name="description" content="Speakwrite captures keystroke dynamics as you type and cryptographically signs each checkpoint with the iPhone's Secure Enclave. The proof goes with the post.">
+  <meta property="og:title" content="Speakwrite — Prove a human wrote it">
+  <meta property="og:description" content="A Bluesky client that captures keystroke dynamics and signs every checkpoint with the iPhone's Secure Enclave. Open protocol. Hardware-backed. No trust required.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://speakwrite.io">
   <meta name="theme-color" content="#0a0a0a">
@@ -20,25 +20,70 @@
   <header>
     <nav>
       <a href="/" class="wordmark">speakwrite</a>
-      <a href="https://github.com/stefanrosscohen/speakwrite" class="nav-link">GitHub</a>
+      <div class="nav-links">
+        <a href="#protocol" class="nav-link">Protocol</a>
+        <a href="https://github.com/stefanrosscohen/speakwrite" class="nav-link">GitHub</a>
+      </div>
     </nav>
   </header>
 
   <main>
 
     <section class="hero">
-      <h1>Write human. Read human.</h1>
-      <p class="subtitle">A Bluesky client that proves a human typed every post.</p>
-      <p class="lede">Speakwrite captures your keystroke dynamics as you type and cryptographically signs each checkpoint with the iPhone&rsquo;s Secure Enclave. When you publish, the proof goes with the post. When you read, you know it was typed by a person.</p>
+      <h1>Prove a human wrote it.</h1>
+      <p class="subtitle">Open protocol. Hardware-backed. No trust required.</p>
+      <p class="lede">AI can produce text indistinguishable from human writing. Every detection tool that analyzes the <em>output</em> is losing an arms race it can never win. The next model will always evade the last detector.</p>
+      <p class="lede">Speakwrite takes a different approach: instead of analyzing what was written, it captures <em>how</em> it was written. Keystroke dynamics, commitment chains, and hardware-backed signatures create a portable proof that anyone can verify.</p>
+    </section>
+
+    <section id="the-problem">
+      <h2>The Problem</h2>
+      <p>The internet has a trust crisis. You can no longer look at a piece of text and know whether a person wrote it. AI detection tools try to solve this by analyzing the output &mdash; word choice, perplexity, sentence structure. But these tools are fundamentally fragile: each new model defeats the last detector.</p>
+      <p>Meanwhile, there is no place to go where everything you see was provably typed by a human. No feed, no platform, no protocol for it.</p>
+      <p>We think the solution isn&rsquo;t better output analysis. It&rsquo;s capturing the <em>process</em> of writing and making it verifiable.</p>
+    </section>
+
+    <section id="the-approach">
+      <h2>The Approach</h2>
+      <p>Speakwrite doesn&rsquo;t analyze what you wrote. It records <em>how</em> you wrote it.</p>
+      <p>As you type, the app captures your keystroke dynamics &mdash; timing, rhythm, pauses, corrections &mdash; and periodically creates cryptographic commitments chained together with SHA-256 hashes. Each checkpoint is signed by the iPhone&rsquo;s Secure Enclave. When you publish, the entire proof chain is attached to your post.</p>
+      <p>The result is a <strong>proof bundle</strong>: a portable JSON artifact that anyone can independently verify. No server. No API key. No central authority.</p>
+    </section>
+
+    <section id="how-it-works">
+      <h2>How It Works</h2>
+      <ol class="steps">
+        <li>
+          <strong>Sign in</strong>
+          <span>Use your Bluesky handle. OAuth via AT Protocol.</span>
+        </li>
+        <li>
+          <strong>Type</strong>
+          <span>Keystroke dynamics &mdash; timing, rhythm, pauses, corrections &mdash; are captured natively as you write. Nothing leaves your device.</span>
+        </li>
+        <li>
+          <strong>Commit</strong>
+          <span>Periodically, behavioral features are extracted and hashed into a cryptographic commitment chain. Each link is signed by the Secure Enclave.</span>
+        </li>
+        <li>
+          <strong>Publish</strong>
+          <span>The final content is bound to the chain tip. The proof bundle is attached to your Bluesky post.</span>
+        </li>
+        <li>
+          <strong>Verify</strong>
+          <span>Anyone can check the proof. Walk the hash chain, verify the signatures, confirm content binding. No trust required.</span>
+        </li>
+      </ol>
     </section>
 
     <section id="the-app">
       <h2>The App</h2>
+      <p>Speakwrite is two things in one: a writing tool and a reader.</p>
       <div class="tabs-preview">
         <div class="tab-card">
           <div class="tab-icon">&gt;_</div>
-          <h3>Feed</h3>
-          <p>Bluesky&rsquo;s Discover algorithm. Browse trending posts across the network. Speakwrite-verified posts get a green seal.</p>
+          <h3>Timeline</h3>
+          <p>Your Bluesky timeline. Browse posts from people you follow. Speakwrite-verified posts are marked.</p>
         </div>
         <div class="tab-card accent-card">
           <div class="tab-icon">[&check;]</div>
@@ -53,26 +98,104 @@
       </div>
     </section>
 
-    <section id="how-it-works">
-      <h2>How It Works</h2>
+    <section id="protocol">
+      <h2>The Protocol</h2>
+      <p>The proof bundle is the protocol. It&rsquo;s a JSON object that contains everything needed to verify a post was typed by a human. No proprietary format. No server dependency.</p>
+
+      <h3>Three layers</h3>
+      <dl>
+        <dt>Layer 1: Cryptographic commitment chain</dt>
+        <dd>SHA-256 hash chain makes the proof tamper-evident. Each checkpoint includes the previous hash, forming an immutable sequence. You can&rsquo;t edit the chain after the fact without breaking it.</dd>
+
+        <dt>Layer 2: Device attestation</dt>
+        <dd>The iPhone&rsquo;s Secure Enclave holds a signing key that never leaves the silicon. Apple&rsquo;s App Attest certifies the key was generated on a real device running the unmodified app. Every commitment is signed.</dd>
+
+        <dt>Layer 3: Behavioral analysis</dt>
+        <dd>Human typing has distinct statistical properties: variable inter-key timing, characteristic digraph patterns, natural pause distributions, error-and-correct sequences. These features are captured and committed.</dd>
+      </dl>
+
+      <h3>Verification</h3>
+      <p>Anyone can verify a proof bundle:</p>
       <ol class="steps">
         <li>
-          <strong>Sign in</strong>
-          <span>Use your Bluesky handle. Face ID unlocks the Secure Enclave signing key.</span>
+          <strong>Content hash</strong>
+          <span>Compute SHA-256 of the post text. Compare to the bundle&rsquo;s <code>content_hash</code>.</span>
         </li>
         <li>
-          <strong>Type</strong>
-          <span>Keystroke dynamics &mdash; timing, rhythm, pauses, corrections &mdash; are captured natively as you write.</span>
+          <strong>Chain integrity</strong>
+          <span>Walk the commitment chain. Each hash must reference the previous. Timestamps must be monotonically increasing.</span>
         </li>
         <li>
-          <strong>Publish</strong>
-          <span>A cryptographic commitment chain is signed by the Secure Enclave and attached to your Bluesky post.</span>
+          <strong>Content binding</strong>
+          <span>The final commitment must bind the content hash to the chain tip via <code>SHA-256(chain_tip || CONTENT_BINDING || content_hash)</code>.</span>
         </li>
         <li>
-          <strong>Verify</strong>
-          <span>Anyone can check the proof. SHA-256 hash chain + P-256 ECDSA signatures. No server, no trust required.</span>
+          <strong>Signatures</strong>
+          <span>Verify each checkpoint signature and the final binding signature against the device public key (P-256 ECDSA).</span>
         </li>
       </ol>
+    </section>
+
+    <section id="why-it-matters">
+      <h2>Why It Matters</h2>
+      <div class="two-col">
+        <div>
+          <h3>For writers</h3>
+          <p>Say &ldquo;I typed this&rdquo; and have it mean something cryptographically verifiable. Not a badge from a platform. Not a claim on your honor. A proof anyone can check.</p>
+        </div>
+        <div>
+          <h3>For readers</h3>
+          <p>A feed where everything was typed by a person. Not filtered by an algorithm guessing what&rsquo;s human. Filtered by cryptographic proof.</p>
+        </div>
+      </div>
+      <div class="two-col">
+        <div>
+          <h3>For the ecosystem</h3>
+          <p>An open protocol that any app can implement. Verification is pure math &mdash; SHA-256 and P-256 ECDSA. No vendor lock-in. No central authority.</p>
+        </div>
+        <div>
+          <h3>For trust</h3>
+          <p>One proof is weak. A corpus of proofs from the same identity, exhibiting consistent behavioral patterns over time, is strong evidence. Trust builds progressively.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="what-it-proves">
+      <h2>Honest Assessment</h2>
+      <div class="two-col">
+        <div>
+          <h3>It proves</h3>
+          <p>A post was composed through physical typing on a genuine Apple device, with keystroke behavior consistent with human motor patterns, signed by hardware that never left the silicon.</p>
+        </div>
+        <div>
+          <h3>It doesn&rsquo;t prove</h3>
+          <p>That the ideas are original, that no AI was consulted, or that the author didn&rsquo;t read something from another screen and retype it. It makes deception expensive &mdash; not impossible.</p>
+        </div>
+      </div>
+      <p class="aside">This honesty is a design choice, not a limitation. Speakwrite produces forensic evidence, not mathematical certainty.</p>
+    </section>
+
+    <section id="properties">
+      <h2>Properties</h2>
+      <dl>
+        <dt>Open protocol</dt>
+        <dd>The proof bundle is JSON. The verification algorithm is public. Anyone can build a verifier, a compatible client, or an alternative implementation.</dd>
+
+        <dt>Hardware-backed</dt>
+        <dd>Secure Enclave + App Attest on every proof. The signing key never leaves the silicon. No web fallback.</dd>
+
+        <dt>On-device</dt>
+        <dd>No server sees your keystrokes. Everything runs on your iPhone. Only aggregate statistical features are committed to the proof.</dd>
+
+        <dt>Decentralized</dt>
+        <dd>Proofs live in the author&rsquo;s AT Protocol Personal Data Server. No central server, no trusted authority. Verification is pure cryptography.</dd>
+
+        <dt>Bluesky native</dt>
+        <dd>Full AT Protocol client. Timeline, verified feed, compose, profiles &mdash; all in one app. Posts publish directly to your Bluesky account.</dd>
+
+        <dt>Progressive trust</dt>
+        <dd>A single proof is weak evidence. A corpus from the same identity with consistent behavioral patterns is strong. Trust compounds over time.</dd>
+      </dl>
     </section>
 
     <section id="why-native">
@@ -80,48 +203,16 @@
       <p>A web app can&rsquo;t do this. Hardware attestation requires a native binary &mdash; Apple&rsquo;s App Attest certifies the app hasn&rsquo;t been tampered with, and the Secure Enclave holds a signing key that never leaves the silicon. No JavaScript bridge. No web wrapper. The entire proof chain happens inside the signed binary.</p>
     </section>
 
-    <section id="what-it-proves">
-      <h2>What It Proves</h2>
-      <div class="two-col">
-        <div>
-          <h3>It proves</h3>
-          <p>A post was composed through physical typing on a genuine Apple device, authenticated by biometrics, with keystroke behavior consistent with human motor patterns.</p>
-        </div>
-        <div>
-          <h3>It doesn&rsquo;t prove</h3>
-          <p>That the ideas are original, that no AI was consulted, or that the author didn&rsquo;t transcribe AI output. It makes deception expensive &mdash; not impossible.</p>
-        </div>
-      </div>
-    </section>
-
-    <section id="properties">
-      <h2>Properties</h2>
-      <dl>
-        <dt>Open protocol</dt>
-        <dd>The proof bundle is JSON. Anyone can build a verifier or a compatible client.</dd>
-
-        <dt>Hardware-backed</dt>
-        <dd>Secure Enclave + App Attest on every proof. No web fallback.</dd>
-
-        <dt>On-device</dt>
-        <dd>No server sees your keystrokes. Only statistical features are committed.</dd>
-
-        <dt>Bluesky native</dt>
-        <dd>Full AT Protocol client. Discover feed, verified feed, compose &mdash; all in one app.</dd>
-
-        <dt>Progressive trust</dt>
-        <dd>One proof is weak. A corpus from the same identity with consistent behavioral patterns is strong.</dd>
-      </dl>
-    </section>
-
     <section id="open-source">
       <h2>Open Source</h2>
-      <p>CC BY-SA 4.0. Everything is public.</p>
+      <p>Everything is public under CC BY-SA 4.0.</p>
       <ul class="repo-list">
         <li>Protocol spec: <code>SPEC-v1.md</code></li>
-        <li>iOS app: Native SwiftUI</li>
-        <li>Reference lib: <code>@speakwrite/core</code></li>
+        <li>iOS app: Native SwiftUI (iOS 17+)</li>
+        <li>Reference lib: <code>@speakwrite/core</code> (TypeScript)</li>
+        <li>Verifier: Standalone web verification tool</li>
       </ul>
+      <p class="cta"><a href="https://github.com/stefanrosscohen/speakwrite">View on GitHub</a></p>
     </section>
 
   </main>

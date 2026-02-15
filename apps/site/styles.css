@@ -60,6 +60,11 @@ nav {
   text-shadow: 0 0 20px rgba(0, 255, 65, 0.3);
 }
 
+.nav-links {
+  display: flex;
+  gap: 1.25rem;
+}
+
 .nav-link {
   font-size: 0.8rem;
   color: var(--text-secondary);
@@ -95,11 +100,11 @@ main {
   font-style: italic;
 }
 
-.hero .cta {
+.cta {
   margin-top: 1.25rem;
 }
 
-.hero .cta a {
+.cta a {
   display: inline-block;
   padding: 0.6rem 1.2rem;
   font-family: var(--font);
@@ -114,7 +119,7 @@ main {
   cursor: pointer;
 }
 
-.hero .cta a:hover {
+.cta a:hover {
   background: transparent;
   color: var(--accent);
 }
@@ -138,6 +143,11 @@ h3 {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-primary);
+}
+
+section h3 {
+  margin-top: 1rem;
+  font-size: 0.85rem;
 }
 
 p { margin-bottom: 0.6rem; }
