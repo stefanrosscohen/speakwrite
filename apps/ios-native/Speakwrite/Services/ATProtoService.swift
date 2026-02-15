@@ -17,6 +17,7 @@ final class ATProtoService {
     private var pdsURL: String?
     private var dpopKeyPair: P256.Signing.PrivateKey?
     private var dpopNonce: String? // Server-provided nonce for DPoP
+    private var authSession: ASWebAuthenticationSession? // Keep strong reference during OAuth
 
     // MARK: - Session Persistence
 
@@ -82,24 +83,42 @@ final class ATProtoService {
         dpopKeyPair = P256.Signing.PrivateKey()
 
         let state = UUID().uuidString
-        let redirectURI = "io.speakwrite.app://oauth/callback"
+        let redirectURI = "io.speakwrite.app:/oauth/callback"
         let clientId = "https://www.speakwrite.io/app/client-metadata.json"
 
-        var components = URLComponents(string: metadata.authorizationEndpoint)!
-        components.queryItems = [
-            URLQueryItem(name: "response_type", value: "code"),
-            URLQueryItem(name: "client_id", value: clientId),
-            URLQueryItem(name: "redirect_uri", value: redirectURI),
-            URLQueryItem(name: "scope", value: "atproto transition:generic"),
-            URLQueryItem(name: "state", value: state),
-            URLQueryItem(name: "code_challenge", value: codeChallenge),
-            URLQueryItem(name: "code_challenge_method", value: "S256"),
+        let authParams: [(String, String)] = [
+            ("response_type", "code"),
+            ("client_id", clientId),
+            ("redirect_uri", redirectURI),
+            ("scope", "atproto transition:generic"),
+            ("state", state),
+            ("code_challenge", codeChallenge),
+            ("code_challenge_method", "S256"),
+            ("login_hint", handle),
         ]
 
-        let authURL = components.url!
+        // Build the auth URL — use PAR if required by the server
+        let authURL: URL
+        if let parEndpoint = metadata.pushedAuthorizationRequestEndpoint {
+            // Pushed Authorization Request: POST params to PAR endpoint, get request_uri back
+            let parResult = try await performPAR(endpoint: parEndpoint, params: authParams)
+
+            var components = URLComponents(string: metadata.authorizationEndpoint)!
+            components.queryItems = [
+                URLQueryItem(name: "client_id", value: clientId),
+                URLQueryItem(name: "request_uri", value: parResult.requestUri),
+            ]
+            authURL = components.url!
+        } else {
+            // Standard authorization request (no PAR)
+            var components = URLComponents(string: metadata.authorizationEndpoint)!
+            components.queryItems = authParams.map { URLQueryItem(name: $0.0, value: $0.1) }
+            authURL = components.url!
+        }
 
         let callbackURL = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, Error>) in
-            let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: "io.speakwrite.app") { url, error in
+            let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: "io.speakwrite.app") { [weak self] url, error in
+                self?.authSession = nil
                 if let error {
                     continuation.resume(throwing: error)
                 } else if let url {
@@ -110,6 +129,7 @@ final class ATProtoService {
             }
             session.presentationContextProvider = PresentationContextProvider(anchor: presentationAnchor)
             session.prefersEphemeralWebBrowserSession = false
+            self.authSession = session
             session.start()
         }
 
@@ -128,6 +148,57 @@ final class ATProtoService {
         self.pdsURL = pds
         self.isLoggedIn = true
         persistSession()
+    }
+
+    /// Perform a Pushed Authorization Request (PAR), handling DPoP nonce exchange.
+    private func performPAR(endpoint: String, params: [(String, String)]) async throws -> PARResponse {
+        func buildRequest() throws -> URLRequest {
+            var request = URLRequest(url: URL(string: endpoint)!)
+            request.httpMethod = "POST"
+            request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+            if let dpopHeader = try createDPoPProof(method: "POST", url: endpoint) {
+                request.setValue(dpopHeader, forHTTPHeaderField: "DPoP")
+            }
+            let bodyString = params.map {
+                "\($0.0)=\($0.1.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? $0.1)"
+            }.joined(separator: "&")
+            request.httpBody = bodyString.data(using: .utf8)
+            return request
+        }
+
+        func decodePARResponse(_ data: Data, statusCode: Int) throws -> PARResponse {
+            if statusCode >= 200 && statusCode < 300 {
+                return try JSONDecoder().decode(PARResponse.self, from: data)
+            }
+            // Try decoding as OAuth error
+            if let oauthErr = try? JSONDecoder().decode(OAuthErrorResponse.self, from: data) {
+                throw ATProtoError.oauthError(oauthErr.error, oauthErr.errorDescription)
+            }
+            throw ATProtoError.oauthError("http_\(statusCode)", String(data: data, encoding: .utf8))
+        }
+
+        let request = try buildRequest()
+        let (data, response) = try await URLSession.shared.data(for: request)
+        let httpResponse = response as? HTTPURLResponse
+
+        // Capture DPoP nonce if provided
+        if let nonce = httpResponse?.value(forHTTPHeaderField: "DPoP-Nonce") {
+            dpopNonce = nonce
+
+            // If 400 with a new nonce, it's likely a DPoP nonce challenge — retry
+            if httpResponse?.statusCode == 400 {
+                let retryRequest = try buildRequest()
+                let (retryData, retryResponse) = try await URLSession.shared.data(for: retryRequest)
+                let retryStatus = (retryResponse as? HTTPURLResponse)?.statusCode ?? 0
+                // Capture nonce from retry too
+                if let retryNonce = (retryResponse as? HTTPURLResponse)?.value(forHTTPHeaderField: "DPoP-Nonce") {
+                    dpopNonce = retryNonce
+                }
+                return try decodePARResponse(retryData, statusCode: retryStatus)
+            }
+        }
+
+        return try decodePARResponse(data, statusCode: httpResponse?.statusCode ?? 0)
     }
 
     private func exchangeCodeForTokens(
@@ -547,9 +618,31 @@ private struct DIDService: Decodable { let type: String; let serviceEndpoint: St
 private struct OAuthServerMetadata: Decodable {
     let authorizationEndpoint: String
     let tokenEndpoint: String
+    let pushedAuthorizationRequestEndpoint: String?
+    let requirePushedAuthorizationRequests: Bool?
     enum CodingKeys: String, CodingKey {
         case authorizationEndpoint = "authorization_endpoint"
         case tokenEndpoint = "token_endpoint"
+        case pushedAuthorizationRequestEndpoint = "pushed_authorization_request_endpoint"
+        case requirePushedAuthorizationRequests = "require_pushed_authorization_requests"
+    }
+}
+
+private struct PARResponse: Decodable {
+    let requestUri: String
+    let expiresIn: Int?
+    enum CodingKeys: String, CodingKey {
+        case requestUri = "request_uri"
+        case expiresIn = "expires_in"
+    }
+}
+
+private struct OAuthErrorResponse: Decodable {
+    let error: String
+    let errorDescription: String?
+    enum CodingKeys: String, CodingKey {
+        case error
+        case errorDescription = "error_description"
     }
 }
 
@@ -689,12 +782,14 @@ private class PresentationContextProvider: NSObject, ASWebAuthenticationPresenta
 
 enum ATProtoError: Error, LocalizedError {
     case noPDS, authCancelled, noAuthCode, notLoggedIn
+    case oauthError(String, String?) // error code, description
     var errorDescription: String? {
         switch self {
         case .noPDS: return "Could not find PDS for this handle"
         case .authCancelled: return "Authentication was cancelled"
         case .noAuthCode: return "No authorization code received"
         case .notLoggedIn: return "Not logged in"
+        case .oauthError(let code, let desc): return "OAuth error (\(code)): \(desc ?? "unknown")"
         }
     }
 }

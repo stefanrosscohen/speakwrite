@@ -4,7 +4,7 @@
   "client_uri": "https://www.speakwrite.io",
   "redirect_uris": [
     "https://www.speakwrite.io/app/",
-    "io.speakwrite.app://oauth/callback"
+    "io.speakwrite.app:/oauth/callback"
   ],
   "scope": "atproto transition:generic",
   "grant_types": ["authorization_code", "refresh_token"],

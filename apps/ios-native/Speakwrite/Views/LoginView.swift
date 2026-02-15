@@ -1,3 +1,4 @@
+import AuthenticationServices
 import SwiftUI
 
 struct LoginView: View {
@@ -69,8 +70,10 @@ struct LoginView: View {
                 throw ATProtoError.authCancelled
             }
             try await viewModel.atproto.signIn(handle: handle, presentationAnchor: window)
+        } catch let err as ASWebAuthenticationSessionError where err.code == .canceledLogin {
+            self.error = nil // User cancelled — don't show error
         } catch {
-            self.error = error.localizedDescription
+            self.error = "\(error)"
         }
         isLoading = false
     }
