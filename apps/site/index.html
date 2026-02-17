@@ -110,7 +110,7 @@
       <h3>Three layers</h3>
       <dl>
         <dt>Layer 1: Cryptographic commitment chain</dt>
-        <dd>SHA-256 hash chain makes the proof tamper-evident. Each checkpoint includes the previous hash, forming an immutable sequence. You can&rsquo;t edit the chain after the fact without breaking it.</dd>
+        <dd>SHA-256 hash chain with openable commitments &mdash; each link binds the behavioral features and a document snapshot hash. Every commitment can be independently re-derived. You can&rsquo;t edit the chain or swap the content without breaking it.</dd>
 
         <dt>Layer 2: Device attestation</dt>
         <dd>The iPhone&rsquo;s Secure Enclave holds a signing key that never leaves the silicon. Apple&rsquo;s App Attest certifies the key was generated on a real device running the unmodified app. Every commitment is signed.</dd>
@@ -127,16 +127,20 @@
           <span>Compute SHA-256 of the post text. Compare to the bundle&rsquo;s <code>content_hash</code>.</span>
         </li>
         <li>
-          <strong>Chain integrity</strong>
-          <span>Walk the commitment chain. Each hash must reference the previous. Timestamps must be monotonically increasing.</span>
+          <strong>Chain integrity + re-derivation</strong>
+          <span>Walk the commitment chain. Re-derive each behavioral commitment from its nonce, features, and document hash. Every link must match.</span>
         </li>
         <li>
           <strong>Content binding</strong>
-          <span>The final commitment must bind the content hash to the chain tip via <code>SHA-256(chain_tip || CONTENT_BINDING || content_hash)</code>.</span>
+          <span>The final commitment must bind the content hash to the chain tip. The last behavioral commitment&rsquo;s document hash must match the published content hash.</span>
         </li>
         <li>
           <strong>Signatures</strong>
           <span>Verify each checkpoint signature and the final binding signature against the device public key (P-256 ECDSA).</span>
+        </li>
+        <li>
+          <strong>Plausibility</strong>
+          <span>Check keystroke count vs content length, typing speed bounds, and timestamp monotonicity. Non-fatal warnings flag anomalies.</span>
         </li>
       </ol>
     </section>

@@ -20,17 +20,17 @@ Speakwrite takes a different approach: instead of analyzing what was written, it
 
 1. **Sign in** — Use your AT Protocol handle (OAuth with DPoP)
 2. **Type** — Keystroke dynamics are captured natively as you write
-3. **Commit** — Behavioral features are periodically hashed into a cryptographic commitment chain, signed by the Secure Enclave
-4. **Publish** — The final content is bound to the chain tip; the proof bundle is published alongside your post on the AT Protocol network
-5. **Verify** — Anyone can walk the hash chain, verify signatures, and confirm content binding
+3. **Commit** — Behavioral features + a document snapshot hash are bound into each commitment link, signed by the Secure Enclave
+4. **Publish** — The final content is bound to the chain tip; the proof bundle (v2) is published alongside your post on the AT Protocol network
+5. **Verify** — Anyone can re-derive every commitment hash, verify P-256 ECDSA signatures, confirm content binding, and check keystroke plausibility
 
 ## The Protocol
 
 The proof bundle is a portable JSON object with three layers:
 
-- **Layer 1 — Cryptographic commitment chain:** SHA-256 hash chain makes the proof tamper-evident
-- **Layer 2 — Device attestation:** Secure Enclave + App Attest signatures on every checkpoint
-- **Layer 3 — Behavioral analysis:** Keystroke timing, digraph patterns, error correction rates
+- **Layer 1 — Cryptographic commitment chain:** SHA-256 hash chain with openable commitments (features + document hash bound into every link)
+- **Layer 2 — Device attestation:** Secure Enclave + App Attest P-256 ECDSA signatures verified on every checkpoint
+- **Layer 3 — Behavioral analysis:** Keystroke timing, digraph patterns, error correction rates, with plausibility checks
 
 Full specification: [`SPEC-v1.md`](SPEC-v1.md)
 
