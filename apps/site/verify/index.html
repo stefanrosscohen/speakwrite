@@ -901,8 +901,32 @@ oyFraWVIyd/dganmrduC1bmTBGwD
         const originalText = stripFooter(rawText);
         const encoder = new TextEncoder();
         const textBytes = encoder.encode(originalText);
-        const hashBuffer = await crypto.subtle.digest('SHA-256', textBytes);
-        const computedHash = bytesToHex(new Uint8Array(hashBuffer));
+        const textHashBuffer = await crypto.subtle.digest('SHA-256', textBytes);
+        const textHashBytes = new Uint8Array(textHashBuffer);
+
+        let computedHash;
+        const mediaHashes = proof.mediaHashes;
+        const hasMedia = Array.isArray(mediaHashes) && mediaHashes.length > 0;
+
+        if (hasMedia) {
+          const sortedHashes = [...mediaHashes].sort();
+          let compositeLength = textHashBytes.length;
+          for (const hex of sortedHashes) {
+            compositeLength += hex.length / 2;
+          }
+          const composite = new Uint8Array(compositeLength);
+          composite.set(textHashBytes, 0);
+          let offset = textHashBytes.length;
+          for (const hex of sortedHashes) {
+            const mediaBytes = hexToBytes(hex);
+            composite.set(mediaBytes, offset);
+            offset += mediaBytes.length;
+          }
+          const finalHash = await crypto.subtle.digest('SHA-256', composite);
+          computedHash = bytesToHex(new Uint8Array(finalHash));
+        } else {
+          computedHash = bytesToHex(textHashBytes);
+        }
 
         if (computedHash !== proof.contentHash) {
           step.status = 'fail';
@@ -914,7 +938,8 @@ oyFraWVIyd/dganmrduC1bmTBGwD
 
         step.status = 'pass';
         step.label = 'Content hash verified';
-        step.detail = `SHA-256: ${computedHash.substring(0, 32)}...`;
+        const mediaDetail = hasMedia ? ` (${mediaHashes.length} media hash${mediaHashes.length === 1 ? '' : 'es'} included)` : '';
+        step.detail = `SHA-256: ${computedHash.substring(0, 32)}...${mediaDetail}`;
         updateContent(postCardHtml);
 
         // Step 6: Validate Apple certificate chain
