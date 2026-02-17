@@ -8,71 +8,74 @@ struct VerifiedFeedView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if viewModel.isFeedLoading && viewModel.verifiedPosts.isEmpty {
-                    VStack(spacing: Theme.md) {
-                        ProgressView()
-                            .tint(Theme.accent)
-                        Text("Loading verified posts...")
-                            .font(Theme.mono)
-                            .foregroundStyle(Theme.textSecondary(colorScheme))
+            VStack(spacing: 0) {
+                // App header
+                HStack(spacing: Theme.sm) {
+                    AvatarButton(
+                        avatarURL: viewModel.myProfile?.avatar,
+                        handle: viewModel.atproto.handle
+                    ) {
+                        showMyProfile = true
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if viewModel.verifiedPosts.isEmpty {
-                    ContentUnavailableView {
-                        Label("No verified posts yet", systemImage: "checkmark.seal")
-                    } description: {
-                        Text("Posts written with Speakwrite will appear here.\nBe the first to publish one.")
-                            .font(Theme.mono)
-                    }
-                } else {
-                    ScrollView {
-                        LazyVStack(spacing: 0) {
-                            ForEach(viewModel.verifiedPosts) { post in
-                                PostRow(post: post)
-                                    .padding(.horizontal, Theme.lg)
+                    Text("speakwrite")
+                        .font(Theme.monoTitle)
+                        .foregroundStyle(Theme.accent)
+                    Image(systemName: "checkmark.seal.fill")
+                        .foregroundStyle(Theme.accent)
+                        .font(.system(size: 14))
+                    Spacer()
+                }
+                .padding(.horizontal, Theme.lg)
+                .padding(.vertical, Theme.sm)
 
-                                Divider()
-                                    .foregroundStyle(Theme.separator(colorScheme))
-                            }
+                // Feed content
+                Group {
+                    if viewModel.isFeedLoading && viewModel.verifiedPosts.isEmpty {
+                        VStack(spacing: Theme.md) {
+                            ProgressView()
+                                .tint(Theme.accent)
+                            Text("Loading verified posts...")
+                                .font(Theme.mono)
+                                .foregroundStyle(Theme.textSecondary(colorScheme))
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if viewModel.verifiedPosts.isEmpty {
+                        ContentUnavailableView {
+                            Label("No verified posts yet", systemImage: "checkmark.seal")
+                        } description: {
+                            Text("Posts written with Speakwrite will appear here.\nBe the first to publish one.")
+                                .font(Theme.mono)
+                        }
+                    } else {
+                        ScrollView {
+                            LazyVStack(spacing: 0) {
+                                ForEach(viewModel.verifiedPosts) { post in
+                                    PostRow(post: post)
+                                        .padding(.horizontal, Theme.lg)
 
-                            if viewModel.feedCursor != nil {
-                                ProgressView()
-                                    .tint(Theme.accent)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, Theme.xl)
-                                    .onAppear {
-                                        Task { await viewModel.loadMoreFeed() }
-                                    }
+                                    Divider()
+                                        .foregroundStyle(Theme.separator(colorScheme))
+                                }
+
+                                if viewModel.feedCursor != nil {
+                                    ProgressView()
+                                        .tint(Theme.accent)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, Theme.xl)
+                                        .onAppear {
+                                            Task { await viewModel.loadMoreFeed() }
+                                        }
+                                }
                             }
                         }
-                    }
-                    .refreshable {
-                        viewModel.feedCursor = nil
-                        await viewModel.loadFeed()
+                        .refreshable {
+                            await viewModel.loadFeed()
+                        }
                     }
                 }
             }
             .background(Theme.background(colorScheme))
-            .navigationTitle("")
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    HStack(spacing: Theme.sm) {
-                        AvatarButton(
-                            avatarURL: viewModel.myProfile?.avatar,
-                            handle: viewModel.atproto.handle
-                        ) {
-                            showMyProfile = true
-                        }
-                        Image(systemName: "checkmark.seal.fill")
-                            .foregroundStyle(Theme.accent)
-                            .font(.system(size: 14))
-                        Text("Verified")
-                            .font(Theme.monoTitle)
-                            .foregroundStyle(Theme.accent)
-                    }
-                }
-            }
+            .navigationBarHidden(true)
             .sheet(isPresented: $showMyProfile) {
                 MyProfileView()
             }

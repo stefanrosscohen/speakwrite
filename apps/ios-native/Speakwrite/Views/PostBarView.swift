@@ -1,10 +1,9 @@
 import SwiftUI
 
-/// Bottom toolbar showing character count ring, stats, and publish button.
+/// Bottom toolbar showing character count ring and publish button.
 struct PostBarView: View {
     @Environment(AppViewModel.self) private var viewModel
     @Environment(\.colorScheme) private var colorScheme
-    @Binding var showPublishSheet: Bool
 
     private let charLimit = 300
 
@@ -13,38 +12,47 @@ struct PostBarView: View {
             HStack(spacing: Theme.md) {
                 CharacterCountRing(count: graphemeCount, limit: charLimit)
 
-                HStack(spacing: 14) {
-                    if let session = viewModel.sessionService {
-                        HStack(spacing: Theme.xs) {
-                            Image(systemName: "keyboard").font(Theme.monoSmall)
-                            Text("\(session.keystrokeCount)").font(Theme.monoCaption)
-                        }
-                        HStack(spacing: Theme.xs) {
-                            Image(systemName: "link").font(Theme.monoSmall)
-                            Text("\(session.commitmentCount)").font(Theme.monoCaption)
-                        }
-                    }
-                }
-                .foregroundStyle(Theme.textSecondary(colorScheme))
-
                 Spacer()
 
-                Button {
-                    showPublishSheet = true
-                } label: {
-                    Text("Publish")
-                        .font(Theme.monoBold)
-                        .padding(.horizontal, Theme.xl)
-                        .padding(.vertical, Theme.sm)
+                if viewModel.isPublishing {
+                    ProgressView()
+                        .tint(Theme.accent)
+                        .padding(.trailing, Theme.sm)
+                } else if viewModel.lastPublishedURI != nil {
+                    HStack(spacing: Theme.xs) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(Theme.accent)
+                        Text("Published")
+                            .font(Theme.monoBold)
+                            .foregroundStyle(Theme.accent)
+                    }
+                } else {
+                    Button {
+                        viewModel.publishError = nil
+                        Task { await viewModel.publish() }
+                    } label: {
+                        Text("Publish")
+                            .font(Theme.monoBold)
+                            .padding(.horizontal, Theme.xl)
+                            .padding(.vertical, Theme.sm)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Theme.accent)
+                    .foregroundStyle(.black)
+                    .clipShape(Capsule())
+                    .disabled(viewModel.postText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isOverLimit)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(Theme.accent)
-                .foregroundStyle(.black)
-                .clipShape(Capsule())
-                .disabled(viewModel.postText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isOverLimit)
             }
             .padding(.horizontal, Theme.lg)
             .padding(.vertical, 10)
+
+            if let error = viewModel.publishError {
+                Text(error)
+                    .font(Theme.monoSmall)
+                    .foregroundStyle(Theme.error)
+                    .padding(.horizontal, Theme.lg)
+                    .padding(.bottom, Theme.sm)
+            }
         }
     }
 

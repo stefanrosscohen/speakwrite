@@ -14,14 +14,17 @@ protocol PostDisplayable: Identifiable {
     var replyCount: Int { get }
     var viewer: PostViewer? { get }
     var showVerifiedBadge: Bool { get }
+    var repostAttribution: String? { get }
 }
 
 extension VerifiedPost: PostDisplayable {
     var showVerifiedBadge: Bool { true }
+    var repostAttribution: String? { nil }
 }
 
 extension TimelinePost: PostDisplayable {
     var showVerifiedBadge: Bool { isVerified }
+    var repostAttribution: String? { repostedBy }
 }
 
 // MARK: - PostRow (Bluesky-style)
@@ -45,6 +48,7 @@ struct PostRow<Post: PostDisplayable>: View {
     @State private var showReplySheet = false
     @State private var showRepostMenu = false
     @State private var showQuotePost = false
+    @State private var isFollowingAuthor = false
 
     /// Build a PostNavigation value for detail view navigation.
     private var postNavigation: PostNavigation {
@@ -63,39 +67,54 @@ struct PostRow<Post: PostDisplayable>: View {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            // Left column: avatar → profile
-            NavigationLink(value: post.author.did) {
-                AvatarView(
-                    url: post.author.avatar,
-                    handle: post.author.handle,
-                    size: .medium
-                )
+        VStack(alignment: .leading, spacing: 0) {
+            // Repost attribution
+            if let repostedBy = post.repostAttribution {
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.2.squarepath")
+                        .font(.system(size: 12))
+                    Text("Reposted by \(repostedBy)")
+                        .font(.system(size: 13))
+                }
+                .foregroundStyle(Theme.textTertiary(colorScheme))
+                .padding(.leading, 52) // Align with post text (avatar + spacing)
+                .padding(.bottom, 2)
             }
-            .buttonStyle(.plain)
 
-            // Right column
-            VStack(alignment: .leading, spacing: 4) {
-                // Header → profile
+            HStack(alignment: .top, spacing: 10) {
+                // Left column: avatar → profile
                 NavigationLink(value: post.author.did) {
-                    headerLine
+                    AvatarView(
+                        url: post.author.avatar,
+                        handle: post.author.handle,
+                        size: .medium
+                    )
                 }
                 .buttonStyle(.plain)
 
-                // Post body → post detail
-                NavigationLink(value: postNavigation) {
-                    Text(post.text)
-                        .font(.system(size: 15))
-                        .foregroundStyle(Theme.textPrimary(colorScheme))
-                        .lineLimit(12)
-                        .multilineTextAlignment(.leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .buttonStyle(.plain)
+                // Right column
+                VStack(alignment: .leading, spacing: 4) {
+                    // Header → profile
+                    NavigationLink(value: post.author.did) {
+                        headerLine
+                    }
+                    .buttonStyle(.plain)
 
-                // Engagement row
-                engagementRow
-                    .padding(.top, 4)
+                    // Post body → post detail
+                    NavigationLink(value: postNavigation) {
+                        Text(post.text)
+                            .font(.system(size: 15))
+                            .foregroundStyle(Theme.textPrimary(colorScheme))
+                            .lineLimit(12)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .buttonStyle(.plain)
+
+                    // Engagement row
+                    engagementRow
+                        .padding(.top, 4)
+                }
             }
         }
         .padding(.vertical, 10)
@@ -138,6 +157,7 @@ struct PostRow<Post: PostDisplayable>: View {
         isReposted = post.viewer?.repost != nil
         repostUri = post.viewer?.repost
         localRepostCount = post.repostCount
+        isFollowingAuthor = post.author.viewer?.following != nil
     }
 
     // MARK: - Header
@@ -149,7 +169,7 @@ struct PostRow<Post: PostDisplayable>: View {
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(Theme.textPrimary(colorScheme))
                     .lineLimit(1)
-                    .layoutPriority(1)
+                    .truncationMode(.tail)
             }
 
             if post.showVerifiedBadge {
@@ -170,6 +190,23 @@ struct PostRow<Post: PostDisplayable>: View {
                 .foregroundStyle(Theme.textTertiary(colorScheme))
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
+
+            // Inline follow button for non-self, non-followed authors
+            if !isFollowingAuthor && post.author.did != viewModel.atproto.did {
+                Spacer(minLength: 4)
+                Button {
+                    Task { await followAuthor() }
+                } label: {
+                    Text("Follow")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Capsule().fill(Theme.accent))
+                }
+                .buttonStyle(.plain)
+                .fixedSize()
+            }
         }
     }
 
@@ -252,6 +289,16 @@ struct PostRow<Post: PostDisplayable>: View {
                 isReposted = false; localRepostCount -= 1
                 print("[Speakwrite] Repost failed: \(error)")
             }
+        }
+    }
+
+    private func followAuthor() async {
+        isFollowingAuthor = true
+        do {
+            try await viewModel.atproto.follow(did: post.author.did)
+        } catch {
+            isFollowingAuthor = false
+            print("[Speakwrite] Follow failed: \(error)")
         }
     }
 

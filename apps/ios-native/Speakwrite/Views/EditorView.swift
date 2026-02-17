@@ -5,7 +5,6 @@ struct EditorView: View {
     @Environment(AppViewModel.self) private var viewModel
     @Environment(\.colorScheme) private var colorScheme
     @State private var showProofSidebar = false
-    @State private var showPublishSheet = false
     @State private var showClearConfirm = false
     @State private var showMyProfile = false
 
@@ -14,6 +13,28 @@ struct EditorView: View {
 
         NavigationStack {
             VStack(spacing: 0) {
+                // App header
+                HStack(spacing: Theme.sm) {
+                    AvatarButton(
+                        avatarURL: viewModel.myProfile?.avatar,
+                        handle: viewModel.atproto.handle
+                    ) {
+                        showMyProfile = true
+                    }
+                    Text("speakwrite")
+                        .font(Theme.monoTitle)
+                        .foregroundStyle(Theme.accent)
+                    Spacer()
+                    Button {
+                        showProofSidebar.toggle()
+                    } label: {
+                        Image(systemName: "chart.bar.doc.horizontal")
+                            .foregroundStyle(Theme.accent)
+                    }
+                }
+                .padding(.horizontal, Theme.lg)
+                .padding(.vertical, Theme.sm)
+
                 // Editor area
                 ZStack(alignment: .topLeading) {
                     CaptureTextEditor(
@@ -47,35 +68,13 @@ struct EditorView: View {
                     .background(Theme.separator(colorScheme))
 
                 // Post bar with character ring + publish
-                PostBarView(showPublishSheet: $showPublishSheet)
+                PostBarView()
             }
             .background(Theme.background(colorScheme))
-            .navigationTitle("")
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    AvatarButton(
-                        avatarURL: viewModel.myProfile?.avatar,
-                        handle: viewModel.atproto.handle
-                    ) {
-                        showMyProfile = true
-                    }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showProofSidebar.toggle()
-                    } label: {
-                        Image(systemName: "chart.bar.doc.horizontal")
-                            .foregroundStyle(Theme.accent)
-                    }
-                }
-            }
+            .navigationBarHidden(true)
             .sheet(isPresented: $showProofSidebar) {
                 ProofSidebarView()
                     .presentationDetents([.medium, .large])
-            }
-            .sheet(isPresented: $showPublishSheet) {
-                PublishView()
-                    .presentationDetents([.medium])
             }
             .sheet(isPresented: $showMyProfile) {
                 MyProfileView()
@@ -88,9 +87,8 @@ struct EditorView: View {
             } message: {
                 Text("This will delete your current draft. Keystroke data for this session will be lost.")
             }
-            .task {
-                await viewModel.startWriting()
-            }
+            // Face ID is triggered by tab selection (onChange in ContentView),
+            // not by .task here — .task fires eagerly in TabView before the user taps Compose.
         }
     }
 }

@@ -27,10 +27,15 @@ final class AppViewModel {
     var feedCursor: String?
     var isFeedLoading: Bool = false
 
-    // Timeline feed state (normal Bluesky)
+    // Timeline feed state (For You — discover feed)
     var timelinePosts: [TimelinePost] = []
     var timelineCursor: String?
     var isTimelineLoading: Bool = false
+
+    // Following feed state (authenticated following timeline)
+    var followingPosts: [TimelinePost] = []
+    var followingCursor: String?
+    var isFollowingLoading: Bool = false
 
     enum AppTab: Hashable {
         case timeline
@@ -61,27 +66,47 @@ final class AppViewModel {
 
     // MARK: - Compose Flow
 
-    func startWriting() async {
-        guard let session = sessionService else { return }
+    /// Start a writing session if one isn't already active.
+    /// Called when the user taps the Compose tab — triggers Face ID once.
+    func ensureSessionReady() async {
+        guard let session = sessionService, !session.sessionActive else { return }
         do {
-            try await session.startSession()
+            try await session.startSessionFromTabSelection()
         } catch {
-            publishError = error.localizedDescription
+            print("[Session] Could not start session: \(error)")
         }
     }
 
     func publish() async {
-        guard let session = sessionService,
-              let document = session.currentDocument else { return }
+        guard let session = sessionService else {
+            publishError = "Session not available."
+            return
+        }
+
+        // Session starts via Face ID on Compose tab selection. If the user somehow
+        // hits Publish without a session, start one now as a fallback.
+        if !session.sessionActive {
+            do {
+                try await session.startSession()
+            } catch {
+                publishError = "Could not start session: \(error.localizedDescription)"
+                return
+            }
+        }
+
+        guard let document = session.currentDocument else {
+            publishError = "No active writing session."
+            return
+        }
 
         isPublishing = true
         publishError = nil
 
         do {
-            // End session (triggers final checkpoint)
+            // End session (final checkpoint, keeps biometric context for signing)
             try await session.endSession()
 
-            // Export proof bundle
+            // Export proof bundle (signs with SE key)
             let bundle = try await proofService.exportProofBundle(
                 content: postText,
                 document: document,
@@ -89,13 +114,23 @@ final class AppViewModel {
                 keystrokeCount: session.keystrokeCount
             )
 
+            // Invalidate biometric context — signing is done
+            await session.finalizeSession()
+
             // Publish to AT Protocol
             let result = try await atproto.publishProofPost(bundle: bundle, postText: postText)
             lastPublishedURI = result.uri
 
             // Reset for next post
             postText = ""
+
+            // Flash "Published" for 2 seconds then reset
+            isPublishing = false
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            lastPublishedURI = nil
+            return
         } catch {
+            await session.finalizeSession()
             publishError = error.localizedDescription
         }
 
@@ -108,11 +143,17 @@ final class AppViewModel {
         isFeedLoading = true
 
         do {
-            let result = try await atproto.fetchVerifiedFeed(cursor: feedCursor)
-            verifiedPosts = result.posts
-            feedCursor = result.cursor
+            let result = try await atproto.fetchVerifiedFeed(cursor: nil)
+            // Only replace posts if we got results — prevents crash when
+            // pull-to-refresh returns empty (view flips from ScrollView to
+            // ContentUnavailableView mid-refresh, causing layout crash).
+            if !result.posts.isEmpty || verifiedPosts.isEmpty {
+                verifiedPosts = result.posts
+                feedCursor = result.cursor
+            }
+            print("[Feed] Loaded \(result.posts.count) verified posts")
         } catch {
-            // Silently fail for feed load
+            print("[Feed] Error loading verified feed: \(error)")
         }
 
         isFeedLoading = false
@@ -130,7 +171,7 @@ final class AppViewModel {
         }
     }
 
-    // MARK: - Timeline (Normal Bluesky Feed)
+    // MARK: - Timeline (For You / Discover Feed)
 
     func loadTimeline() async {
         isTimelineLoading = true
@@ -140,7 +181,7 @@ final class AppViewModel {
             timelinePosts = result.posts
             timelineCursor = result.cursor
         } catch {
-            // Silently fail
+            print("[Timeline] Error loading discover feed: \(error)")
         }
 
         isTimelineLoading = false
@@ -153,6 +194,34 @@ final class AppViewModel {
             let result = try await atproto.fetchTimeline(cursor: cursor)
             timelinePosts.append(contentsOf: result.posts)
             timelineCursor = result.cursor
+        } catch {
+            // Silently fail
+        }
+    }
+
+    // MARK: - Following Timeline (Authenticated)
+
+    func loadFollowing() async {
+        isFollowingLoading = true
+
+        do {
+            let result = try await atproto.fetchFollowingTimeline(cursor: nil)
+            followingPosts = result.posts
+            followingCursor = result.cursor
+        } catch {
+            print("[Timeline] Error loading following feed: \(error)")
+        }
+
+        isFollowingLoading = false
+    }
+
+    func loadMoreFollowing() async {
+        guard let cursor = followingCursor else { return }
+
+        do {
+            let result = try await atproto.fetchFollowingTimeline(cursor: cursor)
+            followingPosts.append(contentsOf: result.posts)
+            followingCursor = result.cursor
         } catch {
             // Silently fail
         }

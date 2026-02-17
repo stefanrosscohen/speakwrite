@@ -56,6 +56,11 @@ struct ContentView: View {
                         .tag(AppViewModel.AppTab.settings)
                 }
                 .tint(Theme.accent)
+                .onChange(of: viewModel.selectedTab) { _, newTab in
+                    if newTab == .compose {
+                        Task { await viewModel.ensureSessionReady() }
+                    }
+                }
             } else {
                 LoginView()
             }

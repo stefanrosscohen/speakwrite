@@ -188,7 +188,7 @@ strong { color: #fff; font-weight: 700; }
 /* ── Tab Cards ── */
 .tabs-preview {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 0.75rem;
 }
 

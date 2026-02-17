@@ -204,12 +204,12 @@ struct CaptureTextEditor: UIViewRepresentable {
         textView.font = .monospacedSystemFont(ofSize: 17, weight: .regular)
         textView.textColor = UIColor(named: "textPrimary") ?? .label
         textView.backgroundColor = .clear
-        textView.autocorrectionType = .no  // Disable autocorrect for clean keystroke capture
+        textView.autocorrectionType = .yes
         textView.autocapitalizationType = .sentences
-        textView.spellCheckingType = .no
-        textView.smartDashesType = .no
-        textView.smartQuotesType = .no
-        textView.smartInsertDeleteType = .no
+        textView.spellCheckingType = .yes
+        textView.smartDashesType = .yes
+        textView.smartQuotesType = .yes
+        textView.smartInsertDeleteType = .yes
         textView.captureDelegate = captureDelegate
         textView.delegate = context.coordinator
         textView.text = text

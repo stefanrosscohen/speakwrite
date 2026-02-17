@@ -68,6 +68,16 @@ final class SessionService: KeystrokeCaptureDelegate {
             try await checkpoint()
         }
 
+        // If no commitments exist yet (very short post or autocorrect-heavy typing),
+        // force a minimal checkpoint so the proof chain isn't empty.
+        if commitments.isEmpty, currentDocument != nil {
+            try await forceMinimalCheckpoint()
+        }
+
+        // NOTE: Do NOT invalidate the attestation context here.
+        // The proof bundle export still needs to sign with the SE key.
+        // The caller (AppViewModel.publish) will call finalizeSession() after export.
+
         currentSession?.endedAt = Date()
         currentSession?.status = "completed"
         sessionActive = false
@@ -75,11 +85,46 @@ final class SessionService: KeystrokeCaptureDelegate {
         try modelContext.save()
     }
 
+    /// Invalidate the biometric context after the proof bundle has been fully signed.
+    func finalizeSession() async {
+        await attestation.endSession()
+    }
+
+    // MARK: - Pending keystrokes (while session is starting from tab selection)
+
+    private(set) var isStartingSession = false
+    private var pendingKeystrokes: [KeystrokeEvent] = []
+
+    /// Called by AppViewModel when the Compose tab is selected.
+    /// Face ID is triggered here, not on first keystroke.
+    func startSessionFromTabSelection() async throws {
+        guard !sessionActive && !isStartingSession else { return }
+        isStartingSession = true
+
+        defer {
+            pendingKeystrokes = []
+            isStartingSession = false
+        }
+
+        try await startSession()
+        // Replay any keystrokes that arrived while Face ID was showing
+        for pending in pendingKeystrokes {
+            recordKeystroke(pending)
+        }
+    }
+
     // MARK: - KeystrokeCaptureDelegate
 
     nonisolated func didRecordKeystroke(_ event: KeystrokeEvent) {
         Task { @MainActor in
-            self.recordKeystroke(event)
+            if self.sessionActive {
+                self.recordKeystroke(event)
+            } else if self.isStartingSession {
+                // Session is starting (Face ID showing) — buffer for replay
+                self.pendingKeystrokes.append(event)
+            }
+            // If session isn't active and isn't starting, drop the keystroke.
+            // Face ID is triggered by tab selection, not by typing.
         }
     }
 
@@ -188,6 +233,52 @@ final class SessionService: KeystrokeCaptureDelegate {
 
         // Clear buffer (keep allSessionKeystrokes for cumulative features)
         keystrokeBuffer = []
+
+        try modelContext.save()
+    }
+
+    /// Create a minimal commitment when no keystrokes were captured (e.g. very short post,
+    /// autocorrect-inserted text, or paste). This ensures the proof chain is never empty.
+    private func forceMinimalCheckpoint() async throws {
+        guard let document = currentDocument else { return }
+
+        // Minimal feature data — indicates a short or autocorrected post
+        let minimalFeature: [String: Any] = [
+            "keystroke_count": keystrokeCount,
+            "type": "minimal"
+        ]
+        let featureData = try JSONSerialization.data(withJSONObject: minimalFeature)
+
+        let nonce = SpeakwriteCrypto.randomNonce()
+        let previousHash = commitments.last?.commitmentHash
+
+        let hash = SpeakwriteCrypto.commitmentHash(
+            previous: previousHash,
+            nonce: nonce,
+            data: featureData
+        )
+
+        let nowMs = ProcessInfo.processInfo.systemUptime * 1000
+
+        // Sign with Secure Enclave
+        let _ = try await attestation.signCheckpoint(
+            commitmentHash: hash,
+            sequenceNum: commitmentCount
+        )
+
+        let commitment = Commitment(
+            document: document,
+            sequenceNum: commitmentCount,
+            commitmentHash: hash,
+            previousHash: previousHash,
+            nonce: Hex.encode(nonce),
+            timestampMs: nowMs,
+            commitmentType: "behavioral",
+            featureJSON: String(data: featureData, encoding: .utf8)
+        )
+        modelContext.insert(commitment)
+        commitments.append(commitment)
+        commitmentCount += 1
 
         try modelContext.save()
     }

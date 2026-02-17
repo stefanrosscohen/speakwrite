@@ -1,1 +1,0 @@
-Speakwrite.debug.dylib

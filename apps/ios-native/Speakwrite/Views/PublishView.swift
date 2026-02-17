@@ -55,7 +55,7 @@ struct PublishView: View {
                     Button {
                         Task { await viewModel.publish() }
                     } label: {
-                        Text("Publish to Bluesky")
+                        Text("Publish to Atproto")
                             .font(Theme.monoHeadline)
                             .frame(maxWidth: .infinity)
                     }

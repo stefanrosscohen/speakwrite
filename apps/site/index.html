@@ -6,7 +6,7 @@
   <title>Speakwrite — Prove a human wrote it</title>
   <meta name="description" content="Speakwrite captures keystroke dynamics as you type and cryptographically signs each checkpoint with the iPhone's Secure Enclave. The proof goes with the post.">
   <meta property="og:title" content="Speakwrite — Prove a human wrote it">
-  <meta property="og:description" content="A Bluesky client that captures keystroke dynamics and signs every checkpoint with the iPhone's Secure Enclave. Open protocol. Hardware-backed. No trust required.">
+  <meta property="og:description" content="An AT Protocol client that captures keystroke dynamics and signs every checkpoint with the iPhone's Secure Enclave. Open protocol. Hardware-backed. No trust required.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://speakwrite.io">
   <meta name="theme-color" content="#0a0a0a">
@@ -55,7 +55,7 @@
       <ol class="steps">
         <li>
           <strong>Sign in</strong>
-          <span>Use your Bluesky handle. OAuth via AT Protocol.</span>
+          <span>Use your AT Protocol handle. OAuth authentication, decentralized identity.</span>
         </li>
         <li>
           <strong>Type</strong>
@@ -67,7 +67,7 @@
         </li>
         <li>
           <strong>Publish</strong>
-          <span>The final content is bound to the chain tip. The proof bundle is attached to your Bluesky post.</span>
+          <span>The final content is bound to the chain tip. The proof bundle is published alongside your post on the AT Protocol network.</span>
         </li>
         <li>
           <strong>Verify</strong>
@@ -83,7 +83,7 @@
         <div class="tab-card">
           <div class="tab-icon">&gt;_</div>
           <h3>Timeline</h3>
-          <p>Your Bluesky timeline. Browse posts from people you follow. Speakwrite-verified posts are marked.</p>
+          <p>Your AT Protocol timeline. Browse posts from people you follow. Speakwrite-verified posts are marked.</p>
         </div>
         <div class="tab-card accent-card">
           <div class="tab-icon">[&check;]</div>
@@ -94,6 +94,11 @@
           <div class="tab-icon">$ _</div>
           <h3>Compose</h3>
           <p>Write your post. Keystroke timing is captured, commitments are chained, and the Secure Enclave signs every checkpoint.</p>
+        </div>
+        <div class="tab-card">
+          <div class="tab-icon">{&middot;}</div>
+          <h3>Settings</h3>
+          <p>Manage your account, appearance, and session. Your identity, your data, your preferences.</p>
         </div>
       </div>
     </section>
@@ -190,8 +195,8 @@
         <dt>Decentralized</dt>
         <dd>Proofs live in the author&rsquo;s AT Protocol Personal Data Server. No central server, no trusted authority. Verification is pure cryptography.</dd>
 
-        <dt>Bluesky native</dt>
-        <dd>Full AT Protocol client. Timeline, verified feed, compose, profiles &mdash; all in one app. Posts publish directly to your Bluesky account.</dd>
+        <dt>AT Protocol native</dt>
+        <dd>Full AT Protocol client. Timeline, verified feed, compose, profiles &mdash; all in one app. Posts publish to your Personal Data Server. Your data, your server.</dd>
 
         <dt>Progressive trust</dt>
         <dd>A single proof is weak evidence. A corpus from the same identity with consistent behavioral patterns is strong. Trust compounds over time.</dd>
@@ -203,14 +208,35 @@
       <p>A web app can&rsquo;t do this. Hardware attestation requires a native binary &mdash; Apple&rsquo;s App Attest certifies the app hasn&rsquo;t been tampered with, and the Secure Enclave holds a signing key that never leaves the silicon. No JavaScript bridge. No web wrapper. The entire proof chain happens inside the signed binary.</p>
     </section>
 
+    <section id="why-atproto">
+      <h2>Why AT Protocol</h2>
+      <p>Speakwrite needs three things from a social protocol: portable identity, user-owned data, and extensibility. AT Protocol provides all three.</p>
+      <dl>
+        <dt>Portable identity</dt>
+        <dd>Your DID (Decentralized Identifier) is yours. If you move servers, your identity, followers, and proof history move with you. No platform lock-in.</dd>
+
+        <dt>Personal Data Server</dt>
+        <dd>Proofs are stored as custom lexicon records (<code>io.speakwrite.proof</code>) on the author&rsquo;s own PDS. The data lives where the author lives &mdash; not on a third-party server Speakwrite controls.</dd>
+
+        <dt>Custom lexicons</dt>
+        <dd>AT Protocol lets any app define new record types. Speakwrite publishes proof bundles alongside posts using a custom lexicon. Any AT Protocol client can read and verify them.</dd>
+
+        <dt>Federated verification</dt>
+        <dd>Because proofs live on the open network, any verifier can fetch and validate them. No API key. No special access. The data is already public in the author&rsquo;s repository.</dd>
+
+        <dt>Open ecosystem</dt>
+        <dd>AT Protocol is not one app. It&rsquo;s an open network of interoperable services. Speakwrite is a native client that reads, writes, and extends the protocol &mdash; not a walled garden built on top of it.</dd>
+      </dl>
+    </section>
+
     <section id="open-source">
       <h2>Open Source</h2>
       <p>Everything is public under CC BY-SA 4.0.</p>
       <ul class="repo-list">
         <li>Protocol spec: <code>SPEC-v1.md</code></li>
         <li>iOS app: Native SwiftUI (iOS 17+)</li>
+        <li>Desktop app: Tauri + React</li>
         <li>Reference lib: <code>@speakwrite/core</code> (TypeScript)</li>
-        <li>Verifier: Standalone web verification tool</li>
       </ul>
       <p class="cta"><a href="https://github.com/stefanrosscohen/speakwrite">View on GitHub</a></p>
     </section>

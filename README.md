@@ -18,10 +18,10 @@ Speakwrite takes a different approach: instead of analyzing what was written, it
 
 ## How It Works
 
-1. **Sign in** — Use your Bluesky handle (AT Protocol OAuth)
+1. **Sign in** — Use your AT Protocol handle (OAuth with DPoP)
 2. **Type** — Keystroke dynamics are captured natively as you write
 3. **Commit** — Behavioral features are periodically hashed into a cryptographic commitment chain, signed by the Secure Enclave
-4. **Publish** — The final content is bound to the chain tip; the proof bundle is attached to your Bluesky post
+4. **Publish** — The final content is bound to the chain tip; the proof bundle is published alongside your post on the AT Protocol network
 5. **Verify** — Anyone can walk the hash chain, verify signatures, and confirm content binding
 
 ## The Protocol
@@ -39,9 +39,21 @@ Full specification: [`SPEC-v1.md`](SPEC-v1.md)
 Speakwrite is two things in one:
 
 - **A writing tool** that captures keystroke dynamics and publishes hardware-signed proofs
-- **A reader** with a global verified feed where every post was typed by a human
+- **A reader** with a feed split into "Following" and "For You" sub-tabs, where every verified post was typed by a human
 
-Native SwiftUI. Full AT Protocol client — timeline, verified feed, compose, profiles, settings.
+Verified posts are detected using the AT Protocol `tags` field on the post record -- no text footer or convention required. The app includes a full profile page with editing, photo pickers, and post management.
+
+Native SwiftUI. Full AT Protocol client -- timeline, verified feed, compose, profiles, settings.
+
+## Why AT Protocol
+
+The AT Protocol is the natural home for verifiable human authorship:
+
+- **Portable identity** — DIDs mean your proof history follows you across any service on the network
+- **User-owned data** — Proof bundles live on the author's PDS, not a third-party server
+- **Custom lexicons** — `io.speakwrite.proof` defines a structured record type any client can read and verify
+- **Federated verification** — Any node on the network can independently verify a proof bundle with nothing but SHA-256
+- **Open ecosystem** — No platform lock-in; any AT Protocol client can display and verify Speakwrite proofs
 
 ## Project Structure
 
@@ -49,7 +61,7 @@ Native SwiftUI. Full AT Protocol client — timeline, verified feed, compose, pr
 speakwrite/
 ├── packages/core/         @speakwrite/core — reference TypeScript library
 ├── apps/ios-native/       Native SwiftUI iOS app (iOS 17+)
-├── apps/verifier/         Standalone web verification tool
+├── apps/desktop/          Tauri + React desktop app
 ├── apps/site/             Landing page (speakwrite.io)
 └── SPEC-v1.md             Protocol specification
 ```
@@ -65,15 +77,17 @@ speakwrite/
 ```bash
 # Core library
 pnpm build:core
-pnpm test              # 39 tests across 5 files
+pnpm test
 
 # iOS app
 open apps/ios-native/Speakwrite.xcodeproj
 # Build with Xcode (iOS 17+, Swift 6)
 
-# Web
-pnpm dev:web           # dev server on :3000
-pnpm dev:verifier      # dev server on :3001
+# Desktop app (Tauri)
+cd apps/desktop && pnpm tauri dev
+
+# Website
+pnpm dev:site
 ```
 
 ## License

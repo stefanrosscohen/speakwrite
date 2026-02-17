@@ -15,6 +15,7 @@ final class ATProtoService {
     private var accessToken: String?
     private var refreshToken: String?
     private var pdsURL: String?
+    private var tokenEndpointURL: String? // Persisted for token refresh
     private var dpopKeyPair: P256.Signing.PrivateKey?
     private var dpopNonce: String? // Server-provided nonce for DPoP
     private var authSession: ASWebAuthenticationSession? // Keep strong reference during OAuth
@@ -27,6 +28,7 @@ final class ATProtoService {
         UserDefaults.standard.set(handle, forKey: "sw_handle")
         UserDefaults.standard.set(did, forKey: "sw_did")
         UserDefaults.standard.set(pdsURL, forKey: "sw_pds")
+        UserDefaults.standard.set(tokenEndpointURL, forKey: "sw_token_endpoint")
         if let token = accessToken {
             KeychainHelper.save(key: "sw_access_token", value: token)
         }
@@ -52,6 +54,7 @@ final class ATProtoService {
         pdsURL = p
         accessToken = at
         refreshToken = KeychainHelper.load(key: "sw_refresh_token")
+        tokenEndpointURL = UserDefaults.standard.string(forKey: "sw_token_endpoint")
 
         // Restore the DPoP key pair that was used during token exchange
         if let keyData = KeychainHelper.loadData(key: "sw_dpop_key"),
@@ -86,10 +89,24 @@ final class ATProtoService {
         return (did: result.did, pds: pds)
     }
 
+    /// Discover the authorization server URL from a PDS's protected resource metadata.
+    private func discoverAuthorizationServer(pds: String) async throws -> String {
+        let url = URL(string: "\(pds)/.well-known/oauth-protected-resource")!
+        let (data, _) = try await URLSession.shared.data(from: url)
+        let resource = try JSONDecoder().decode(OAuthProtectedResource.self, from: data)
+        guard let server = resource.authorizationServers.first else {
+            throw ATProtoError.noPDS
+        }
+        return server
+    }
+
     func signIn(handle: String, presentationAnchor: ASPresentationAnchor) async throws {
         let (resolvedDID, pds) = try await resolveHandle(handle)
 
-        let metadataURL = URL(string: "\(pds)/.well-known/oauth-authorization-server")!
+        // Discover the authorization server from the PDS's protected resource metadata
+        let authServer = try await discoverAuthorizationServer(pds: pds)
+
+        let metadataURL = URL(string: "\(authServer)/.well-known/oauth-authorization-server")!
         let (metaData, _) = try await URLSession.shared.data(from: metadataURL)
         let metadata = try JSONDecoder().decode(OAuthServerMetadata.self, from: metaData)
 
@@ -163,6 +180,7 @@ final class ATProtoService {
         self.handle = handle
         self.did = resolvedDID
         self.pdsURL = pds
+        self.tokenEndpointURL = metadata.tokenEndpoint
         self.isLoggedIn = true
         persistSession()
     }
@@ -274,16 +292,11 @@ final class ATProtoService {
     func publishProofPost(bundle: ProofBundle, postText: String) async throws -> (uri: String, cid: String) {
         guard let pds = pdsURL, let did = did else { throw ATProtoError.notLoggedIn }
 
-        let footer = "\n\n\u{2705} \(bundle.totalKeystrokeCount) keystrokes \u{00b7} \(bundle.commitments.count) commitments"
-        let maxContentLen = 300 - footer.count
-        let trimmedContent = postText.count > maxContentLen
-            ? String(postText.prefix(maxContentLen - 1)) + "\u{2026}"
-            : postText
-        let fullText = trimmedContent + footer
-
+        // Use the tags field for discoverability — keeps post text clean
         let postRecord: [String: Any] = [
             "$type": "app.bsky.feed.post",
-            "text": fullText,
+            "text": postText,
+            "tags": ["speakwrite", "human-verified"],
             "createdAt": ISO8601DateFormatter().string(from: Date()),
         ]
 
@@ -311,26 +324,79 @@ final class ATProtoService {
     func fetchVerifiedFeed(cursor: String? = nil) async throws -> (posts: [VerifiedPost], cursor: String?) {
         let publicAPI = "https://api.bsky.app"
 
-        var urlString = "\(publicAPI)/xrpc/app.bsky.feed.searchPosts?q=%E2%9C%85%20keystrokes%20%C2%B7%20commitments&limit=25"
-        if let cursor { urlString += "&cursor=\(cursor)" }
+        // Search by tag (new posts) and also text (old posts with footer)
+        // Run both searches concurrently and merge results
+        var allPosts: [VerifiedPost] = []
+        var lastCursor: String?
 
-        let (data, _) = try await URLSession.shared.data(from: URL(string: urlString)!)
-
-        let result = try JSONDecoder().decode(SearchPostsResponse.self, from: data)
-
-        let posts = result.posts.map { post in
-            VerifiedPost(
-                uri: post.uri, cid: post.cid, author: post.author,
-                text: post.record.text, createdAt: post.record.createdAt,
-                likeCount: post.likeCount ?? 0, repostCount: post.repostCount ?? 0,
-                replyCount: post.replyCount ?? 0, viewer: post.viewer
-            )
+        // 1. Tag-based search (new format)
+        do {
+            var tagURL = "\(publicAPI)/xrpc/app.bsky.feed.searchPosts?tag=speakwrite&limit=25&sort=latest"
+            if let cursor {
+                let encoded = cursor.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? cursor
+                tagURL += "&cursor=\(encoded)"
+            }
+            let (data, response) = try await URLSession.shared.data(from: URL(string: tagURL)!)
+            if let httpResp = response as? HTTPURLResponse, httpResp.statusCode == 200 {
+                let decoder = JSONDecoder()
+                let result = try decoder.decode(SearchPostsResponse.self, from: data)
+                let posts = result.posts.compactMap { post -> VerifiedPost? in
+                    VerifiedPost(
+                        uri: post.uri, cid: post.cid, author: post.author,
+                        text: post.record.text, createdAt: post.record.safeCreatedAt,
+                        likeCount: post.likeCount ?? 0, repostCount: post.repostCount ?? 0,
+                        replyCount: post.replyCount ?? 0, viewer: post.viewer
+                    )
+                }
+                allPosts.append(contentsOf: posts)
+                lastCursor = result.cursor
+                print("[Feed] Tag search returned \(posts.count) posts")
+            } else {
+                let body = String(data: try await URLSession.shared.data(from: URL(string: tagURL)!).0, encoding: .utf8) ?? ""
+                print("[Feed] Tag search failed with status \((response as? HTTPURLResponse)?.statusCode ?? 0): \(body.prefix(200))")
+            }
+        } catch {
+            print("[Feed] Tag search error: \(error)")
         }
 
-        return (posts: posts, cursor: result.cursor)
+        // 2. Text-based search (backward compat for old posts with footer)
+        do {
+            var textURL = "\(publicAPI)/xrpc/app.bsky.feed.searchPosts?q=%22human+verified%22+speakwrite&limit=25&sort=latest"
+            if let cursor, allPosts.isEmpty {
+                let encoded = cursor.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? cursor
+                textURL += "&cursor=\(encoded)"
+            }
+            let (data, response) = try await URLSession.shared.data(from: URL(string: textURL)!)
+            if let httpResp = response as? HTTPURLResponse, httpResp.statusCode == 200 {
+                let decoder = JSONDecoder()
+                let result = try decoder.decode(SearchPostsResponse.self, from: data)
+                let posts = result.posts.compactMap { post -> VerifiedPost? in
+                    VerifiedPost(
+                        uri: post.uri, cid: post.cid, author: post.author,
+                        text: post.record.text, createdAt: post.record.safeCreatedAt,
+                        likeCount: post.likeCount ?? 0, repostCount: post.repostCount ?? 0,
+                        replyCount: post.replyCount ?? 0, viewer: post.viewer
+                    )
+                }
+                let existingURIs = Set(allPosts.map(\.uri))
+                let newPosts = posts.filter { !existingURIs.contains($0.uri) }
+                allPosts.append(contentsOf: newPosts)
+                if lastCursor == nil { lastCursor = result.cursor }
+                print("[Feed] Text search returned \(posts.count) posts (\(newPosts.count) new)")
+            } else {
+                print("[Feed] Text search failed with status \((response as? HTTPURLResponse)?.statusCode ?? 0)")
+            }
+        } catch {
+            print("[Feed] Text search error: \(error)")
+        }
+
+        // Sort by createdAt descending
+        allPosts.sort { $0.createdAt > $1.createdAt }
+
+        return (posts: allPosts, cursor: lastCursor)
     }
 
-    // MARK: - Timeline (Bluesky Discover Feed)
+    // MARK: - Timeline (Discover / For You Feed)
 
     func fetchTimeline(cursor: String? = nil) async throws -> (posts: [TimelinePost], cursor: String?) {
         let publicAPI = "https://api.bsky.app"
@@ -345,21 +411,64 @@ final class ATProtoService {
 
         let result = try JSONDecoder().decode(FeedResponse.self, from: data)
 
-        let posts = result.feed.compactMap { item -> TimelinePost? in
+        return (posts: parseFeedPosts(result.feed), cursor: result.cursor)
+    }
+
+    // MARK: - Following Timeline (Authenticated)
+
+    func fetchFollowingTimeline(cursor: String? = nil) async throws -> (posts: [TimelinePost], cursor: String?) {
+        guard let pds = pdsURL, let myDID = did else { throw ATProtoError.notLoggedIn }
+
+        var urlString = "\(pds)/xrpc/app.bsky.feed.getTimeline?limit=50"
+        if let cursor { urlString += "&cursor=\(cursor)" }
+
+        let (data, _) = try await authenticatedRequest(url: urlString, method: "GET")
+
+        let result = try JSONDecoder().decode(FeedResponse.self, from: data)
+
+        // Filter to only posts from followed accounts or the user's own posts.
+        // getTimeline can include suggested/algorithmic posts from non-followed accounts.
+        let allPosts = parseFeedPosts(result.feed)
+        let filtered = allPosts.filter { post in
+            // Own posts
+            if post.author.did == myDID { return true }
+            // Posts from followed authors
+            if post.author.viewer?.following != nil { return true }
+            // Reposts by someone you follow (the original author may not be followed)
+            if post.repostedBy != nil { return true }
+            return false
+        }
+
+        return (posts: filtered, cursor: result.cursor)
+    }
+
+    /// Parse feed items into TimelinePost array with verified detection.
+    private func parseFeedPosts(_ feedItems: [FeedItem]) -> [TimelinePost] {
+        return feedItems.compactMap { item -> TimelinePost? in
             let post = item.post
             guard let text = post.record?.text else { return nil }
-            let isVerified = text.contains("\u{2705}") && text.contains("keystrokes") && text.contains("commitments")
+            let hasSpeakwriteTag = post.record?.tags?.contains("speakwrite") == true
+            let isVerified = hasSpeakwriteTag ||
+                (text.contains("human verified") && text.contains("speakwrite")) ||
+                (text.contains("keystrokes") && text.contains("commitments"))
+
+            // Extract repost attribution
+            let repostedBy: String?
+            if item.reason?.type == "app.bsky.feed.defs#reasonRepost",
+               let by = item.reason?.by {
+                repostedBy = by.displayName ?? by.handle
+            } else {
+                repostedBy = nil
+            }
 
             return TimelinePost(
                 uri: post.uri, cid: post.cid, author: post.author,
                 text: text, createdAt: post.record?.createdAt ?? "",
                 likeCount: post.likeCount ?? 0, repostCount: post.repostCount ?? 0,
                 replyCount: post.replyCount ?? 0, isVerified: isVerified,
-                viewer: post.viewer
+                viewer: post.viewer, repostedBy: repostedBy
             )
         }
-
-        return (posts: posts, cursor: result.cursor)
     }
 
     // MARK: - Profile
@@ -388,14 +497,17 @@ final class ATProtoService {
         let posts = result.feed.compactMap { item -> TimelinePost? in
             let post = item.post
             guard let text = post.record?.text else { return nil }
-            let isVerified = text.contains("\u{2705}") && text.contains("keystrokes") && text.contains("commitments")
+            let hasSpeakwriteTag = post.record?.tags?.contains("speakwrite") == true
+            let isVerified = hasSpeakwriteTag ||
+                (text.contains("human verified") && text.contains("speakwrite")) ||
+                (text.contains("keystrokes") && text.contains("commitments"))
 
             return TimelinePost(
                 uri: post.uri, cid: post.cid, author: post.author,
                 text: text, createdAt: post.record?.createdAt ?? "",
                 likeCount: post.likeCount ?? 0, repostCount: post.repostCount ?? 0,
                 replyCount: post.replyCount ?? 0, isVerified: isVerified,
-                viewer: post.viewer
+                viewer: post.viewer, repostedBy: nil
             )
         }
 
@@ -524,16 +636,203 @@ final class ATProtoService {
         let _ = try await authenticatedRequest(url: url, method: "POST", body: bodyData)
     }
 
+    /// Delete a post by URI.
+    func deletePost(uri: String) async throws {
+        try await deleteRecord(collection: "app.bsky.feed.post", recordUri: uri)
+    }
+
+    /// Upload an image blob to the PDS. Returns the blob JSON for use in profile updates.
+    func uploadBlob(imageData: Data, mimeType: String) async throws -> [String: Any] {
+        guard let pds = pdsURL, let token = accessToken else { throw ATProtoError.notLoggedIn }
+        let url = "\(pds)/xrpc/com.atproto.repo.uploadBlob"
+
+        var request = URLRequest(url: URL(string: url)!)
+        request.httpMethod = "POST"
+        request.setValue(mimeType, forHTTPHeaderField: "Content-Type")
+        request.setValue("DPoP \(token)", forHTTPHeaderField: "Authorization")
+        if let dpopHeader = try createDPoPProof(method: "POST", url: url, accessToken: token) {
+            request.setValue(dpopHeader, forHTTPHeaderField: "DPoP")
+        }
+        request.httpBody = imageData
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        // Handle DPoP nonce
+        if let httpResponse = response as? HTTPURLResponse,
+           let nonce = httpResponse.value(forHTTPHeaderField: "DPoP-Nonce") {
+            dpopNonce = nonce
+
+            if httpResponse.statusCode == 401 {
+                // Retry with nonce
+                var retryReq = URLRequest(url: URL(string: url)!)
+                retryReq.httpMethod = "POST"
+                retryReq.setValue(mimeType, forHTTPHeaderField: "Content-Type")
+                retryReq.setValue("DPoP \(token)", forHTTPHeaderField: "Authorization")
+                if let dpopHeader = try createDPoPProof(method: "POST", url: url, accessToken: token) {
+                    retryReq.setValue(dpopHeader, forHTTPHeaderField: "DPoP")
+                }
+                retryReq.httpBody = imageData
+                let (retryData, _) = try await URLSession.shared.data(for: retryReq)
+                let blob = try JSONSerialization.jsonObject(with: retryData) as? [String: Any]
+                return blob?["blob"] as? [String: Any] ?? [:]
+            }
+        }
+
+        let blob = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        return blob?["blob"] as? [String: Any] ?? [:]
+    }
+
+    /// Update the user's profile (display name, bio, avatar, banner).
+    func updateProfile(displayName: String? = nil, description: String? = nil,
+                       avatar: [String: Any]? = nil, banner: [String: Any]? = nil) async throws {
+        guard let pds = pdsURL, let did = self.did else { throw ATProtoError.notLoggedIn }
+
+        // Get current profile record
+        let getURL = "\(pds)/xrpc/com.atproto.repo.getRecord?repo=\(did)&collection=app.bsky.actor.profile&rkey=self"
+        let (getData, _) = try await authenticatedRequest(url: getURL, method: "GET")
+        let existing = try JSONSerialization.jsonObject(with: getData) as? [String: Any] ?? [:]
+        var record = existing["value"] as? [String: Any] ?? ["$type": "app.bsky.actor.profile"]
+
+        // Merge changes
+        if let displayName { record["displayName"] = displayName }
+        if let description { record["description"] = description }
+        if let avatar { record["avatar"] = avatar }
+        if let banner { record["banner"] = banner }
+
+        // Put updated record
+        let putURL = "\(pds)/xrpc/com.atproto.repo.putRecord"
+        let body: [String: Any] = [
+            "repo": did,
+            "collection": "app.bsky.actor.profile",
+            "rkey": "self",
+            "record": record,
+        ]
+        let bodyData = try JSONSerialization.data(withJSONObject: body)
+        let _ = try await authenticatedRequest(url: putURL, method: "POST", body: bodyData)
+    }
+
+    /// Refresh the access token using the stored refresh token.
+    /// The refresh request is DPoP-bound with the same key pair used during initial token exchange.
+    private func refreshAccessToken() async throws {
+        guard let rt = refreshToken, let tokenEndpoint = tokenEndpointURL ?? resolveTokenEndpoint() else {
+            print("[Auth] Refresh failed: no refresh token or token endpoint")
+            throw ATProtoError.notLoggedIn
+        }
+
+        print("[Auth] Attempting token refresh at \(tokenEndpoint)")
+
+        let clientId = "https://www.speakwrite.io/app/client-metadata.json"
+        let bodyDict: [String: String] = [
+            "grant_type": "refresh_token",
+            "refresh_token": rt,
+            "client_id": clientId,
+        ]
+        let bodyData = try JSONEncoder().encode(bodyDict)
+
+        func buildRefreshRequest() throws -> URLRequest {
+            var request = URLRequest(url: URL(string: tokenEndpoint)!)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            if let dpopHeader = try createDPoPProof(method: "POST", url: tokenEndpoint) {
+                request.setValue(dpopHeader, forHTTPHeaderField: "DPoP")
+            }
+            request.httpBody = bodyData
+            return request
+        }
+
+        let request = try buildRefreshRequest()
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        if let httpResponse = response as? HTTPURLResponse {
+            if let nonce = httpResponse.value(forHTTPHeaderField: "DPoP-Nonce") {
+                dpopNonce = nonce
+            }
+
+            print("[Auth] Refresh response: \(httpResponse.statusCode)")
+
+            // Retry with nonce if 400 or 401 (DPoP nonce challenge)
+            if httpResponse.statusCode == 400 || httpResponse.statusCode == 401 {
+                let retryRequest = try buildRefreshRequest()
+                let (retryData, retryResponse) = try await URLSession.shared.data(for: retryRequest)
+                if let retryHttp = retryResponse as? HTTPURLResponse {
+                    if let retryNonce = retryHttp.value(forHTTPHeaderField: "DPoP-Nonce") {
+                        dpopNonce = retryNonce
+                    }
+                    print("[Auth] Refresh retry response: \(retryHttp.statusCode)")
+                    if retryHttp.statusCode >= 200 && retryHttp.statusCode < 300 {
+                        let tokens = try JSONDecoder().decode(TokenResponse.self, from: retryData)
+                        accessToken = tokens.accessToken
+                        if let newRT = tokens.refreshToken { refreshToken = newRT }
+                        persistSession()
+                        print("[Auth] Token refreshed successfully (after nonce retry)")
+                        return
+                    }
+                    let errorBody = String(data: retryData, encoding: .utf8) ?? ""
+                    print("[Auth] Refresh retry failed: \(errorBody)")
+                    throw ATProtoError.oauthError("refresh_failed_\(retryHttp.statusCode)", errorBody)
+                }
+                // Fallback: try to decode anyway
+                let tokens = try JSONDecoder().decode(TokenResponse.self, from: retryData)
+                accessToken = tokens.accessToken
+                if let newRT = tokens.refreshToken { refreshToken = newRT }
+                persistSession()
+                return
+            }
+
+            if httpResponse.statusCode >= 200 && httpResponse.statusCode < 300 {
+                let tokens = try JSONDecoder().decode(TokenResponse.self, from: data)
+                accessToken = tokens.accessToken
+                if let newRT = tokens.refreshToken { refreshToken = newRT }
+                persistSession()
+                print("[Auth] Token refreshed successfully")
+                return
+            }
+
+            let errorBody = String(data: data, encoding: .utf8) ?? "HTTP \(httpResponse.statusCode)"
+            print("[Auth] Refresh failed: \(errorBody)")
+            throw ATProtoError.oauthError("refresh_failed_\(httpResponse.statusCode)", errorBody)
+        }
+
+        // Non-HTTP response (shouldn't happen)
+        let tokens = try JSONDecoder().decode(TokenResponse.self, from: data)
+        accessToken = tokens.accessToken
+        if let newRT = tokens.refreshToken { refreshToken = newRT }
+        persistSession()
+    }
+
+    /// Try to discover the token endpoint from the PDS if not already stored.
+    private func resolveTokenEndpoint() -> String? {
+        // Synchronous check — for restored sessions that didn't persist the token endpoint.
+        // The caller can fall back to re-login if this returns nil.
+        guard let pds = pdsURL else { return nil }
+        // We can't do async from here, so return nil and let the refresh fail gracefully.
+        // The user will need to re-login (one-time migration).
+        return nil
+    }
+
+    /// Async version: discover token endpoint from PDS metadata.
+    private func discoverTokenEndpoint() async throws -> String? {
+        guard let pds = pdsURL else { return nil }
+        let authServer = try await discoverAuthorizationServer(pds: pds)
+        let metadataURL = URL(string: "\(authServer)/.well-known/oauth-authorization-server")!
+        let (metaData, _) = try await URLSession.shared.data(from: metadataURL)
+        let metadata = try JSONDecoder().decode(OAuthServerMetadata.self, from: metaData)
+        tokenEndpointURL = metadata.tokenEndpoint
+        UserDefaults.standard.set(metadata.tokenEndpoint, forKey: "sw_token_endpoint")
+        return metadata.tokenEndpoint
+    }
+
     private func authenticatedRequest(url: String, method: String, body: Data? = nil) async throws -> (Data, URLResponse) {
-        guard let accessToken else { throw ATProtoError.notLoggedIn }
+        guard accessToken != nil else { throw ATProtoError.notLoggedIn }
 
         func buildRequest() throws -> URLRequest {
+            guard let token = accessToken else { throw ATProtoError.notLoggedIn }
             var request = URLRequest(url: URL(string: url)!)
             request.httpMethod = method
-            request.setValue("DPoP \(accessToken)", forHTTPHeaderField: "Authorization")
+            request.setValue("DPoP \(token)", forHTTPHeaderField: "Authorization")
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-            if let dpopHeader = try createDPoPProof(method: method, url: url, accessToken: accessToken) {
+            if let dpopHeader = try createDPoPProof(method: method, url: url, accessToken: token) {
                 request.setValue(dpopHeader, forHTTPHeaderField: "DPoP")
             }
 
@@ -556,20 +855,81 @@ final class ATProtoService {
 
         captureNonce(from: httpResponse)
 
-        // Retry on 401 (DPoP nonce challenge) — server sends fresh nonce, retry with it
+        // Handle 401 — could be DPoP nonce challenge OR expired token
         if httpResponse.statusCode == 401 {
-            let retryRequest = try buildRequest()
-            let (retryData, retryResponse) = try await URLSession.shared.data(for: retryRequest)
-            if let retryHttp = retryResponse as? HTTPURLResponse {
-                captureNonce(from: retryHttp)
-                if retryHttp.statusCode >= 200 && retryHttp.statusCode < 300 {
-                    return (retryData, retryResponse)
+            // Check if this is a token expiry error vs. a nonce issue
+            let errorJSON = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            let errorMessage = errorJSON?["message"] as? String ?? ""
+            let isTokenExpired = errorMessage.contains("exp") || errorMessage.contains("invalid_token") || errorMessage.contains("expired")
+
+            if !isTokenExpired {
+                print("[Auth] Got 401 for \(url), attempting nonce retry")
+                // First retry: might just need the fresh DPoP nonce
+                let retryRequest = try buildRequest()
+                let (retryData, retryResponse) = try await URLSession.shared.data(for: retryRequest)
+                if let retryHttp = retryResponse as? HTTPURLResponse {
+                    captureNonce(from: retryHttp)
+                    if retryHttp.statusCode >= 200 && retryHttp.statusCode < 300 {
+                        print("[Auth] Nonce retry succeeded")
+                        return (retryData, retryResponse)
+                    }
                 }
-                // Retry also failed — throw the error
-                let errorBody = String(data: retryData, encoding: .utf8) ?? "HTTP \(retryHttp.statusCode)"
-                throw ATProtoError.oauthError("http_\(retryHttp.statusCode)", errorBody)
+            } else {
+                print("[Auth] Got 401 for \(url) — token expired, skipping nonce retry")
             }
-            return (retryData, retryResponse)
+
+            // Token expired or nonce retry failed — try refreshing the access token
+            if refreshToken != nil {
+                // Discover token endpoint if we don't have it (migration for existing sessions)
+                if tokenEndpointURL == nil {
+                    print("[Auth] No token endpoint cached, discovering...")
+                    tokenEndpointURL = try? await discoverTokenEndpoint()
+                    print("[Auth] Discovered token endpoint: \(tokenEndpointURL ?? "nil")")
+                }
+
+                do {
+                    try await refreshAccessToken()
+                    // Retry with the fresh token
+                    let freshRequest = try buildRequest()
+                    let (freshData, freshResponse) = try await URLSession.shared.data(for: freshRequest)
+                    if let freshHttp = freshResponse as? HTTPURLResponse {
+                        captureNonce(from: freshHttp)
+                        if freshHttp.statusCode >= 200 && freshHttp.statusCode < 300 {
+                            print("[Auth] Request succeeded after token refresh")
+                            return (freshData, freshResponse)
+                        }
+                        // If we get another nonce challenge after refresh, retry once more
+                        if freshHttp.statusCode == 401 {
+                            print("[Auth] Got 401 after refresh, trying one more time with fresh nonce")
+                            let finalRequest = try buildRequest()
+                            let (finalData, finalResponse) = try await URLSession.shared.data(for: finalRequest)
+                            if let finalHttp = finalResponse as? HTTPURLResponse {
+                                captureNonce(from: finalHttp)
+                                if finalHttp.statusCode >= 200 && finalHttp.statusCode < 300 {
+                                    print("[Auth] Final retry after refresh succeeded")
+                                    return (finalData, finalResponse)
+                                }
+                                let errorBody = String(data: finalData, encoding: .utf8) ?? "HTTP \(finalHttp.statusCode)"
+                                print("[Auth] Final retry failed: \(finalHttp.statusCode) \(errorBody)")
+                                throw ATProtoError.oauthError("http_\(finalHttp.statusCode)", errorBody)
+                            }
+                            return (finalData, finalResponse)
+                        }
+                        let errorBody = String(data: freshData, encoding: .utf8) ?? "HTTP \(freshHttp.statusCode)"
+                        print("[Auth] Request failed even after refresh: \(freshHttp.statusCode) \(errorBody)")
+                        throw ATProtoError.oauthError("http_\(freshHttp.statusCode)", errorBody)
+                    }
+                    return (freshData, freshResponse)
+                } catch {
+                    print("[Auth] Token refresh error: \(error)")
+                    throw error
+                }
+            }
+
+            // No refresh token — throw the error
+            let errorBody = String(data: data, encoding: .utf8) ?? "HTTP \(httpResponse.statusCode)"
+            print("[Auth] No refresh token available, failing with 401")
+            throw ATProtoError.oauthError("http_\(httpResponse.statusCode)", errorBody)
         }
 
         // Throw on non-2xx responses
@@ -614,9 +974,10 @@ final class ATProtoService {
             ] as [String: Any],
         ]
 
+        let now = Int(Date().timeIntervalSince1970)
         var payload: [String: Any] = [
             "jti": UUID().uuidString, "htm": method,
-            "htu": url, "iat": Int(Date().timeIntervalSince1970),
+            "htu": url, "iat": now, "exp": now + 120,
         ]
         if let nonce = dpopNonce { payload["nonce"] = nonce }
         // Include access token hash when presenting a DPoP-bound token (RFC 9449 §4.2)
@@ -643,6 +1004,7 @@ final class ATProtoService {
         UserDefaults.standard.removeObject(forKey: "sw_handle")
         UserDefaults.standard.removeObject(forKey: "sw_did")
         UserDefaults.standard.removeObject(forKey: "sw_pds")
+        UserDefaults.standard.removeObject(forKey: "sw_token_endpoint")
         KeychainHelper.delete(key: "sw_access_token")
         KeychainHelper.delete(key: "sw_refresh_token")
         KeychainHelper.delete(key: "sw_dpop_key")
@@ -650,6 +1012,7 @@ final class ATProtoService {
         accessToken = nil
         refreshToken = nil
         pdsURL = nil
+        tokenEndpointURL = nil
         dpopKeyPair = nil
         dpopNonce = nil
         handle = nil
@@ -663,6 +1026,13 @@ final class ATProtoService {
 private struct ResolveHandleResponse: Decodable { let did: String }
 private struct DIDDocument: Decodable { let service: [DIDService]? }
 private struct DIDService: Decodable { let type: String; let serviceEndpoint: String }
+
+private struct OAuthProtectedResource: Decodable {
+    let authorizationServers: [String]
+    enum CodingKeys: String, CodingKey {
+        case authorizationServers = "authorization_servers"
+    }
+}
 
 private struct OAuthServerMetadata: Decodable {
     let authorizationEndpoint: String
@@ -718,7 +1088,21 @@ private struct SearchPost: Decodable {
     let viewer: PostViewer?
 }
 
-private struct PostRecord: Decodable { let text: String; let createdAt: String }
+private struct PostRecord: Decodable {
+    let text: String
+    let createdAt: String?
+
+    var safeCreatedAt: String { createdAt ?? "" }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        // Default to empty string if text is missing (defensive against bad API data)
+        text = (try? container.decode(String.self, forKey: .text)) ?? ""
+        createdAt = try? container.decode(String.self, forKey: .createdAt)
+    }
+
+    enum CodingKeys: String, CodingKey { case text, createdAt }
+}
 
 // MARK: - Public Response Types
 
@@ -736,14 +1120,25 @@ struct PostViewer: Codable {
 }
 
 struct FeedResponse: Decodable { let feed: [FeedItem]; let cursor: String? }
-struct FeedItem: Decodable { let post: FeedPost }
+struct FeedItem: Decodable {
+    let post: FeedPost
+    let reason: FeedReason?
+}
+struct FeedReason: Decodable {
+    let type: String?
+    let by: PostAuthor?
+    enum CodingKeys: String, CodingKey {
+        case type = "$type"
+        case by
+    }
+}
 struct FeedPost: Decodable {
     let uri: String; let cid: String; let author: PostAuthor
     let record: FeedPostRecord?
     let likeCount: Int?; let repostCount: Int?; let replyCount: Int?
     let viewer: PostViewer?
 }
-struct FeedPostRecord: Decodable { let text: String?; let createdAt: String? }
+struct FeedPostRecord: Decodable { let text: String?; let createdAt: String?; let tags: [String]? }
 
 struct VerifiedPost: Identifiable {
     let uri: String; let cid: String; let author: PostAuthor
@@ -758,6 +1153,7 @@ struct TimelinePost: Identifiable {
     let text: String; let createdAt: String
     let likeCount: Int; let repostCount: Int; let replyCount: Int
     let isVerified: Bool; let viewer: PostViewer?
+    let repostedBy: String? // Display name or handle of the reposter
     var id: String { uri }
 }
 

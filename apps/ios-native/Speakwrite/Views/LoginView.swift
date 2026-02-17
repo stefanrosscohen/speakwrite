@@ -23,7 +23,7 @@ struct LoginView: View {
             Spacer()
 
             VStack(spacing: Theme.lg) {
-                TextField("your.bsky.handle", text: $handle)
+                TextField("handle.bsky.social", text: $handle)
                     .textFieldStyle(.roundedBorder)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
@@ -37,7 +37,7 @@ struct LoginView: View {
                         ProgressView()
                             .tint(Theme.textPrimary(colorScheme))
                     } else {
-                        Text("Sign in with Bluesky")
+                        Text("Sign in")
                             .font(Theme.monoHeadline)
                     }
                 }

@@ -10,12 +10,10 @@ apps/reader/dist/
 packages/core/dist/
 *.tsbuildinfo
 
-# iOS
-apps/ios/ios/App/Pods/
-apps/ios/ios/App/App/public/
-apps/ios/ios/App/App/capacitor.config.json
-apps/ios/ios/App/App/config.xml
-apps/ios/ios/capacitor-cordova-ios-plugins/
+# iOS (native)
+apps/ios-native/build/
+apps/ios-native/**/*.xcuserstate
+apps/ios-native/**/xcuserdata/
 
 # Environment
 .env

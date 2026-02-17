@@ -31,11 +31,10 @@ struct ProfileView: View {
                         .frame(height: 150)
                 }
 
-                // Avatar + Follow button row
-                HStack(alignment: .bottom) {
+                // Avatar + Follow button
+                HStack {
                     AvatarView(url: profile?.avatar, handle: profile?.handle, size: .large)
                         .overlay(Circle().stroke(Theme.avatarBorder(colorScheme), lineWidth: 3))
-                        .offset(y: -35)
 
                     Spacer()
 
@@ -53,16 +52,24 @@ struct ProfileView: View {
                             }
                         } label: {
                             Text(isFollowing ? "Following" : "Follow")
-                                .font(.system(size: 14, weight: .semibold))
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(isFollowing ? Theme.textPrimary(colorScheme) : .white)
                                 .padding(.horizontal, Theme.xl)
                                 .padding(.vertical, Theme.sm)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 20)
+                                        .fill(isFollowing ? Theme.surface(colorScheme) : Theme.accent)
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 20)
+                                        .stroke(isFollowing ? Theme.separator(colorScheme) : Color.clear, lineWidth: 1)
+                                )
                         }
-                        .buttonStyle(.bordered)
-                        .tint(isFollowing ? Theme.textSecondary(colorScheme) : Theme.accent)
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.horizontal, Theme.lg)
-                .padding(.bottom, -30)
+                .padding(.top, Theme.md)
 
                 // Name + handle
                 VStack(alignment: .leading, spacing: 2) {

@@ -9,11 +9,11 @@
 
 ## 1. What This Is
 
-Speakwrite is a native iOS app for writing and reading human-verified posts on Bluesky. It is two things in one:
+Speakwrite is a native iOS app for writing and reading human-verified posts on the AT Protocol network. It is two things in one:
 
 1. **A writing tool** that captures keystroke dynamics as you type, cryptographically signs each checkpoint with the iPhone's Secure Enclave, and publishes the proof alongside the post.
 
-2. **A reader** that shows a global feed of all human-verified posts across the Bluesky network — one place where everything was typed by a person.
+2. **A reader** that shows a global feed of all human-verified posts across the AT Protocol network — one place where everything was typed by a person.
 
 **Scope of v1:** Native SwiftUI iOS app. Short-form posts (up to ~5,000 chars). Published via AT Protocol (OAuth 2.0 with PKCE + DPoP). Verified via an open JSON proof bundle. Hardware attestation via Apple App Attest + Secure Enclave. Global verified feed for reading.
 
@@ -50,7 +50,7 @@ Speakwrite is a native iOS app for writing and reading human-verified posts on B
 ### 2.2 Session Lifecycle
 
 ```
-1. User opens app → signs in with Bluesky handle (AT Protocol OAuth)
+1. User opens app → signs in with AT Protocol handle (AT Protocol OAuth)
 2. User starts typing → CaptureTextView captures keystroke events
 3. Periodically → Checkpoint:
    - Extract behavioral features from keystrokes
@@ -262,7 +262,7 @@ OAuth 2.0 with PKCE + DPoP per the AT Protocol specification:
 
 1. **Client metadata** is discoverable at `https://www.speakwrite.io/app/client-metadata.json`
 2. **Pushed Authorization Request (PAR)** to the user's PDS authorization server
-3. **ASWebAuthenticationSession** presents the Bluesky login flow
+3. **ASWebAuthenticationSession** presents the AT Protocol login flow
 4. **Token exchange** with DPoP-bound access tokens
 5. **DPoP proofs** include `ath` (access token hash) per RFC 9449 §4.2
 
@@ -303,12 +303,22 @@ Proofs are stored as records in the author's AT Protocol repo under a custom col
 
 When publishing, the app creates two records:
 
-1. **`app.bsky.feed.post`** — The post text visible on Bluesky, with a keystroke/commitment count footer
+1. **`app.bsky.feed.post`** — The post text, with `tags: ["speakwrite", "human-verified"]` on the record for discovery. The post text itself is clean with no footer.
 2. **`io.speakwrite.proof`** — The full proof bundle stored in the author's repo
 
 ### 5.5 Verified Feed (Reader)
 
-The app queries `app.bsky.feed.searchPosts` on `api.bsky.app` to find posts with the Speakwrite keystroke/commitment footer pattern. These are displayed in reverse chronological order with author info, verification badges, and keystroke/commitment counts.
+The app queries `app.bsky.feed.searchPosts` on `api.bsky.app` to discover human-verified posts. Detection uses:
+
+1. **Tag search (primary):** `tag=speakwrite` — matches posts with the `speakwrite` tag on the record.
+2. **Text search (backward compat):** Searches for legacy footer text to surface older posts that predate tag-based tagging.
+
+Results are returned with `sort=latest` for reverse chronological ordering. Posts are displayed with author info, verification badges, and keystroke/commitment counts.
+
+The feed supports two sub-feeds:
+
+- **Following** — Human-verified posts from accounts the signed-in user follows.
+- **For You** — All human-verified posts across the network (global discovery).
 
 Public API read endpoints (timeline, verified feed, profiles, post threads) use unauthenticated requests because DPoP-bound tokens are PDS-specific and cannot be used against `api.bsky.app`.
 
@@ -466,7 +476,7 @@ iOS Keyboard → CaptureTextView → Keystroke Events → SwiftData
                                         ↓
                                 Proof Bundle (JSON)
                                         ↓
-                  AT Protocol (OAuth + DPoP) → Bluesky Post
+                  AT Protocol (OAuth + DPoP) → AT Protocol Post
                                         ↓
                            Verified Feed in Speakwrite App
 ```

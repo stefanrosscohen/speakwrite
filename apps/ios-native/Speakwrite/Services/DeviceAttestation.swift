@@ -72,6 +72,10 @@ actor DeviceAttestationService {
     private var finalSignatureData: Data?
     private var signingKey: SecureEnclave.P256.Signing.PrivateKey?
 
+    /// Pre-authenticated LAContext — Face ID is prompted once at session start,
+    /// then this context is reused for all subsequent signing operations.
+    private var authContext: LAContext?
+
     private static let keyIdKey = "speakwrite_attest_key_id"
     private static let seKeyTag = "speakwrite_se_key"
 
@@ -105,8 +109,8 @@ actor DeviceAttestationService {
             attestationData = nil
         }
 
-        // Generate or restore Secure Enclave signing key
-        if let existingKey = try? loadSEKey() {
+        // Generate or restore Secure Enclave signing key (without biometric context yet)
+        if let existingKey = try? loadSEKey(authContext: nil) {
             signingKey = existingKey
         } else {
             let accessControl = SecAccessControlCreateWithFlags(
@@ -129,12 +133,6 @@ actor DeviceAttestationService {
     }
 
     func startSession() async throws -> SessionStart {
-        // Restore SE key if needed
-        if signingKey == nil {
-            signingKey = try loadSEKey()
-        }
-        guard let key = signingKey else { throw AttestationError.noSigningKey }
-
         let sid = UUID().uuidString
         let timestamp = ISO8601DateFormatter().string(from: Date())
 
@@ -143,7 +141,25 @@ actor DeviceAttestationService {
         checkpointSignatures = []
         finalSignatureData = nil
 
-        // Sign session start (triggers biometric prompt)
+        // Authenticate with Face ID once — this LAContext will be reused
+        // for all subsequent signing operations in this session.
+        let context = LAContext()
+        try await context.evaluatePolicy(
+            .deviceOwnerAuthenticationWithBiometrics,
+            localizedReason: "Authenticate to start a verified writing session"
+        )
+        authContext = context
+
+        // Restore the SE key with the authenticated context so signing doesn't
+        // trigger additional biometric prompts.
+        guard let keyData = loadSEKeyData() else { throw AttestationError.noSigningKey }
+        let key = try SecureEnclave.P256.Signing.PrivateKey(
+            dataRepresentation: keyData,
+            authenticationContext: context
+        )
+        signingKey = key
+
+        // Sign session start (uses pre-authenticated context — no extra prompt)
         let payload = Data("\(sid)|\(timestamp)".utf8)
         let signature = try key.signature(for: payload)
         sessionSignature = signature.rawRepresentation
@@ -192,6 +208,12 @@ actor DeviceAttestationService {
         )
     }
 
+    /// Invalidate the pre-authenticated biometric context when the session ends.
+    func endSession() {
+        authContext?.invalidate()
+        authContext = nil
+    }
+
     func getAttestationEnvelope() -> AttestationEnvelope? {
         guard let key = signingKey else { return nil }
 
@@ -238,7 +260,8 @@ actor DeviceAttestationService {
         }
     }
 
-    private func loadSEKey() throws -> SecureEnclave.P256.Signing.PrivateKey? {
+    /// Load raw SE key data from Keychain (no biometric prompt).
+    private func loadSEKeyData() -> Data? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: Self.seKeyTag,
@@ -249,7 +272,20 @@ actor DeviceAttestationService {
         guard status == errSecSuccess, let data = result as? Data else {
             return nil
         }
-        return try SecureEnclave.P256.Signing.PrivateKey(dataRepresentation: data)
+        return data
+    }
+
+    /// Load SE key, optionally with a pre-authenticated LAContext.
+    private func loadSEKey(authContext: LAContext?) throws -> SecureEnclave.P256.Signing.PrivateKey? {
+        guard let data = loadSEKeyData() else { return nil }
+        if let context = authContext {
+            return try SecureEnclave.P256.Signing.PrivateKey(
+                dataRepresentation: data,
+                authenticationContext: context
+            )
+        } else {
+            return try SecureEnclave.P256.Signing.PrivateKey(dataRepresentation: data)
+        }
     }
 }
 
