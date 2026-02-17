@@ -116,7 +116,7 @@
         <dd>The iPhone&rsquo;s Secure Enclave holds a signing key that never leaves the silicon. Apple&rsquo;s App Attest certifies the key was generated on a real device running the unmodified app. Every commitment is signed.</dd>
 
         <dt>Layer 3: Behavioral analysis</dt>
-        <dd>Human typing has distinct statistical properties: variable inter-key timing, characteristic digraph patterns, natural pause distributions, error-and-correct sequences. These features are captured and committed.</dd>
+        <dd>Human typing has distinct statistical properties: variable inter-key timing, characteristic digraph patterns, natural pause distributions, error-and-correct sequences. These features are captured and committed into the proof as evidence &mdash; the protocol does not declare a threshold for &ldquo;human enough.&rdquo; Behavioral analysis is forensic evidence, not a binary verdict.</dd>
       </dl>
 
       <h3>Verification</h3>
@@ -136,11 +136,11 @@
         </li>
         <li>
           <strong>Signatures</strong>
-          <span>Verify each checkpoint signature and the final binding signature against the device public key (P-256 ECDSA).</span>
+          <span>Verify each domain-separated signature against the device public key (P-256 ECDSA). Domain prefixes prevent cross-type confusion between checkpoint, session, and binding signatures.</span>
         </li>
         <li>
           <strong>Plausibility</strong>
-          <span>Check keystroke count vs content length, typing speed bounds, and timestamp monotonicity. Non-fatal warnings flag anomalies.</span>
+          <span>Check keystroke count vs content length, typing speed bounds, timestamp monotonicity, session duration vs content length, and feature drift between checkpoints. Non-fatal warnings flag anomalies.</span>
         </li>
       </ol>
     </section>

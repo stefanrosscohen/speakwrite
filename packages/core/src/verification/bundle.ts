@@ -133,7 +133,7 @@ export async function verifyProofBundle(
 
       // Verify checkpoint signatures
       for (const cs of att.checkpoint_signatures) {
-        const message = `${cs.sequence_num}|${cs.commitment_hash}`;
+        const message = `speakwrite:checkpoint:${cs.sequence_num}|${cs.commitment_hash}`;
         const valid = await verifyECDSA(pubKey, cs.signature, message);
         if (!valid) {
           allSigsValid = false;
@@ -146,7 +146,7 @@ export async function verifyProofBundle(
 
       // Verify session start signature
       if (att.session_binding?.session_start_signature && att.session_binding.session_start_timestamp) {
-        const message = `${att.session_binding.session_id}|${att.session_binding.session_start_timestamp}`;
+        const message = `speakwrite:session:${att.session_binding.session_id}|${att.session_binding.session_start_timestamp}`;
         const valid = await verifyECDSA(
           pubKey,
           att.session_binding.session_start_signature,
@@ -161,7 +161,7 @@ export async function verifyProofBundle(
 
       // Verify final signature
       if (att.final_signature) {
-        const message = `${bundle.content_hash}|${bundle.binding_hash}`;
+        const message = `speakwrite:binding:${bundle.content_hash}|${bundle.binding_hash}`;
         const valid = await verifyECDSA(pubKey, att.final_signature, message);
         if (!valid) {
           allSigsValid = false;
@@ -171,6 +171,17 @@ export async function verifyProofBundle(
       }
 
       signaturesValid = allSigsValid;
+
+      // Key provenance warnings
+      if (att.attestation_certificate) {
+        consistencyWarnings.push(
+          "App Attest certificate present but not verified (CBOR chain verification not implemented). Signatures are internally consistent but key provenance is unverified.",
+        );
+      } else {
+        consistencyWarnings.push(
+          "No attestation certificate. Signatures verified against self-asserted public key only.",
+        );
+      }
     } catch (e) {
       signaturesValid = false;
       consistencyWarnings.push(
@@ -193,6 +204,7 @@ export async function verifyProofBundle(
     actual_content_hash: actualContentHash,
     message,
     signatures_valid: signaturesValid,
+    key_attested: bundle.device_attestation ? false : undefined,
     attestation_level: attestationLevel,
     signature_count: signatureCount,
     consistency_warnings: consistencyWarnings,
@@ -202,7 +214,15 @@ export async function verifyProofBundle(
 // --- Fix 3 helpers: ECDSA P-256 signature verification ---
 
 async function importP256PublicKey(base64Key: string): Promise<CryptoKey> {
-  const raw = base64ToBytes(base64Key);
+  let raw = base64ToBytes(base64Key);
+  // CryptoKit rawRepresentation is 64 bytes (x||y).
+  // Web Crypto "raw" import expects 65 bytes (0x04||x||y).
+  if (raw.length === 64) {
+    const uncompressed = new Uint8Array(65);
+    uncompressed[0] = 0x04;
+    uncompressed.set(raw, 1);
+    raw = uncompressed;
+  }
   return crypto.subtle.importKey(
     "raw",
     raw,
@@ -305,6 +325,9 @@ function runConsistencyChecks(
   }
 
   // Check typing speed from features_json (human range: 1-1000 CPM)
+  // Also track speeds for drift detection
+  let prevSpeed: number | undefined;
+  let prevSpeedSeq: number | undefined;
   for (const c of behavioralCommitments) {
     if (c.features_json) {
       try {
@@ -316,10 +339,54 @@ function runConsistencyChecks(
               `Typing speed at C${c.sequence_num} is ${speed} CPM — outside human range (1-1000)`,
             );
           }
+          // Feature drift detection: flag 3x+ speed changes between consecutive checkpoints
+          if (prevSpeed !== undefined && prevSpeed > 0 && speed > 0) {
+            const ratio = speed / prevSpeed;
+            if (ratio >= 3 || ratio <= 1 / 3) {
+              warnings.push(
+                `Typing speed changed dramatically between C${prevSpeedSeq} and C${c.sequence_num}: ${Math.round(prevSpeed)} CPM → ${Math.round(speed)} CPM`,
+              );
+            }
+          }
+          prevSpeed = speed;
+          prevSpeedSeq = c.sequence_num;
         }
       } catch {
         // features_json not parseable — skip
       }
+    }
+  }
+
+  // Session duration plausibility: check if session is implausibly short for content length
+  if (bundle.commitments.length >= 2) {
+    const firstTs = bundle.commitments[0].timestamp_ms;
+    const lastTs = bundle.commitments[bundle.commitments.length - 1].timestamp_ms;
+    const durationMs = lastTs - firstTs;
+
+    // Estimate content length from last behavioral commitment's document_length
+    let contentLength = 0;
+    for (let i = behavioralCommitments.length - 1; i >= 0; i--) {
+      if (behavioralCommitments[i].document_length !== undefined) {
+        contentLength = behavioralCommitments[i].document_length!;
+        break;
+      }
+    }
+
+    if (durationMs < 5000 && contentLength > 100) {
+      warnings.push(
+        `Session duration (${durationMs}ms) is implausibly short for content length (${contentLength} chars)`,
+      );
+    }
+  }
+
+  // Check session_start_timestamp is not in the future relative to created_at
+  if (bundle.device_attestation?.session_binding?.session_start_timestamp && bundle.created_at) {
+    const sessionStart = new Date(bundle.device_attestation.session_binding.session_start_timestamp).getTime();
+    const createdAt = new Date(bundle.created_at).getTime();
+    if (!isNaN(sessionStart) && !isNaN(createdAt) && sessionStart > createdAt) {
+      warnings.push(
+        "Session start timestamp is after bundle created_at — timestamps may be fabricated",
+      );
     }
   }
 }

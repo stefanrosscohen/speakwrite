@@ -160,7 +160,7 @@ actor DeviceAttestationService {
         signingKey = key
 
         // Sign session start (uses pre-authenticated context — no extra prompt)
-        let payload = Data("\(sid)|\(timestamp)".utf8)
+        let payload = Data("speakwrite:session:\(sid)|\(timestamp)".utf8)
         let signature = try key.signature(for: payload)
         sessionSignature = signature.rawRepresentation
 
@@ -175,7 +175,7 @@ actor DeviceAttestationService {
         guard sessionId != nil else { throw AttestationError.noActiveSession }
         guard let key = signingKey else { throw AttestationError.noSigningKey }
 
-        let payload = Data("\(sequenceNum)|\(commitmentHash)".utf8)
+        let payload = Data("speakwrite:checkpoint:\(sequenceNum)|\(commitmentHash)".utf8)
         let signature = try key.signature(for: payload)
         let sigBase64 = signature.rawRepresentation.base64EncodedString()
 
@@ -197,7 +197,7 @@ actor DeviceAttestationService {
         guard sessionId != nil else { throw AttestationError.noActiveSession }
         guard let key = signingKey else { throw AttestationError.noSigningKey }
 
-        let payload = Data("\(contentHash)|\(bindingHash)".utf8)
+        let payload = Data("speakwrite:binding:\(contentHash)|\(bindingHash)".utf8)
         let signature = try key.signature(for: payload)
         finalSignatureData = signature.rawRepresentation
 

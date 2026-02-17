@@ -57,6 +57,7 @@ export interface VerifyResult {
   message: string;
   // v2 fields — attestation verification + consistency checks
   signatures_valid?: boolean;
+  key_attested?: boolean;  // true only when cert chain verified to Apple Root CA
   attestation_level?: string | null;
   signature_count?: number;
   consistency_warnings?: string[];
