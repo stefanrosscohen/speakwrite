@@ -435,15 +435,13 @@ final class ATProtoService {
         let publicAPI = "https://api.bsky.app"
 
         // Single search: #speakwrite matches both tags array and text containing "speakwrite"
-        var urlString = "\(publicAPI)/xrpc/app.bsky.feed.searchPosts?q=%23speakwrite&limit=40&sort=latest"
+        var urlString = "\(publicAPI)/xrpc/app.bsky.feed.searchPosts?q=%23speakwrite&limit=25&sort=latest"
         if let cursor {
             let encoded = cursor.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? cursor
             urlString += "&cursor=\(encoded)"
         }
 
-        var request = URLRequest(url: URL(string: urlString)!)
-        request.cachePolicy = .reloadIgnoringLocalCacheData
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await URLSession.shared.data(from: URL(string: urlString)!)
 
         guard let httpResp = response as? HTTPURLResponse, httpResp.statusCode == 200 else {
             return (posts: [], cursor: nil)

@@ -86,9 +86,8 @@ struct VerifiedFeedView: View {
                 PostDetailView(nav: nav)
             }
             .task {
-                if viewModel.verifiedPosts.isEmpty {
-                    await viewModel.loadFeed()
-                }
+                // Always refresh; cached posts show instantly while search completes
+                await viewModel.loadFeed()
             }
         }
     }

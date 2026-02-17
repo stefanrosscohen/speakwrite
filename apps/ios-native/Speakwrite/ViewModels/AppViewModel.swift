@@ -121,13 +121,32 @@ final class AppViewModel: InputRestrictedDelegate {
             let result = try await atproto.publishAttestedPost(text: text, attestation: record)
             lastPublishedURI = result.uri
 
+            // Optimistic insert — show the post in verified feed immediately
+            // (search API indexing lags, so this avoids a blank/stale feed)
+            let optimisticPost = VerifiedPost(
+                uri: result.uri,
+                cid: result.cid,
+                author: PostAuthor(
+                    did: atproto.did ?? "",
+                    handle: atproto.handle ?? "",
+                    displayName: myProfile?.displayName,
+                    avatar: myProfile?.avatar,
+                    viewer: nil
+                ),
+                text: text,
+                createdAt: ISO8601DateFormatter().string(from: Date()),
+                likeCount: 0, repostCount: 0, replyCount: 0,
+                viewer: nil
+            )
+            verifiedPosts.insert(optimisticPost, at: 0)
+
             // Reset for next post
             postText = ""
             keystrokeCount = 0
             violationCount = 0
             isPublishing = false
 
-            // Navigate to feed
+            // Navigate to main feed
             selectedTab = .timeline
             lastPublishedURI = nil
             return
@@ -141,19 +160,24 @@ final class AppViewModel: InputRestrictedDelegate {
     // MARK: - Verified Feed
 
     func loadFeed() async {
-        isFeedLoading = true
+        // Only show loading spinner on first load (no cached posts)
+        let isFirstLoad = verifiedPosts.isEmpty
+        if isFirstLoad { isFeedLoading = true }
 
         do {
             let result = try await atproto.fetchVerifiedFeed(cursor: nil)
             if !result.posts.isEmpty || verifiedPosts.isEmpty {
-                verifiedPosts = result.posts
+                // Merge: keep optimistic posts that haven't been indexed yet
+                let fetchedURIs = Set(result.posts.map(\.uri))
+                let optimistic = verifiedPosts.filter { !fetchedURIs.contains($0.uri) }
+                verifiedPosts = optimistic + result.posts
                 feedCursor = result.cursor
             }
         } catch {
             print("[Feed] Error loading verified feed: \(error)")
         }
 
-        isFeedLoading = false
+        if isFirstLoad { isFeedLoading = false }
     }
 
     func loadMoreFeed() async {

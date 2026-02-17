@@ -227,6 +227,74 @@
       color: #ff4444;
       padding: 2rem 0;
     }
+
+    /* Input form */
+    .verify-form {
+      margin: 1rem 0;
+    }
+
+    .verify-form label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-secondary);
+      margin-bottom: 0.5rem;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .verify-input {
+      flex: 1;
+      font-family: var(--font);
+      font-size: 0.85rem;
+      padding: 0.6rem 0.8rem;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      outline: none;
+    }
+
+    .verify-input::placeholder {
+      color: var(--text-secondary);
+    }
+
+    .verify-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px var(--accent-glow);
+    }
+
+    .verify-btn {
+      font-family: var(--font);
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 0.6rem 1.2rem;
+      background: var(--accent);
+      color: var(--bg-primary);
+      border: 1px solid var(--accent);
+      cursor: pointer;
+    }
+
+    .verify-btn:hover {
+      background: transparent;
+      color: var(--accent);
+    }
+
+    .input-hint {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      margin-top: 0.4rem;
+    }
+
+    @media (max-width: 480px) {
+      .input-row { flex-direction: column; }
+    }
   </style>
 </head>
 <body>
@@ -245,6 +313,17 @@
     <div class="verify-header">
       <h1>Verify Post</h1>
       <p>Client-side cryptographic verification. No server. No trust required.</p>
+    </div>
+
+    <div id="input-section" style="display:none;">
+      <div class="verify-form">
+        <label for="post-url">Paste a Bluesky post URL or AT URI</label>
+        <div class="input-row">
+          <input type="text" id="post-url" class="verify-input" placeholder="https://bsky.app/profile/handle/post/rkey" autocomplete="off">
+          <button onclick="verifyFromInput()" class="verify-btn">Verify</button>
+        </div>
+        <div class="input-hint">e.g. https://bsky.app/profile/stefans.house/post/3abc... or at://did:plc:.../app.bsky.feed.post/3abc...</div>
+      </div>
     </div>
 
     <div id="content">
@@ -432,6 +511,36 @@ M/pWNqumUnq5fy5Ai8y/MJDOV7hd-----END CERTIFICATE-----`;
       return raw;
     }
 
+    // ── Parse Bluesky URL or AT URI into {handle, rkey} ──
+    function parsePostUrl(input) {
+      input = input.trim();
+
+      // AT URI: at://did:plc:xxx/app.bsky.feed.post/rkey
+      const atMatch = input.match(/^at:\/\/([^/]+)\/app\.bsky\.feed\.post\/([^/]+)/);
+      if (atMatch) return { handle: atMatch[1], rkey: atMatch[2] };
+
+      // Bluesky URL: https://bsky.app/profile/{handle}/post/{rkey}
+      const bskyMatch = input.match(/bsky\.app\/profile\/([^/]+)\/post\/([^/?#]+)/);
+      if (bskyMatch) return { handle: bskyMatch[1], rkey: bskyMatch[2] };
+
+      return null;
+    }
+
+    function verifyFromInput() {
+      const input = document.getElementById('post-url').value;
+      const parsed = parsePostUrl(input);
+      if (!parsed) {
+        document.getElementById('content').innerHTML = `
+          <div class="error-message">
+            <p>Could not parse URL. Paste a Bluesky post URL or AT URI.</p>
+          </div>`;
+        return;
+      }
+      // Hide the input section and run verification
+      document.getElementById('input-section').style.display = 'none';
+      runVerification(parsed.handle, parsed.rkey);
+    }
+
     // ── Verify ──
     async function verify() {
       const content = document.getElementById('content');
@@ -441,15 +550,24 @@ M/pWNqumUnq5fy5Ai8y/MJDOV7hd-----END CERTIFICATE-----`;
       const parts = path.split('/').filter(Boolean);
       // parts = ['verify', handle, rkey]
       if (parts.length < 3) {
-        content.innerHTML = `
-          <div class="error-message">
-            <p>Invalid verification URL. Expected: /verify/{handle}/{rkey}</p>
-          </div>`;
+        // No handle/rkey in URL — show input form
+        document.getElementById('input-section').style.display = 'block';
+        content.innerHTML = '';
+        // Allow Enter key to submit
+        document.getElementById('post-url').addEventListener('keydown', e => {
+          if (e.key === 'Enter') verifyFromInput();
+        });
+        document.getElementById('post-url').focus();
         return;
       }
 
       const handle = parts[1];
       const rkey = parts[2];
+      runVerification(handle, rkey);
+    }
+
+    async function runVerification(handle, rkey) {
+      const content = document.getElementById('content');
 
       const steps = [];
       function renderSteps() {
@@ -571,8 +689,10 @@ M/pWNqumUnq5fy5Ai8y/MJDOV7hd-----END CERTIFICATE-----`;
         step = addStep('Verifying content hash...');
         updateContent(postCardHtml);
 
+        // Hash the original text (before footer was appended for cross-app display)
+        const originalText = stripFooter(rawText);
         const encoder = new TextEncoder();
-        const textBytes = encoder.encode(rawText);
+        const textBytes = encoder.encode(originalText);
         const hashBuffer = await crypto.subtle.digest('SHA-256', textBytes);
         const computedHash = bytesToHex(new Uint8Array(hashBuffer));
 
