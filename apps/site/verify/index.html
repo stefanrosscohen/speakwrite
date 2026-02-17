@@ -1044,14 +1044,15 @@ oyFraWVIyd/dganmrduC1bmTBGwD
         updateContent(postCardHtml + successHtml);
 
       } catch (err) {
+        const msg = err.message || `${err.name || 'Error'}: cryptographic verification failed`;
         const lastStep = steps[steps.length - 1];
         if (lastStep) {
           lastStep.status = 'fail';
-          lastStep.label = err.message;
+          lastStep.label = msg;
         }
         const postCardEl = content.querySelector('.post-card');
         const postCardHtml = postCardEl ? postCardEl.outerHTML : '';
-        updateContent(postCardHtml + renderFailBanner(err.message));
+        updateContent(postCardHtml + renderFailBanner(msg));
       }
     }
 
