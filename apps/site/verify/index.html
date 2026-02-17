@@ -862,7 +862,7 @@ M/pWNqumUnq5fy5Ai8y/MJDOV7hd-----END CERTIFICATE-----`;
           // AlgorithmIdentifier starts with 30 13 (SEQUENCE, length 19)
           // SPKI starts with 30 59 (SEQUENCE, length 89) right before that
           // Look backwards for 0x30 0x59
-          for (let k = i - 1; k >= Math.max(0, i - 10); k--) {
+          for (let k = i - 1; k >= Math.max(0, i - 20); k--) {
             if (certBytes[k] === 0x30 && certBytes[k + 1] === 0x59) {
               spkiStart = k;
               break;
