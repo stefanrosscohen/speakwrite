@@ -31,6 +31,7 @@ export interface DeviceAttestation {
     biometric_gate: boolean;
     session_start_signature?: string;
     session_start_timestamp?: string;
+    author_did?: string;
   };
   checkpoint_signatures: DeviceAttestationCheckpoint[];
   final_signature?: string;

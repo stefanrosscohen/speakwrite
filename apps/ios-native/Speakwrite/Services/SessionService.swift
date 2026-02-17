@@ -30,7 +30,7 @@ final class SessionService: KeystrokeCaptureDelegate {
 
     // MARK: - Session Lifecycle
 
-    func startSession() async throws {
+    func startSession(authorDid: String) async throws {
         let document = Document()
         modelContext.insert(document)
 
@@ -48,7 +48,7 @@ final class SessionService: KeystrokeCaptureDelegate {
 
         // Initialize device attestation and start attested session (triggers Face ID)
         _ = try await attestation.initialize()
-        _ = try await attestation.startSession()
+        _ = try await attestation.startSession(authorDid: authorDid)
 
         // Start periodic checkpoint timer
         checkpointTimer = Timer.scheduledTimer(withTimeInterval: checkpointIntervalSeconds, repeats: true) { [weak self] _ in
@@ -97,7 +97,7 @@ final class SessionService: KeystrokeCaptureDelegate {
 
     /// Called by AppViewModel when the Compose tab is selected.
     /// Face ID is triggered here, not on first keystroke.
-    func startSessionFromTabSelection() async throws {
+    func startSessionFromTabSelection(authorDid: String) async throws {
         guard !sessionActive && !isStartingSession else { return }
         isStartingSession = true
 
@@ -106,7 +106,7 @@ final class SessionService: KeystrokeCaptureDelegate {
             isStartingSession = false
         }
 
-        try await startSession()
+        try await startSession(authorDid: authorDid)
         // Replay any keystrokes that arrived while Face ID was showing
         for pending in pendingKeystrokes {
             recordKeystroke(pending)

@@ -54,7 +54,7 @@ Speakwrite is a native iOS app for writing and reading human-verified posts on t
 ```
 1. User selects Compose tab → Face ID triggered (biometric gate)
 2. Secure Enclave key loaded with pre-authenticated LAContext
-3. Session start signed: ECDSA("speakwrite:session:sessionId|timestamp")
+3. Session start signed: ECDSA("speakwrite:session:authorDid:sessionId|timestamp")
 4. User types → CaptureTextView captures keystroke events
 5. Every 60 seconds → Checkpoint:
    - Extract cumulative behavioral features from all keystrokes
@@ -125,14 +125,15 @@ The proof bundle is a JSON object. This IS the protocol — anyone who can compu
     "platform": "apple",
     "attestation_type": "app_attest",
     "attestation_level": "platform_attested",
-    "device_public_key": "base64-encoded P-256 public key (uncompressed, 65 bytes)",
+    "device_public_key": "base64-encoded P-256 public key (64 bytes: x||y from CryptoKit rawRepresentation)",
     "app_id": "io.speakwrite.app",
     "attestation_certificate": "base64-encoded App Attest certificate chain",
     "session_binding": {
       "session_id": "uuid",
       "biometric_gate": true,
-      "session_start_signature": "base64(P-256 ECDSA over 'speakwrite:session:sessionId|timestamp')",
-      "session_start_timestamp": "2026-02-14T12:00:00Z"
+      "session_start_signature": "base64(P-256 ECDSA over 'speakwrite:session:authorDid:sessionId|timestamp')",
+      "session_start_timestamp": "2026-02-14T12:00:00Z",
+      "author_did": "did:plc:abc123..."
     },
     "checkpoint_signatures": [
       {
@@ -182,7 +183,7 @@ The proof bundle is a JSON object. This IS the protocol — anyone who can compu
 | `platform` | string | `"apple"` (only platform currently) |
 | `attestation_type` | string | `"app_attest"` |
 | `attestation_level` | string | `"platform_attested"` when App Attest succeeds; `"hardware_unverified"` when SE key exists but no Apple cert |
-| `device_public_key` | string | Base64-encoded uncompressed P-256 public key (65 bytes) |
+| `device_public_key` | string | Base64-encoded P-256 public key (64 bytes `x\|\|y` from CryptoKit; verifiers should also accept 65-byte uncompressed `0x04\|\|x\|\|y`) |
 | `app_id` | string | Bundle identifier (`"io.speakwrite.app"`) |
 | `attestation_certificate` | string | Base64-encoded App Attest certificate chain from Apple |
 | `checkpoint_signatures` | array | ECDSA signatures over each checkpoint |
@@ -227,6 +228,8 @@ Where:
 
 This is a **transparent commitment**: all inputs are published in the proof bundle, so any verifier can re-derive the hash and confirm it matches. The nonce prevents a verifier from precomputing hashes for feature values they haven't seen — but once published, the commitment is fully openable.
 
+**Note on concatenation:** The hash input is a raw byte concatenation of variable-length fields. Parsing is unambiguous because `previous_bytes` is either 0 or 32 bytes (null vs SHA-256 output), `nonce` is always exactly 32 bytes, and `document_hash_bytes` is always exactly 32 bytes — only `features_bytes` is variable-length, and it occupies the remaining bytes between the fixed-length fields. A future protocol version may adopt explicit length-prefixing for defense in depth.
+
 ### 3.4 Content Binding Hash
 
 ```
@@ -241,7 +244,7 @@ The UTF-8 literal `"CONTENT_BINDING"` is the domain separator. This binds the en
 
 32 random bytes (256 bits) via `SecRandomCopyBytes` (iOS) or `crypto.getRandomValues()` (Web Crypto). Hex-encoded when stored in the proof bundle.
 
-In v2, all commitment inputs are published — the nonce no longer hides anything. It serves two purposes: (1) **Uniqueness** — two identical checkpoints produce different hashes, preventing hash collision without features changing; (2) **Freshness** — proves the commitment was created at a specific time, not replayed from a previous session.
+In v2, all commitment inputs are published — the nonce no longer hides anything. It serves one purpose: **Uniqueness** — two identical checkpoints produce different hashes, preventing hash collision without features changing. Note: the nonce does NOT provide temporal freshness. A random nonce proves uniqueness, not *when* the commitment was created. Temporal claims rest on the self-reported timestamps and the signed session start time. True freshness would require an interactive challenge from a verifier or a trusted timestamping authority, neither of which this protocol uses.
 
 ### 3.6 Signatures
 
@@ -249,15 +252,14 @@ P-256 ECDSA with SHA-256, computed inside the Secure Enclave via a biometric-gat
 
 | Signature | Message format | When |
 |-----------|---------------|------|
-| Session start | `"speakwrite:session:sessionId\|timestamp"` (UTF-8) | After Face ID, before first keystroke |
+| Session start | `"speakwrite:session:authorDid:sessionId\|timestamp"` (UTF-8) | After Face ID, before first keystroke |
 | Checkpoint | `"speakwrite:checkpoint:sequenceNum\|commitmentHash"` (UTF-8) | At each 60-second checkpoint |
 | Final binding | `"speakwrite:binding:contentHash\|bindingHash"` (UTF-8) | At publish time |
 
 Each signature message carries a domain prefix (`speakwrite:session:`, `speakwrite:checkpoint:`, `speakwrite:binding:`) to prevent cross-type confusion — a valid checkpoint signature cannot be reinterpreted as a session start signature, even if the payload bytes happened to collide.
 
-The private key is generated with `SecKeyCreateRandomKey` using:
-- `kSecAttrKeyTypeECSECPrimeRandom` (P-256)
-- `kSecAttrTokenIDSecureEnclave` (hardware-bound)
+The private key is generated with CryptoKit's `SecureEnclave.P256.Signing.PrivateKey` using:
+- P-256 (secp256r1) curve, hardware-bound in the Secure Enclave
 - Access control: `.biometryCurrentSet | .privateKeyUsage`
 - `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`
 
@@ -291,7 +293,7 @@ Anyone can verify a proof bundle. No server, no API key, no trust required.
 
 6. **Device attestation signature verification.**
    - Import `device_public_key` as a P-256 public key (uncompressed format, 65 bytes: `0x04 || x || y`). Note: CryptoKit exports 64 bytes (`x || y`); prepend `0x04` if the key is 64 bytes.
-   - Verify `session_start_signature` against `"speakwrite:session:session_id|session_start_timestamp"`.
+   - Verify `session_start_signature` against `"speakwrite:session:author_did:session_id|session_start_timestamp"` (include `author_did` when present; omit the DID prefix for pre-identity-binding bundles).
    - Verify each `checkpoint_signature` against `"speakwrite:checkpoint:sequence_num|commitment_hash"`.
    - Verify `final_signature` against `"speakwrite:binding:content_hash|binding_hash"`.
    - All signatures use ECDSA with SHA-256.
@@ -362,6 +364,10 @@ If any of these assumptions is broken, the corresponding security property degra
 **Property 4 — Device authenticity.** Given the integrity of Apple's App Attest service, the `attestation_certificate` proves the signing key was generated inside a Secure Enclave on a genuine Apple device running the unmodified Speakwrite binary. This means the keystroke capture code (`CaptureTextView`) was not modified, and the commitment computation was performed by the real app.
 
 **Property 5 — Human presence.** The biometric gate (Face ID / Touch ID) proves a registered biometric identity authenticated the session. The Secure Enclave key is created with `.biometryCurrentSet` access control — it cannot sign without a successful biometric evaluation. If the user's biometric enrollment changes (e.g., new face enrolled), the key is invalidated.
+
+**Property 6 — Identity binding.** The session start signature includes the author's AT Protocol DID (`author_did`). This binds the proof to a specific identity — a valid proof bundle cannot be republished under a different account without invalidating the session start signature.
+
+**Dependency note:** Properties 4 and 5 are conditional on successful verification of the `attestation_certificate` chain to Apple's Root CA (step 4.1.6). Without cert chain verification (`key_attested: false` in `VerifyResult`), an adversary can self-generate a P-256 keypair and produce a bundle that passes all other cryptographic checks. Properties 1, 2, 3, and 6 hold unconditionally — they depend only on SHA-256 collision resistance and ECDSA unforgeability, not on the hardware trust chain.
 
 ### 5.3 Attestation Coverage
 
@@ -443,13 +449,13 @@ On first launch, the app generates two keys in the Secure Enclave:
 
 1. **App Attest key** — Generated via `DCAppAttestService.generateKey()`. Apple's attestation service issues a certificate chain proving: (a) the key lives in a Secure Enclave, (b) on a genuine Apple device, (c) running the unmodified app binary identified by `app_id`. The attestation is a challenge-response: the app sends `H(keyId)` as the challenge, and Apple returns a signed attestation object.
 
-2. **Session signing key** — A P-256 key generated with `SecKeyCreateRandomKey` in the Secure Enclave, with access control flags requiring `.biometryCurrentSet`. This key can only sign when Face ID / Touch ID has been evaluated in the current `LAContext`. The key persists in the Keychain across app launches and is reused for all sessions.
+2. **Session signing key** — A P-256 key generated with CryptoKit's `SecureEnclave.P256.Signing.PrivateKey` in the Secure Enclave, with access control flags requiring `.biometryCurrentSet`. This key can only sign when Face ID / Touch ID has been evaluated in the current `LAContext`. The key persists in the Keychain across app launches and is reused for all sessions.
 
 ### 6.2 Session Flow
 
 1. **Face ID** is triggered once when the user selects the Compose tab (`LAContext.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics)`).
 2. The pre-authenticated `LAContext` is used to load the SE signing key (`SecKeyCreateSignature`).
-3. **Session start** is signed: `ECDSA("speakwrite:session:sessionId|timestamp")`.
+3. **Session start** is signed: `ECDSA("speakwrite:session:authorDid:sessionId|timestamp")`. The author's AT Protocol DID is included to bind the proof to their identity.
 4. All subsequent checkpoint signatures use the same pre-authenticated context — no additional Face ID prompts.
 5. The **final binding** is signed: `ECDSA("speakwrite:binding:contentHash|bindingHash")`.
 6. After proof export, the `LAContext` is invalidated. A new session requires new biometric authentication.

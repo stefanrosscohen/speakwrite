@@ -70,8 +70,12 @@ final class AppViewModel {
     /// Called when the user taps the Compose tab — triggers Face ID once.
     func ensureSessionReady() async {
         guard let session = sessionService, !session.sessionActive else { return }
+        guard let did = atproto.did else {
+            print("[Session] Cannot start session: no DID (not logged in)")
+            return
+        }
         do {
-            try await session.startSessionFromTabSelection()
+            try await session.startSessionFromTabSelection(authorDid: did)
         } catch {
             print("[Session] Could not start session: \(error)")
         }
@@ -86,8 +90,12 @@ final class AppViewModel {
         // Session starts via Face ID on Compose tab selection. If the user somehow
         // hits Publish without a session, start one now as a fallback.
         if !session.sessionActive {
+            guard let did = atproto.did else {
+                publishError = "Not logged in — cannot start session."
+                return
+            }
             do {
-                try await session.startSession()
+                try await session.startSession(authorDid: did)
             } catch {
                 publishError = "Could not start session: \(error.localizedDescription)"
                 return

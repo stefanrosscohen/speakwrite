@@ -135,8 +135,8 @@
           <span>The final commitment must bind the content hash to the chain tip. The last behavioral commitment&rsquo;s document hash must match the published content hash.</span>
         </li>
         <li>
-          <strong>Signatures</strong>
-          <span>Verify each domain-separated signature against the device public key (P-256 ECDSA). Domain prefixes prevent cross-type confusion between checkpoint, session, and binding signatures.</span>
+          <strong>Signatures + identity</strong>
+          <span>Verify each domain-separated signature against the device public key (P-256 ECDSA). The author&rsquo;s AT Protocol DID is signed into the session start, binding the proof to a specific identity.</span>
         </li>
         <li>
           <strong>Plausibility</strong>

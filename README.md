@@ -37,13 +37,14 @@ Full specification with formal security analysis: [`SPEC-v1.md`](SPEC-v1.md)
 
 ## Security Properties
 
-The protocol provides five security properties (detailed in SPEC-v1.md §5.2):
+The protocol provides six security properties (detailed in SPEC-v1.md §5.2):
 
 1. **Chain immutability** — Can't modify behavioral data or document snapshots without breaking re-derivation (SHA-256 collision required)
 2. **Content binding** — Can't type A and publish B; document hash at last checkpoint must match published content
 3. **Signature unforgeability** — Can't forge checkpoint/binding signatures without the Secure Enclave key (ECDSA EU-CMA)
 4. **Device authenticity** — App Attest proves the signing key is hardware-bound on a genuine Apple device running the unmodified app
 5. **Human presence** — Biometric gate (Face ID) with `.biometryCurrentSet` access control on the SE key
+6. **Identity binding** — Author's AT Protocol DID is signed into the session start, preventing proof replay under a different account
 
 ## The App
 

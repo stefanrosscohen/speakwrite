@@ -15,6 +15,7 @@ struct SessionStart {
     let sessionId: String
     let timestamp: String
     let signature: String // base64
+    let authorDid: String
     let biometricGate = true
 }
 
@@ -46,6 +47,7 @@ struct AttestationEnvelope: Codable {
         let biometricGate: Bool
         let sessionStartSignature: String?
         let sessionStartTimestamp: String?
+        let authorDid: String?
     }
 
     struct CheckpointSignatureRecord: Codable {
@@ -68,6 +70,7 @@ actor DeviceAttestationService {
     private var sessionId: String?
     private var sessionTimestamp: String?
     private var sessionSignature: Data?
+    private var authorDid: String?
     private var checkpointSignatures: [AttestationEnvelope.CheckpointSignatureRecord] = []
     private var finalSignatureData: Data?
     private var signingKey: SecureEnclave.P256.Signing.PrivateKey?
@@ -132,12 +135,13 @@ actor DeviceAttestationService {
         return (keyId: keyId, publicKey: pubKeyBase64)
     }
 
-    func startSession() async throws -> SessionStart {
+    func startSession(authorDid did: String) async throws -> SessionStart {
         let sid = UUID().uuidString
         let timestamp = ISO8601DateFormatter().string(from: Date())
 
         sessionId = sid
         sessionTimestamp = timestamp
+        authorDid = did
         checkpointSignatures = []
         finalSignatureData = nil
 
@@ -160,14 +164,16 @@ actor DeviceAttestationService {
         signingKey = key
 
         // Sign session start (uses pre-authenticated context — no extra prompt)
-        let payload = Data("speakwrite:session:\(sid)|\(timestamp)".utf8)
+        // DID is included to bind the proof to the author's identity
+        let payload = Data("speakwrite:session:\(did):\(sid)|\(timestamp)".utf8)
         let signature = try key.signature(for: payload)
         sessionSignature = signature.rawRepresentation
 
         return SessionStart(
             sessionId: sid,
             timestamp: timestamp,
-            signature: signature.rawRepresentation.base64EncodedString()
+            signature: signature.rawRepresentation.base64EncodedString(),
+            authorDid: did
         )
     }
 
@@ -226,7 +232,8 @@ actor DeviceAttestationService {
                 sessionId: sid,
                 biometricGate: true,
                 sessionStartSignature: sessionSignature?.base64EncodedString(),
-                sessionStartTimestamp: sessionTimestamp
+                sessionStartTimestamp: sessionTimestamp,
+                authorDid: authorDid
             )
         }
 

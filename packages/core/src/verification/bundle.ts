@@ -146,7 +146,9 @@ export async function verifyProofBundle(
 
       // Verify session start signature
       if (att.session_binding?.session_start_signature && att.session_binding.session_start_timestamp) {
-        const message = `speakwrite:session:${att.session_binding.session_id}|${att.session_binding.session_start_timestamp}`;
+        // Include author_did in signature message when present (identity binding)
+        const didPrefix = att.session_binding.author_did ? `${att.session_binding.author_did}:` : "";
+        const message = `speakwrite:session:${didPrefix}${att.session_binding.session_id}|${att.session_binding.session_start_timestamp}`;
         const valid = await verifyECDSA(
           pubKey,
           att.session_binding.session_start_signature,
@@ -157,6 +159,12 @@ export async function verifyProofBundle(
           consistencyWarnings.push("Session start signature failed verification");
         }
         signatureCount++;
+
+        if (!att.session_binding.author_did) {
+          consistencyWarnings.push(
+            "Session signature does not bind to an author identity (no author_did). Proof could be replayed under a different account.",
+          );
+        }
       }
 
       // Verify final signature
