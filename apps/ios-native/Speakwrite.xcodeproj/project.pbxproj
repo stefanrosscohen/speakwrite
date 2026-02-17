@@ -8,26 +8,13 @@
 
 /* Begin PBXBuildFile section */
 		A10001010000000000000001 /* SpeakwriteApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000001 /* SpeakwriteApp.swift */; };
-		A10001010000000000000002 /* Hashing.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000002 /* Hashing.swift */; };
-		A10001010000000000000003 /* HexEncoding.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000003 /* HexEncoding.swift */; };
-		A10001010000000000000004 /* Document.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000004 /* Document.swift */; };
-		A10001010000000000000005 /* Session.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000005 /* Session.swift */; };
-		A10001010000000000000006 /* Keystroke.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000006 /* Keystroke.swift */; };
-		A10001010000000000000007 /* Commitment.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000007 /* Commitment.swift */; };
-		A10001010000000000000008 /* FeatureVector.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000008 /* FeatureVector.swift */; };
-		A10001010000000000000009 /* StatsUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000009 /* StatsUtils.swift */; };
-		A10001010000000000000010 /* Tier1Features.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000010 /* Tier1Features.swift */; };
-		A10001010000000000000011 /* Tier2Features.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000011 /* Tier2Features.swift */; };
 		A10001010000000000000012 /* DeviceAttestation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000012 /* DeviceAttestation.swift */; };
 		A10001010000000000000013 /* KeystrokeCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000013 /* KeystrokeCapture.swift */; };
-		A10001010000000000000014 /* SessionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000014 /* SessionService.swift */; };
-		A10001010000000000000015 /* ProofService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000015 /* ProofService.swift */; };
 		A10001010000000000000016 /* ATProtoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000016 /* ATProtoService.swift */; };
 		A10001010000000000000017 /* AppViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000017 /* AppViewModel.swift */; };
 		A10001010000000000000018 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000018 /* LoginView.swift */; };
 		A10001010000000000000019 /* EditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000019 /* EditorView.swift */; };
 		A10001010000000000000020 /* PostBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000020 /* PostBarView.swift */; };
-		A10001010000000000000021 /* ProofSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000021 /* ProofSidebarView.swift */; };
 		A10001010000000000000022 /* PublishView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000022 /* PublishView.swift */; };
 		A10001010000000000000023 /* FeedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000023 /* FeedView.swift */; };
 		A10001010000000000000024 /* TimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000024 /* TimelineView.swift */; };
@@ -44,34 +31,21 @@
 		A10001010000000000000035 /* StatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000035 /* StatView.swift */; };
 		A10001010000000000000036 /* PostDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000036 /* PostDetailView.swift */; };
 		A10001010000000000000037 /* QuotePostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000037 /* QuotePostView.swift */; };
+		A10001010000000000000038 /* SearchUsersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000038 /* SearchUsersView.swift */; };
 		A10003010000000000000001 /* CryptoKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A10004010000000000000001 /* CryptoKit.framework */; };
 		A10003010000000000000002 /* DeviceCheck.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A10004010000000000000002 /* DeviceCheck.framework */; };
-		A10003010000000000000003 /* LocalAuthentication.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A10004010000000000000003 /* LocalAuthentication.framework */; };
 		A10003010000000000000004 /* AuthenticationServices.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A10004010000000000000004 /* AuthenticationServices.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		A10002010000000000000001 /* SpeakwriteApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeakwriteApp.swift; sourceTree = "<group>"; };
-		A10002010000000000000002 /* Hashing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Hashing.swift; sourceTree = "<group>"; };
-		A10002010000000000000003 /* HexEncoding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HexEncoding.swift; sourceTree = "<group>"; };
-		A10002010000000000000004 /* Document.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Document.swift; sourceTree = "<group>"; };
-		A10002010000000000000005 /* Session.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Session.swift; sourceTree = "<group>"; };
-		A10002010000000000000006 /* Keystroke.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Keystroke.swift; sourceTree = "<group>"; };
-		A10002010000000000000007 /* Commitment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Commitment.swift; sourceTree = "<group>"; };
-		A10002010000000000000008 /* FeatureVector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureVector.swift; sourceTree = "<group>"; };
-		A10002010000000000000009 /* StatsUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsUtils.swift; sourceTree = "<group>"; };
-		A10002010000000000000010 /* Tier1Features.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tier1Features.swift; sourceTree = "<group>"; };
-		A10002010000000000000011 /* Tier2Features.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tier2Features.swift; sourceTree = "<group>"; };
 		A10002010000000000000012 /* DeviceAttestation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceAttestation.swift; sourceTree = "<group>"; };
 		A10002010000000000000013 /* KeystrokeCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeystrokeCapture.swift; sourceTree = "<group>"; };
-		A10002010000000000000014 /* SessionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionService.swift; sourceTree = "<group>"; };
-		A10002010000000000000015 /* ProofService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProofService.swift; sourceTree = "<group>"; };
 		A10002010000000000000016 /* ATProtoService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ATProtoService.swift; sourceTree = "<group>"; };
 		A10002010000000000000017 /* AppViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppViewModel.swift; sourceTree = "<group>"; };
 		A10002010000000000000018 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		A10002010000000000000019 /* EditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorView.swift; sourceTree = "<group>"; };
 		A10002010000000000000020 /* PostBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostBarView.swift; sourceTree = "<group>"; };
-		A10002010000000000000021 /* ProofSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProofSidebarView.swift; sourceTree = "<group>"; };
 		A10002010000000000000022 /* PublishView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublishView.swift; sourceTree = "<group>"; };
 		A10002010000000000000023 /* FeedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedView.swift; sourceTree = "<group>"; };
 		A10002010000000000000024 /* TimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineView.swift; sourceTree = "<group>"; };
@@ -88,9 +62,9 @@
 		A10002010000000000000035 /* StatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatView.swift; sourceTree = "<group>"; };
 		A10002010000000000000036 /* PostDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostDetailView.swift; sourceTree = "<group>"; };
 		A10002010000000000000037 /* QuotePostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuotePostView.swift; sourceTree = "<group>"; };
+		A10002010000000000000038 /* SearchUsersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchUsersView.swift; sourceTree = "<group>"; };
 		A10004010000000000000001 /* CryptoKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CryptoKit.framework; path = System/Library/Frameworks/CryptoKit.framework; sourceTree = SDKROOT; };
 		A10004010000000000000002 /* DeviceCheck.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = DeviceCheck.framework; path = System/Library/Frameworks/DeviceCheck.framework; sourceTree = SDKROOT; };
-		A10004010000000000000003 /* LocalAuthentication.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = LocalAuthentication.framework; path = System/Library/Frameworks/LocalAuthentication.framework; sourceTree = SDKROOT; };
 		A10004010000000000000004 /* AuthenticationServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AuthenticationServices.framework; path = System/Library/Frameworks/AuthenticationServices.framework; sourceTree = SDKROOT; };
 		A10005010000000000000001 /* Speakwrite.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Speakwrite.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10006010000000000000001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -104,7 +78,6 @@
 			files = (
 				A10003010000000000000001 /* CryptoKit.framework in Frameworks */,
 				A10003010000000000000002 /* DeviceCheck.framework in Frameworks */,
-				A10003010000000000000003 /* LocalAuthentication.framework in Frameworks */,
 				A10003010000000000000004 /* AuthenticationServices.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -129,8 +102,6 @@
 				A10002010000000000000025 /* Assets.xcassets */,
 				A10006010000000000000001 /* Info.plist */,
 				A10006010000000000000002 /* Speakwrite.entitlements */,
-				A10008010000000000000003 /* Crypto */,
-				A10008010000000000000004 /* Models */,
 				A10008010000000000000005 /* Features */,
 				A10008010000000000000006 /* Services */,
 				A10008010000000000000007 /* ViewModels */,
@@ -139,33 +110,9 @@
 			path = Speakwrite;
 			sourceTree = "<group>";
 		};
-		A10008010000000000000003 /* Crypto */ = {
-			isa = PBXGroup;
-			children = (
-				A10002010000000000000002 /* Hashing.swift */,
-				A10002010000000000000003 /* HexEncoding.swift */,
-			);
-			path = Crypto;
-			sourceTree = "<group>";
-		};
-		A10008010000000000000004 /* Models */ = {
-			isa = PBXGroup;
-			children = (
-				A10002010000000000000004 /* Document.swift */,
-				A10002010000000000000005 /* Session.swift */,
-				A10002010000000000000006 /* Keystroke.swift */,
-				A10002010000000000000007 /* Commitment.swift */,
-				A10002010000000000000008 /* FeatureVector.swift */,
-			);
-			path = Models;
-			sourceTree = "<group>";
-		};
 		A10008010000000000000005 /* Features */ = {
 			isa = PBXGroup;
 			children = (
-				A10002010000000000000009 /* StatsUtils.swift */,
-				A10002010000000000000010 /* Tier1Features.swift */,
-				A10002010000000000000011 /* Tier2Features.swift */,
 			);
 			path = Features;
 			sourceTree = "<group>";
@@ -175,8 +122,6 @@
 			children = (
 				A10002010000000000000012 /* DeviceAttestation.swift */,
 				A10002010000000000000013 /* KeystrokeCapture.swift */,
-				A10002010000000000000014 /* SessionService.swift */,
-				A10002010000000000000015 /* ProofService.swift */,
 				A10002010000000000000016 /* ATProtoService.swift */,
 				A10002010000000000000026 /* KeychainHelper.swift */,
 			);
@@ -198,7 +143,6 @@
 				A10002010000000000000018 /* LoginView.swift */,
 				A10002010000000000000019 /* EditorView.swift */,
 				A10002010000000000000020 /* PostBarView.swift */,
-				A10002010000000000000021 /* ProofSidebarView.swift */,
 				A10002010000000000000022 /* PublishView.swift */,
 				A10002010000000000000023 /* FeedView.swift */,
 				A10002010000000000000024 /* TimelineView.swift */,
@@ -209,6 +153,7 @@
 				A10002010000000000000032 /* SettingsView.swift */,
 				A10002010000000000000036 /* PostDetailView.swift */,
 				A10002010000000000000037 /* QuotePostView.swift */,
+				A10002010000000000000038 /* SearchUsersView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -228,7 +173,6 @@
 			children = (
 				A10004010000000000000001 /* CryptoKit.framework */,
 				A10004010000000000000002 /* DeviceCheck.framework */,
-				A10004010000000000000003 /* LocalAuthentication.framework */,
 				A10004010000000000000004 /* AuthenticationServices.framework */,
 			);
 			name = Frameworks;
@@ -312,26 +256,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10001010000000000000001 /* SpeakwriteApp.swift in Sources */,
-				A10001010000000000000002 /* Hashing.swift in Sources */,
-				A10001010000000000000003 /* HexEncoding.swift in Sources */,
-				A10001010000000000000004 /* Document.swift in Sources */,
-				A10001010000000000000005 /* Session.swift in Sources */,
-				A10001010000000000000006 /* Keystroke.swift in Sources */,
-				A10001010000000000000007 /* Commitment.swift in Sources */,
-				A10001010000000000000008 /* FeatureVector.swift in Sources */,
-				A10001010000000000000009 /* StatsUtils.swift in Sources */,
-				A10001010000000000000010 /* Tier1Features.swift in Sources */,
-				A10001010000000000000011 /* Tier2Features.swift in Sources */,
 				A10001010000000000000012 /* DeviceAttestation.swift in Sources */,
 				A10001010000000000000013 /* KeystrokeCapture.swift in Sources */,
-				A10001010000000000000014 /* SessionService.swift in Sources */,
-				A10001010000000000000015 /* ProofService.swift in Sources */,
 				A10001010000000000000016 /* ATProtoService.swift in Sources */,
 				A10001010000000000000017 /* AppViewModel.swift in Sources */,
 				A10001010000000000000018 /* LoginView.swift in Sources */,
 				A10001010000000000000019 /* EditorView.swift in Sources */,
 				A10001010000000000000020 /* PostBarView.swift in Sources */,
-				A10001010000000000000021 /* ProofSidebarView.swift in Sources */,
 				A10001010000000000000022 /* PublishView.swift in Sources */,
 				A10001010000000000000023 /* FeedView.swift in Sources */,
 				A10001010000000000000024 /* TimelineView.swift in Sources */,
@@ -347,6 +278,7 @@
 				A10001010000000000000035 /* StatView.swift in Sources */,
 				A10001010000000000000036 /* PostDetailView.swift in Sources */,
 				A10001010000000000000037 /* QuotePostView.swift in Sources */,
+				A10001010000000000000038 /* SearchUsersView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

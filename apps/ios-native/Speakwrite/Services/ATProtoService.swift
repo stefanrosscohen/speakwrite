@@ -289,26 +289,40 @@ final class ATProtoService {
 
     // MARK: - Publishing
 
-    func publishProofPost(bundle: ProofBundle, postText: String) async throws -> (uri: String, cid: String) {
+    func publishAttestedPost(text: String, attestation: AttestationRecord) async throws -> (uri: String, cid: String) {
         guard let pds = pdsURL, let did = did else { throw ATProtoError.notLoggedIn }
 
-        // Use the tags field for discoverability — keeps post text clean
-        let postRecord: [String: Any] = [
+        // Tags for machine readability + minimal text footer for search discoverability
+        let fullText = "\(text)\n\n✓ speakwrite"
+
+        // Parse @mentions and build facets
+        let facets = try await buildMentionFacets(text: fullText)
+
+        var postRecord: [String: Any] = [
             "$type": "app.bsky.feed.post",
-            "text": postText,
+            "text": fullText,
             "tags": ["speakwrite", "human-verified"],
             "createdAt": ISO8601DateFormatter().string(from: Date()),
         ]
+
+        if !facets.isEmpty {
+            postRecord["facets"] = facets
+        }
 
         let postResult: CreateRecordResponse = try await createRecord(
             pds: pds, did: did, collection: "app.bsky.feed.post", record: postRecord
         )
 
-        let bundleJSON = try JSONEncoder().encode(bundle)
+        // Attestation proof record — verifiers check the attestationObject cert chain
+        // against Apple's App Attest root CA, then verify the assertion signature
         let proofRecord: [String: Any] = [
             "$type": "io.speakwrite.proof",
-            "proof": String(data: bundleJSON, encoding: .utf8) ?? "{}",
             "postUri": postResult.uri,
+            "keyId": attestation.keyId,
+            "attestationObject": attestation.attestationObject,
+            "assertion": attestation.assertion,
+            "contentHash": attestation.contentHash,
+            "appId": attestation.appId,
             "createdAt": ISO8601DateFormatter().string(from: Date()),
         ]
 
@@ -317,6 +331,76 @@ final class ATProtoService {
         )
 
         return (uri: postResult.uri, cid: postResult.cid)
+    }
+
+    // MARK: - @Mention Facets
+
+    private func buildMentionFacets(text: String) async throws -> [[String: Any]] {
+        var facets: [[String: Any]] = []
+        let utf8 = Array(text.utf8)
+
+        // Find @mentions using regex
+        let pattern = try NSRegularExpression(pattern: "@([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\.)+[a-zA-Z]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?")
+        let matches = pattern.matches(in: text, range: NSRange(text.startIndex..., in: text))
+
+        for match in matches {
+            guard let range = Range(match.range, in: text) else { continue }
+            let mention = String(text[range])
+            let handle = String(mention.dropFirst()) // remove @
+
+            // Resolve handle to DID
+            guard let did = try? await resolveHandleToDID(handle) else { continue }
+
+            // Calculate byte offsets
+            let beforeMention = String(text[text.startIndex..<range.lowerBound])
+            let byteStart = Array(beforeMention.utf8).count
+            let byteEnd = byteStart + Array(mention.utf8).count
+
+            let facet: [String: Any] = [
+                "index": [
+                    "byteStart": byteStart,
+                    "byteEnd": byteEnd,
+                ] as [String: Any],
+                "features": [
+                    [
+                        "$type": "app.bsky.richtext.facet#mention",
+                        "did": did,
+                    ] as [String: Any]
+                ],
+            ]
+            facets.append(facet)
+        }
+
+        return facets
+    }
+
+    func resolveHandleToDID(_ handle: String) async throws -> String {
+        let url = URL(string: "https://bsky.social/xrpc/com.atproto.identity.resolveHandle?handle=\(handle)")!
+        let (data, _) = try await URLSession.shared.data(from: url)
+        let result = try JSONDecoder().decode(ResolveHandleResponse.self, from: data)
+        return result.did
+    }
+
+    // MARK: - User Search
+
+    func searchUsers(query: String, limit: Int = 10) async throws -> [ProfileViewBasic] {
+        let publicAPI = "https://api.bsky.app"
+        let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
+        let urlString = "\(publicAPI)/xrpc/app.bsky.actor.searchActors?q=\(encoded)&limit=\(limit)"
+
+        let (data, _) = try await URLSession.shared.data(from: URL(string: urlString)!)
+        let result = try JSONDecoder().decode(SearchActorsResponse.self, from: data)
+        return result.actors
+    }
+
+    func searchUsersTypeahead(query: String, limit: Int = 8) async throws -> [ProfileViewBasic] {
+        let publicAPI = "https://api.bsky.app"
+        let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
+        let urlString = "\(publicAPI)/xrpc/app.bsky.actor.searchActorsTypeahead?q=\(encoded)&limit=\(limit)"
+
+        let (data, _) = try await URLSession.shared.data(from: URL(string: urlString)!)
+        let result = try JSONDecoder().decode(SearchActorsTypeaheadResponse.self, from: data)
+        return result.actors
     }
 
     // MARK: - Feed (Global Verified Posts)
@@ -329,30 +413,34 @@ final class ATProtoService {
         var allPosts: [VerifiedPost] = []
         var lastCursor: String?
 
-        // 1. Tag-based search (new format)
+        // 1. Primary search: finds posts with "speakwrite" in text (both footer formats)
         do {
-            var tagURL = "\(publicAPI)/xrpc/app.bsky.feed.searchPosts?tag=speakwrite&limit=25&sort=latest"
+            var tagURL = "\(publicAPI)/xrpc/app.bsky.feed.searchPosts?q=%22speakwrite%22&limit=25&sort=latest"
             if let cursor {
                 let encoded = cursor.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? cursor
                 tagURL += "&cursor=\(encoded)"
             }
-            let (data, response) = try await URLSession.shared.data(from: URL(string: tagURL)!)
+            var tagRequest = URLRequest(url: URL(string: tagURL)!)
+            tagRequest.cachePolicy = .reloadIgnoringLocalCacheData
+            let (data, response) = try await URLSession.shared.data(for: tagRequest)
             if let httpResp = response as? HTTPURLResponse, httpResp.statusCode == 200 {
                 let decoder = JSONDecoder()
                 let result = try decoder.decode(SearchPostsResponse.self, from: data)
                 let posts = result.posts.compactMap { post -> VerifiedPost? in
-                    VerifiedPost(
+                    // Filter: only include genuine speakwrite posts (tag or old footer)
+                    guard post.record.isSpeakwrite else { return nil }
+                    return VerifiedPost(
                         uri: post.uri, cid: post.cid, author: post.author,
-                        text: post.record.text, createdAt: post.record.safeCreatedAt,
+                        text: post.record.displayText, createdAt: post.record.safeCreatedAt,
                         likeCount: post.likeCount ?? 0, repostCount: post.repostCount ?? 0,
                         replyCount: post.replyCount ?? 0, viewer: post.viewer
                     )
                 }
                 allPosts.append(contentsOf: posts)
                 lastCursor = result.cursor
-                print("[Feed] Tag search returned \(posts.count) posts")
+                print("[Feed] Primary search returned \(posts.count) verified posts")
             } else {
-                let body = String(data: try await URLSession.shared.data(from: URL(string: tagURL)!).0, encoding: .utf8) ?? ""
+                let body = String(data: data, encoding: .utf8) ?? ""
                 print("[Feed] Tag search failed with status \((response as? HTTPURLResponse)?.statusCode ?? 0): \(body.prefix(200))")
             }
         } catch {
@@ -366,14 +454,17 @@ final class ATProtoService {
                 let encoded = cursor.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? cursor
                 textURL += "&cursor=\(encoded)"
             }
-            let (data, response) = try await URLSession.shared.data(from: URL(string: textURL)!)
+            var textRequest = URLRequest(url: URL(string: textURL)!)
+            textRequest.cachePolicy = .reloadIgnoringLocalCacheData
+            let (data, response) = try await URLSession.shared.data(for: textRequest)
             if let httpResp = response as? HTTPURLResponse, httpResp.statusCode == 200 {
                 let decoder = JSONDecoder()
                 let result = try decoder.decode(SearchPostsResponse.self, from: data)
                 let posts = result.posts.compactMap { post -> VerifiedPost? in
-                    VerifiedPost(
+                    guard post.record.isSpeakwrite else { return nil }
+                    return VerifiedPost(
                         uri: post.uri, cid: post.cid, author: post.author,
-                        text: post.record.text, createdAt: post.record.safeCreatedAt,
+                        text: post.record.displayText, createdAt: post.record.safeCreatedAt,
                         likeCount: post.likeCount ?? 0, repostCount: post.repostCount ?? 0,
                         replyCount: post.replyCount ?? 0, viewer: post.viewer
                     )
@@ -382,7 +473,7 @@ final class ATProtoService {
                 let newPosts = posts.filter { !existingURIs.contains($0.uri) }
                 allPosts.append(contentsOf: newPosts)
                 if lastCursor == nil { lastCursor = result.cursor }
-                print("[Feed] Text search returned \(posts.count) posts (\(newPosts.count) new)")
+                print("[Feed] Text search returned \(posts.count) verified posts (\(newPosts.count) new)")
             } else {
                 print("[Feed] Text search failed with status \((response as? HTTPURLResponse)?.statusCode ?? 0)")
             }
@@ -407,7 +498,9 @@ final class ATProtoService {
         var urlString = "\(publicAPI)/xrpc/app.bsky.feed.getFeed?feed=\(encodedFeed)&limit=30"
         if let cursor { urlString += "&cursor=\(cursor)" }
 
-        let (data, _) = try await URLSession.shared.data(from: URL(string: urlString)!)
+        var request = URLRequest(url: URL(string: urlString)!)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        let (data, _) = try await URLSession.shared.data(for: request)
 
         let result = try JSONDecoder().decode(FeedResponse.self, from: data)
 
@@ -452,6 +545,9 @@ final class ATProtoService {
                 (text.contains("human verified") && text.contains("speakwrite")) ||
                 (text.contains("keystrokes") && text.contains("commitments"))
 
+            // Strip speakwrite footer for clean display
+            let displayText = Self.stripSpeakwriteFooter(text)
+
             // Extract repost attribution
             let repostedBy: String?
             if item.reason?.type == "app.bsky.feed.defs#reasonRepost",
@@ -463,7 +559,7 @@ final class ATProtoService {
 
             return TimelinePost(
                 uri: post.uri, cid: post.cid, author: post.author,
-                text: text, createdAt: post.record?.createdAt ?? "",
+                text: displayText, createdAt: post.record?.createdAt ?? "",
                 likeCount: post.likeCount ?? 0, repostCount: post.repostCount ?? 0,
                 replyCount: post.replyCount ?? 0, isVerified: isVerified,
                 viewer: post.viewer, repostedBy: repostedBy
@@ -504,7 +600,7 @@ final class ATProtoService {
 
             return TimelinePost(
                 uri: post.uri, cid: post.cid, author: post.author,
-                text: text, createdAt: post.record?.createdAt ?? "",
+                text: Self.stripSpeakwriteFooter(text), createdAt: post.record?.createdAt ?? "",
                 likeCount: post.likeCount ?? 0, repostCount: post.repostCount ?? 0,
                 replyCount: post.replyCount ?? 0, isVerified: isVerified,
                 viewer: post.viewer, repostedBy: nil
@@ -941,6 +1037,19 @@ final class ATProtoService {
         return (data, response)
     }
 
+    // MARK: - Text Helpers
+
+    /// Strip speakwrite footer from post text for clean display.
+    static func stripSpeakwriteFooter(_ text: String) -> String {
+        if let range = text.range(of: "\n\n✓ speakwrite", options: .backwards) {
+            return String(text[..<range.lowerBound])
+        }
+        if let range = text.range(of: "\n\n❤️‍🔥 human verified · speakwrite", options: .backwards) {
+            return String(text[..<range.lowerBound])
+        }
+        return text
+    }
+
     // MARK: - PKCE
 
     private func generateCodeVerifier() -> String {
@@ -1023,7 +1132,7 @@ final class ATProtoService {
 
 // MARK: - Private Response Types
 
-private struct ResolveHandleResponse: Decodable { let did: String }
+struct ResolveHandleResponse: Decodable { let did: String }
 private struct DIDDocument: Decodable { let service: [DIDService]? }
 private struct DIDService: Decodable { let type: String; let serviceEndpoint: String }
 
@@ -1091,17 +1200,38 @@ private struct SearchPost: Decodable {
 private struct PostRecord: Decodable {
     let text: String
     let createdAt: String?
+    let tags: [String]?
 
     var safeCreatedAt: String { createdAt ?? "" }
+
+    /// Whether this post is a genuine Speakwrite post (has tag or old-format footer).
+    var isSpeakwrite: Bool {
+        tags?.contains("speakwrite") == true ||
+        (text.contains("human verified") && text.contains("speakwrite"))
+    }
+
+    /// Post text with speakwrite footer stripped for display.
+    var displayText: String {
+        // Strip new footer: "\n\n✓ speakwrite"
+        if let range = text.range(of: "\n\n✓ speakwrite", options: .backwards) {
+            return String(text[..<range.lowerBound])
+        }
+        // Strip old footer: "\n\n❤️‍🔥 human verified · speakwrite"
+        if let range = text.range(of: "\n\n❤️‍🔥 human verified · speakwrite", options: .backwards) {
+            return String(text[..<range.lowerBound])
+        }
+        return text
+    }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         // Default to empty string if text is missing (defensive against bad API data)
         text = (try? container.decode(String.self, forKey: .text)) ?? ""
         createdAt = try? container.decode(String.self, forKey: .createdAt)
+        tags = try? container.decode([String].self, forKey: .tags)
     }
 
-    enum CodingKeys: String, CodingKey { case text, createdAt }
+    enum CodingKeys: String, CodingKey { case text, createdAt, tags }
 }
 
 // MARK: - Public Response Types
@@ -1237,6 +1367,22 @@ enum ATProtoError: Error, LocalizedError {
         case .oauthError(let code, let desc): return "OAuth error (\(code)): \(desc ?? "unknown")"
         }
     }
+}
+
+struct ProfileViewBasic: Codable, Identifiable {
+    let did: String
+    let handle: String
+    let displayName: String?
+    let avatar: String?
+    var id: String { did }
+}
+
+struct SearchActorsResponse: Decodable {
+    let actors: [ProfileViewBasic]
+}
+
+struct SearchActorsTypeaheadResponse: Decodable {
+    let actors: [ProfileViewBasic]
 }
 
 extension Data {

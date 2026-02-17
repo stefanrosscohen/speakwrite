@@ -1,4 +1,3 @@
-import SwiftData
 import SwiftUI
 
 @main
@@ -12,19 +11,11 @@ struct SpeakwriteApp: App {
                 .environment(viewModel)
                 .preferredColorScheme(AppearanceMode(rawValue: appearanceMode)?.colorScheme)
         }
-        .modelContainer(for: [
-            Document.self,
-            Session.self,
-            Keystroke.self,
-            Commitment.self,
-            FeatureVector.self,
-        ])
     }
 }
 
 struct ContentView: View {
     @Environment(AppViewModel.self) private var viewModel
-    @Environment(\.modelContext) private var modelContext
 
     var body: some View {
         Group {
@@ -57,8 +48,11 @@ struct ContentView: View {
                 }
                 .tint(Theme.accent)
                 .onChange(of: viewModel.selectedTab) { _, newTab in
-                    if newTab == .compose {
-                        Task { await viewModel.ensureSessionReady() }
+                    if newTab == .verified {
+                        Task { await viewModel.loadFeed() }
+                    }
+                    if newTab == .timeline {
+                        Task { await viewModel.loadFollowing() }
                     }
                 }
             } else {
@@ -66,8 +60,6 @@ struct ContentView: View {
             }
         }
         .onAppear {
-            viewModel.setupSession(modelContext: modelContext)
-            // Restore previous session on app launch
             if viewModel.atproto.restoreSession() {
                 Task { await viewModel.loadMyProfile() }
             }

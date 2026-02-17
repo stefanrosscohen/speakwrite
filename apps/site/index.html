@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Speakwrite — Prove a human wrote it</title>
-  <meta name="description" content="Speakwrite captures keystroke dynamics as you type and cryptographically signs each checkpoint with the iPhone's Secure Enclave. The proof goes with the post.">
+  <meta name="description" content="Speakwrite enforces input restrictions (soft keyboard only, no paste, no dictation) and cryptographically signs each checkpoint with the iPhone's Secure Enclave. The proof goes with the post.">
   <meta property="og:title" content="Speakwrite — Prove a human wrote it">
-  <meta property="og:description" content="An AT Protocol client that captures keystroke dynamics and signs every checkpoint with the iPhone's Secure Enclave. Open protocol. Hardware-backed. No trust required.">
+  <meta property="og:description" content="An AT Protocol client that enforces input restrictions (soft keyboard only, no paste, no dictation) and signs every checkpoint with the iPhone's Secure Enclave. Open protocol. Hardware-backed. No trust required.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://speakwrite.io">
   <meta name="theme-color" content="#0a0a0a">
@@ -33,7 +33,7 @@
       <h1>Prove a human wrote it.</h1>
       <p class="subtitle">Open protocol. Hardware-backed. No trust required.</p>
       <p class="lede">AI can produce text indistinguishable from human writing. Every detection tool that analyzes the <em>output</em> is losing an arms race it can never win. The next model will always evade the last detector.</p>
-      <p class="lede">Speakwrite takes a different approach: instead of analyzing what was written, it captures <em>how</em> it was written. Keystroke dynamics, commitment chains, and hardware-backed signatures create a portable proof that anyone can verify.</p>
+      <p class="lede">Speakwrite takes a different approach: instead of analyzing what was written, it restricts <em>how</em> it can be written. Soft keyboard only &mdash; no paste, no dictation, no autocorrect &mdash; with commitment chains and hardware-backed signatures that create a portable proof anyone can verify.</p>
     </section>
 
     <section id="the-problem">
@@ -45,8 +45,8 @@
 
     <section id="the-approach">
       <h2>The Approach</h2>
-      <p>Speakwrite doesn&rsquo;t analyze what you wrote. It records <em>how</em> you wrote it.</p>
-      <p>As you type, the app captures your keystroke dynamics &mdash; timing, rhythm, pauses, corrections &mdash; and periodically creates cryptographic commitments chained together with SHA-256 hashes. Each checkpoint is signed by the iPhone&rsquo;s Secure Enclave. When you publish, the entire proof chain is attached to your post.</p>
+      <p>Speakwrite doesn&rsquo;t analyze what you wrote. It restricts <em>how</em> you can write.</p>
+      <p>The app enforces soft keyboard only &mdash; no paste, no dictation, no autocorrect, no hardware keyboard &mdash; and periodically creates cryptographic commitments chained together with SHA-256 hashes. Each checkpoint is signed by the iPhone&rsquo;s Secure Enclave. When you publish, the entire proof chain is attached to your post.</p>
       <p>The result is a <strong>proof bundle</strong>: a portable JSON artifact that anyone can independently verify. No server. No API key. No central authority.</p>
     </section>
 
@@ -59,11 +59,11 @@
         </li>
         <li>
           <strong>Type</strong>
-          <span>Keystroke dynamics &mdash; timing, rhythm, pauses, corrections &mdash; are captured natively as you write. Nothing leaves your device.</span>
+          <span>Input restricted to soft keyboard only &mdash; no paste, no dictation, no autocorrect, no hardware keyboard. Nothing leaves your device.</span>
         </li>
         <li>
           <strong>Commit</strong>
-          <span>Periodically, behavioral features are extracted and hashed into a cryptographic commitment chain. Each link is signed by the Secure Enclave.</span>
+          <span>Periodically, a document snapshot is hashed into a cryptographic commitment chain. Each link is signed by the Secure Enclave.</span>
         </li>
         <li>
           <strong>Publish</strong>
@@ -93,7 +93,7 @@
         <div class="tab-card">
           <div class="tab-icon">$ _</div>
           <h3>Compose</h3>
-          <p>Write your post. Keystroke timing is captured, commitments are chained, and the Secure Enclave signs every checkpoint.</p>
+          <p>Write your post. Input is restricted to soft keyboard only. Commitments are chained, and the Secure Enclave signs every checkpoint.</p>
         </div>
         <div class="tab-card">
           <div class="tab-icon">{&middot;}</div>
@@ -110,13 +110,13 @@
       <h3>Three layers</h3>
       <dl>
         <dt>Layer 1: Cryptographic commitment chain</dt>
-        <dd>SHA-256 hash chain with openable commitments &mdash; each link binds the behavioral features and a document snapshot hash. Every commitment can be independently re-derived. You can&rsquo;t edit the chain or swap the content without breaking it.</dd>
+        <dd>SHA-256 hash chain with openable commitments &mdash; each link binds a document snapshot hash. Every commitment can be independently re-derived. You can&rsquo;t edit the chain or swap the content without breaking it.</dd>
 
         <dt>Layer 2: Device attestation</dt>
         <dd>The iPhone&rsquo;s Secure Enclave holds a signing key that never leaves the silicon. Apple&rsquo;s App Attest certifies the key was generated on a real device running the unmodified app. Every commitment is signed.</dd>
 
-        <dt>Layer 3: Behavioral analysis</dt>
-        <dd>Human typing has distinct statistical properties: variable inter-key timing, characteristic digraph patterns, natural pause distributions, error-and-correct sequences. These features are captured and committed into the proof as evidence &mdash; the protocol does not declare a threshold for &ldquo;human enough.&rdquo; Behavioral analysis is forensic evidence, not a binary verdict.</dd>
+        <dt>Layer 3: Input restriction</dt>
+        <dd>The app enforces soft keyboard only &mdash; no paste, no dictation, no autocorrect, no hardware keyboard. The input restriction is attested in the proof bundle. App Attest certifies the restriction code is unmodified.</dd>
       </dl>
 
       <h3>Verification</h3>
@@ -128,11 +128,11 @@
         </li>
         <li>
           <strong>Chain integrity + re-derivation</strong>
-          <span>Walk the commitment chain. Re-derive each behavioral commitment from its nonce, features, and document hash. Every link must match.</span>
+          <span>Walk the commitment chain. Re-derive each commitment from its nonce and document hash. Every link must match.</span>
         </li>
         <li>
           <strong>Content binding</strong>
-          <span>The final commitment must bind the content hash to the chain tip. The last behavioral commitment&rsquo;s document hash must match the published content hash.</span>
+          <span>The final commitment must bind the content hash to the chain tip. The last commitment&rsquo;s document hash must match the published content hash.</span>
         </li>
         <li>
           <strong>Signatures + identity</strong>
@@ -140,7 +140,7 @@
         </li>
         <li>
           <strong>Plausibility</strong>
-          <span>Check keystroke count vs content length, typing speed bounds, timestamp monotonicity, session duration vs content length, and feature drift between checkpoints. Non-fatal warnings flag anomalies.</span>
+          <span>Check input restriction validation, timestamp monotonicity, session duration vs content length. Non-fatal warnings flag anomalies.</span>
         </li>
       </ol>
     </section>
@@ -174,7 +174,7 @@
       <div class="two-col">
         <div>
           <h3>It proves</h3>
-          <p>A post was composed through physical typing on a genuine Apple device, with keystroke behavior consistent with human motor patterns, signed by hardware that never left the silicon.</p>
+          <p>A post was composed through physical typing on a genuine Apple device, with input restricted to soft keyboard only (no paste, no dictation, no autocorrect), signed by hardware that never left the silicon.</p>
         </div>
         <div>
           <h3>It doesn&rsquo;t prove</h3>
@@ -194,7 +194,7 @@
         <dd>Secure Enclave + App Attest on every proof. The signing key never leaves the silicon. No web fallback.</dd>
 
         <dt>On-device</dt>
-        <dd>No server sees your keystrokes. Everything runs on your iPhone. Only aggregate statistical features are committed to the proof.</dd>
+        <dd>No server sees your keystrokes. Everything runs on your iPhone. Document snapshots are committed to the proof. No behavioral data collected.</dd>
 
         <dt>Decentralized</dt>
         <dd>Proofs live in the author&rsquo;s AT Protocol Personal Data Server. No central server, no trusted authority. Verification is pure cryptography.</dd>

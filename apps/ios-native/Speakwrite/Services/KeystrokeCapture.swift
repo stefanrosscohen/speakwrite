@@ -1,180 +1,93 @@
 import SwiftUI
 import UIKit
 
-/// Protocol for receiving keystroke events from the capture text view.
-protocol KeystrokeCaptureDelegate: AnyObject {
-    func didRecordKeystroke(_ event: KeystrokeEvent)
+/// Protocol for receiving text changes and keystroke counts from the input-restricted text view.
+protocol InputRestrictedDelegate: AnyObject {
     func textDidChange(_ text: String)
+    func keystrokeCountDidChange(_ count: Int)
+    func violationCountDidChange(_ count: Int)
 }
 
-/// Lightweight keystroke event (not persisted — converted to Keystroke model for storage).
-struct KeystrokeEvent {
-    let eventType: String      // "KeyDown", "KeyUp"
-    let key: String            // "a", "Enter", "Backspace"
-    let code: String           // "KeyA", "Enter", "Backspace"
-    let timestampMs: Double    // milliseconds since boot
-    let shiftKey: Bool
-    let ctrlKey: Bool
-    let altKey: Bool
-    let metaKey: Bool
-    let isRepeat: Bool
-    let isComposing: Bool
-    let sequenceNumber: Int
-}
+// MARK: - UITextView subclass with input restrictions
 
-// MARK: - UITextView subclass with keystroke capture
-
-/// Custom UITextView that captures keystroke timing for behavioral analysis.
-/// Handles both software keyboard (insertText/deleteBackward) and hardware keyboard (pressesBegan/pressesEnded).
-class CaptureTextView: UITextView {
-    weak var captureDelegate: KeystrokeCaptureDelegate?
-    private var sequenceCounter = 0
+/// Custom UITextView that enforces soft-keyboard-only input.
+/// Blocks paste, dictation, autocorrect, hardware keyboard, and other non-typing input methods.
+/// This is the v3 replacement for behavioral analysis — the restriction IS the guarantee.
+class InputRestrictedTextView: UITextView {
+    weak var inputDelegate: InputRestrictedDelegate?
+    private var keystrokeCount = 0
     private var isComposing = false
 
-    private func nowMs() -> Double {
-        ProcessInfo.processInfo.systemUptime * 1000
+    /// Number of input restriction violations detected this session.
+    private(set) var violationCount = 0
+
+    // MARK: - Block paste, cut, and other non-typing actions
+
+    override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
+        // Block paste, cut, and other clipboard-related actions
+        let blockedActions: [Selector] = [
+            #selector(UIResponderStandardEditActions.paste(_:)),
+            #selector(UIResponderStandardEditActions.cut(_:)),
+            NSSelectorFromString("_share:"),       // Share sheet
+            NSSelectorFromString("_define:"),      // Look up
+            NSSelectorFromString("_translate:"),   // Translate
+            NSSelectorFromString("_promptForReplace:"), // Replace...
+        ]
+        if blockedActions.contains(action) {
+            violationCount += 1
+            inputDelegate?.violationCountDidChange(violationCount)
+            return false
+        }
+        return super.canPerformAction(action, withSender: sender)
     }
 
-    private func nextSequence() -> Int {
-        let seq = sequenceCounter
-        sequenceCounter += 1
-        return seq
-    }
-
-    // MARK: - Software keyboard capture
+    // MARK: - Software keyboard input (with dictation blocking)
 
     override func insertText(_ text: String) {
-        // Capture before the insert so we record what key was pressed
-        let key: String
-        let code: String
-        switch text {
-        case "\n":
-            key = "Enter"
-            code = "Enter"
-        case "\t":
-            key = "Tab"
-            code = "Tab"
-        default:
-            key = text
-            code = text.count == 1 ? "Key\(text.uppercased())" : text
+        // Dictation inserts bulk text in a single call.
+        // During IME composition, multi-character insertions are expected.
+        // Swift's Character handles emoji correctly — "🇺🇸".count == 1
+        if text.count > 1 && !isComposing {
+            // Likely dictation or programmatic insertion — block it
+            violationCount += 1
+            inputDelegate?.violationCountDidChange(violationCount)
+            return
         }
 
-        let event = KeystrokeEvent(
-            eventType: "KeyDown",
-            key: key,
-            code: code,
-            timestampMs: nowMs(),
-            shiftKey: false,
-            ctrlKey: false,
-            altKey: false,
-            metaKey: false,
-            isRepeat: false,
-            isComposing: isComposing,
-            sequenceNumber: nextSequence()
-        )
-        captureDelegate?.didRecordKeystroke(event)
-
-        // Synthetic KeyUp immediately after (software keyboard doesn't have distinct up events)
-        let upEvent = KeystrokeEvent(
-            eventType: "KeyUp",
-            key: key,
-            code: code,
-            timestampMs: nowMs() + 1, // 1ms after keydown
-            shiftKey: false,
-            ctrlKey: false,
-            altKey: false,
-            metaKey: false,
-            isRepeat: false,
-            isComposing: isComposing,
-            sequenceNumber: nextSequence()
-        )
-        captureDelegate?.didRecordKeystroke(upEvent)
-
         super.insertText(text)
-        captureDelegate?.textDidChange(self.text)
+        keystrokeCount += 1
+        inputDelegate?.keystrokeCountDidChange(keystrokeCount)
+        inputDelegate?.textDidChange(self.text)
     }
 
     override func deleteBackward() {
-        let event = KeystrokeEvent(
-            eventType: "KeyDown",
-            key: "Backspace",
-            code: "Backspace",
-            timestampMs: nowMs(),
-            shiftKey: false,
-            ctrlKey: false,
-            altKey: false,
-            metaKey: false,
-            isRepeat: false,
-            isComposing: isComposing,
-            sequenceNumber: nextSequence()
-        )
-        captureDelegate?.didRecordKeystroke(event)
-
-        let upEvent = KeystrokeEvent(
-            eventType: "KeyUp",
-            key: "Backspace",
-            code: "Backspace",
-            timestampMs: nowMs() + 1,
-            shiftKey: false,
-            ctrlKey: false,
-            altKey: false,
-            metaKey: false,
-            isRepeat: false,
-            isComposing: isComposing,
-            sequenceNumber: nextSequence()
-        )
-        captureDelegate?.didRecordKeystroke(upEvent)
-
         super.deleteBackward()
-        captureDelegate?.textDidChange(self.text)
+        keystrokeCount += 1
+        inputDelegate?.keystrokeCountDidChange(keystrokeCount)
+        inputDelegate?.textDidChange(self.text)
     }
 
-    // MARK: - Hardware keyboard capture
+    // MARK: - Block hardware keyboard
 
     override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
-        for press in presses {
-            guard let uiKey = press.key else { continue }
-            let keystroke = KeystrokeEvent(
-                eventType: "KeyDown",
-                key: uiKey.characters,
-                code: String(describing: uiKey.keyCode.rawValue),
-                timestampMs: nowMs(),
-                shiftKey: uiKey.modifierFlags.contains(.shift),
-                ctrlKey: uiKey.modifierFlags.contains(.control),
-                altKey: uiKey.modifierFlags.contains(.alternate),
-                metaKey: uiKey.modifierFlags.contains(.command),
-                isRepeat: false,
-                isComposing: isComposing,
-                sequenceNumber: nextSequence()
-            )
-            captureDelegate?.didRecordKeystroke(keystroke)
-        }
-        super.pressesBegan(presses, with: event)
+        // Consume hardware keyboard events without calling super
+        violationCount += presses.count
+        inputDelegate?.violationCountDidChange(violationCount)
     }
 
     override func pressesEnded(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
-        for press in presses {
-            guard let uiKey = press.key else { continue }
-            let keystroke = KeystrokeEvent(
-                eventType: "KeyUp",
-                key: uiKey.characters,
-                code: String(describing: uiKey.keyCode.rawValue),
-                timestampMs: nowMs(),
-                shiftKey: uiKey.modifierFlags.contains(.shift),
-                ctrlKey: uiKey.modifierFlags.contains(.control),
-                altKey: uiKey.modifierFlags.contains(.alternate),
-                metaKey: uiKey.modifierFlags.contains(.command),
-                isRepeat: false,
-                isComposing: isComposing,
-                sequenceNumber: nextSequence()
-            )
-            captureDelegate?.didRecordKeystroke(keystroke)
-        }
-        super.pressesEnded(presses, with: event)
-        captureDelegate?.textDidChange(self.text)
+        // Consume hardware keyboard events without calling super
     }
 
-    // MARK: - Composition tracking (for IME input)
+    override func pressesChanged(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        // Consume hardware keyboard events without calling super
+    }
+
+    override func pressesCancelled(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        // Consume hardware keyboard events without calling super
+    }
+
+    // MARK: - IME composition tracking (for CJK input)
 
     override func setMarkedText(_ markedText: String?, selectedRange: NSRange) {
         isComposing = true
@@ -184,43 +97,48 @@ class CaptureTextView: UITextView {
     override func unmarkText() {
         isComposing = false
         super.unmarkText()
+        inputDelegate?.textDidChange(self.text)
     }
 
-    /// Reset sequence counter (call when starting a new session).
-    func resetSequence() {
-        sequenceCounter = 0
+    /// Reset counters (call when starting a new session).
+    func resetCounters() {
+        keystrokeCount = 0
+        violationCount = 0
     }
 }
 
 // MARK: - SwiftUI wrapper
 
-struct CaptureTextEditor: UIViewRepresentable {
+struct InputRestrictedEditor: UIViewRepresentable {
     @Binding var text: String
     var placeholder: String = "Start typing..."
-    var captureDelegate: KeystrokeCaptureDelegate?
+    var inputDelegate: InputRestrictedDelegate?
 
-    func makeUIView(context: Context) -> CaptureTextView {
-        let textView = CaptureTextView()
+    func makeUIView(context: Context) -> InputRestrictedTextView {
+        let textView = InputRestrictedTextView()
         textView.font = .monospacedSystemFont(ofSize: 17, weight: .regular)
         textView.textColor = UIColor(named: "textPrimary") ?? .label
         textView.backgroundColor = .clear
-        textView.autocorrectionType = .yes
-        textView.autocapitalizationType = .sentences
-        textView.spellCheckingType = .yes
-        textView.smartDashesType = .yes
-        textView.smartQuotesType = .yes
-        textView.smartInsertDeleteType = .yes
-        textView.captureDelegate = captureDelegate
+
+        // Disable all auto-correction and smart text features
+        textView.autocorrectionType = .no
+        textView.autocapitalizationType = .none
+        textView.spellCheckingType = .no
+        textView.smartQuotesType = .no
+        textView.smartDashesType = .no
+        textView.smartInsertDeleteType = .no
+
+        textView.inputDelegate = inputDelegate
         textView.delegate = context.coordinator
         textView.text = text
         return textView
     }
 
-    func updateUIView(_ textView: CaptureTextView, context: Context) {
+    func updateUIView(_ textView: InputRestrictedTextView, context: Context) {
         if textView.text != text {
             textView.text = text
         }
-        textView.captureDelegate = captureDelegate
+        textView.inputDelegate = inputDelegate
     }
 
     func makeCoordinator() -> Coordinator {
@@ -228,9 +146,9 @@ struct CaptureTextEditor: UIViewRepresentable {
     }
 
     class Coordinator: NSObject, UITextViewDelegate {
-        let parent: CaptureTextEditor
+        let parent: InputRestrictedEditor
 
-        init(_ parent: CaptureTextEditor) {
+        init(_ parent: InputRestrictedEditor) {
             self.parent = parent
         }
 

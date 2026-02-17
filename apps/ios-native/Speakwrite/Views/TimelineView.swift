@@ -5,6 +5,7 @@ struct TimelineView: View {
     @Environment(AppViewModel.self) private var viewModel
     @Environment(\.colorScheme) private var colorScheme
     @State private var showMyProfile = false
+    @State private var showSearch = false
     @State private var selectedFeed: FeedType = .following
 
     enum FeedType: String, CaseIterable {
@@ -27,6 +28,12 @@ struct TimelineView: View {
                         .font(Theme.monoTitle)
                         .foregroundStyle(Theme.accent)
                     Spacer()
+                    Button {
+                        showSearch = true
+                    } label: {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundStyle(Theme.accent)
+                    }
                 }
                 .padding(.horizontal, Theme.lg)
                 .padding(.vertical, Theme.sm)
@@ -51,6 +58,9 @@ struct TimelineView: View {
             .navigationBarHidden(true)
             .sheet(isPresented: $showMyProfile) {
                 MyProfileView()
+            }
+            .sheet(isPresented: $showSearch) {
+                SearchUsersView()
             }
             .navigationDestination(for: String.self) { did in
                 ProfileView(actorDID: did)

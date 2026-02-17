@@ -17,14 +17,17 @@ struct ProfileView: View {
             VStack(alignment: .leading, spacing: 0) {
                 // Banner
                 if let bannerURL = profile?.banner, let url = URL(string: bannerURL) {
-                    AsyncImage(url: url) { image in
-                        image.resizable().aspectRatio(contentMode: .fill)
-                    } placeholder: {
-                        Rectangle().fill(Theme.surface(colorScheme))
-                    }
-                    .frame(height: 150)
-                    .frame(maxWidth: .infinity)
-                    .clipped()
+                    Color.clear
+                        .frame(height: 150)
+                        .frame(maxWidth: .infinity)
+                        .background {
+                            AsyncImage(url: url) { image in
+                                image.resizable().aspectRatio(contentMode: .fill)
+                            } placeholder: {
+                                Rectangle().fill(Theme.surface(colorScheme))
+                            }
+                        }
+                        .clipped()
                 } else {
                     Rectangle()
                         .fill(Theme.surface(colorScheme))

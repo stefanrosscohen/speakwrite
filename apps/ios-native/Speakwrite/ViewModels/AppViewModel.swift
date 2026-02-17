@@ -1,14 +1,12 @@
+import CryptoKit
 import Foundation
-import SwiftData
 
 /// Top-level app state. Replaces Zustand store from the web app.
 @Observable
 @MainActor
-final class AppViewModel {
+final class AppViewModel: InputRestrictedDelegate {
     let attestation = DeviceAttestationService()
     var atproto: ATProtoService
-    var sessionService: SessionService?
-    var proofService: ProofService
 
     // Navigation — default to feed for preview
     var selectedTab: AppTab = .timeline
@@ -21,6 +19,8 @@ final class AppViewModel {
     var isPublishing: Bool = false
     var publishError: String?
     var lastPublishedURI: String?
+    var keystrokeCount: Int = 0
+    var violationCount: Int = 0
 
     // Verified feed state
     var verifiedPosts: [VerifiedPost] = []
@@ -46,11 +46,26 @@ final class AppViewModel {
 
     init() {
         self.atproto = ATProtoService()
-        self.proofService = ProofService(attestation: attestation)
     }
 
-    func setupSession(modelContext: ModelContext) {
-        sessionService = SessionService(modelContext: modelContext, attestation: attestation)
+    // MARK: - InputRestrictedDelegate
+
+    nonisolated func textDidChange(_ text: String) {
+        Task { @MainActor in
+            self.postText = text
+        }
+    }
+
+    nonisolated func keystrokeCountDidChange(_ count: Int) {
+        Task { @MainActor in
+            self.keystrokeCount = count
+        }
+    }
+
+    nonisolated func violationCountDidChange(_ count: Int) {
+        Task { @MainActor in
+            self.violationCount = count
+        }
     }
 
     // MARK: - Profile
@@ -66,44 +81,10 @@ final class AppViewModel {
 
     // MARK: - Compose Flow
 
-    /// Start a writing session if one isn't already active.
-    /// Called when the user taps the Compose tab — triggers Face ID once.
-    func ensureSessionReady() async {
-        guard let session = sessionService, !session.sessionActive else { return }
-        guard let did = atproto.did else {
-            print("[Session] Cannot start session: no DID (not logged in)")
-            return
-        }
-        do {
-            try await session.startSessionFromTabSelection(authorDid: did)
-        } catch {
-            print("[Session] Could not start session: \(error)")
-        }
-    }
-
     func publish() async {
-        guard let session = sessionService else {
-            publishError = "Session not available."
-            return
-        }
-
-        // Session starts via Face ID on Compose tab selection. If the user somehow
-        // hits Publish without a session, start one now as a fallback.
-        if !session.sessionActive {
-            guard let did = atproto.did else {
-                publishError = "Not logged in — cannot start session."
-                return
-            }
-            do {
-                try await session.startSession(authorDid: did)
-            } catch {
-                publishError = "Could not start session: \(error.localizedDescription)"
-                return
-            }
-        }
-
-        guard let document = session.currentDocument else {
-            publishError = "No active writing session."
+        let text = postText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else {
+            publishError = "Post cannot be empty."
             return
         }
 
@@ -111,34 +92,45 @@ final class AppViewModel {
         publishError = nil
 
         do {
-            // End session (final checkpoint, keeps biometric context for signing)
-            try await session.endSession()
+            // Initialize attestation (generates + attests App Attest key if needed)
+            let keyId = try await attestation.initialize()
 
-            // Export proof bundle (signs with SE key)
-            let bundle = try await proofService.exportProofBundle(
-                content: postText,
-                document: document,
-                commitments: session.commitments,
-                keystrokeCount: session.keystrokeCount
+            // Compute content hash (SHA-256 raw bytes — App Attest needs Data)
+            let contentHashData = Data(SHA256.hash(data: Data(text.utf8)))
+            let contentHashHex = contentHashData.map { String(format: "%02x", $0) }.joined()
+
+            // Generate App Attest assertion over the content hash
+            let assertionData = try await attestation.generateAssertion(contentHash: contentHashData)
+
+            // Get attestation object (Apple's cert chain)
+            guard let attestationObject = await attestation.attestationObjectBase64 else {
+                throw AttestationError.notAttested
+            }
+
+            // Build attestation record
+            let record = AttestationRecord(
+                keyId: keyId,
+                attestationObject: attestationObject,
+                assertion: assertionData.base64EncodedString(),
+                contentHash: contentHashHex,
+                appId: Bundle.main.bundleIdentifier ?? "io.speakwrite.app"
             )
 
-            // Invalidate biometric context — signing is done
-            await session.finalizeSession()
-
             // Publish to AT Protocol
-            let result = try await atproto.publishProofPost(bundle: bundle, postText: postText)
+            let result = try await atproto.publishAttestedPost(text: text, attestation: record)
             lastPublishedURI = result.uri
 
             // Reset for next post
             postText = ""
-
-            // Flash "Published" for 2 seconds then reset
+            keystrokeCount = 0
+            violationCount = 0
             isPublishing = false
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
+
+            // Navigate to feed
+            selectedTab = .timeline
             lastPublishedURI = nil
             return
         } catch {
-            await session.finalizeSession()
             publishError = error.localizedDescription
         }
 
@@ -152,14 +144,10 @@ final class AppViewModel {
 
         do {
             let result = try await atproto.fetchVerifiedFeed(cursor: nil)
-            // Only replace posts if we got results — prevents crash when
-            // pull-to-refresh returns empty (view flips from ScrollView to
-            // ContentUnavailableView mid-refresh, causing layout crash).
             if !result.posts.isEmpty || verifiedPosts.isEmpty {
                 verifiedPosts = result.posts
                 feedCursor = result.cursor
             }
-            print("[Feed] Loaded \(result.posts.count) verified posts")
         } catch {
             print("[Feed] Error loading verified feed: \(error)")
         }

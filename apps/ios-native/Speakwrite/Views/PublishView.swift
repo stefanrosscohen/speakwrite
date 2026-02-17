@@ -25,12 +25,9 @@ struct PublishView: View {
                 }
                 .padding(.horizontal)
 
-                if let session = viewModel.sessionService {
-                    HStack(spacing: Theme.xxl) {
-                        PublishStatBadge(label: "keystrokes", value: "\(session.keystrokeCount)")
-                        PublishStatBadge(label: "commitments", value: "\(session.commitmentCount)")
-                        PublishStatBadge(label: "words", value: "\(viewModel.postText.split(separator: " ").count)")
-                    }
+                HStack(spacing: Theme.xxl) {
+                    PublishStatBadge(label: "keystrokes", value: "\(viewModel.keystrokeCount)")
+                    PublishStatBadge(label: "words", value: "\(viewModel.postText.split(separator: " ").count)")
                 }
 
                 Spacer()

@@ -27,16 +27,20 @@ struct MyProfileView: View {
                     // Banner
                     PhotosPicker(selection: $bannerItem, matching: .images) {
                         if let bannerURL = viewModel.myProfile?.banner, let url = URL(string: bannerURL) {
-                            AsyncImage(url: url) { image in
-                                image.resizable().aspectRatio(contentMode: .fill)
-                            } placeholder: {
-                                Rectangle().fill(Theme.surface(colorScheme))
-                            }
-                            .frame(height: 150)
-                            .clipped()
-                            .overlay(alignment: .bottomTrailing) {
-                                bannerOverlayIcon
-                            }
+                            Color.clear
+                                .frame(height: 150)
+                                .frame(maxWidth: .infinity)
+                                .background {
+                                    AsyncImage(url: url) { image in
+                                        image.resizable().aspectRatio(contentMode: .fill)
+                                    } placeholder: {
+                                        Rectangle().fill(Theme.surface(colorScheme))
+                                    }
+                                }
+                                .clipped()
+                                .overlay(alignment: .bottomTrailing) {
+                                    bannerOverlayIcon
+                                }
                         } else {
                             Rectangle()
                                 .fill(Theme.surface(colorScheme))

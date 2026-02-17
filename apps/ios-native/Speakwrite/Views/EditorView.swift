@@ -4,9 +4,12 @@ import SwiftUI
 struct EditorView: View {
     @Environment(AppViewModel.self) private var viewModel
     @Environment(\.colorScheme) private var colorScheme
-    @State private var showProofSidebar = false
     @State private var showClearConfirm = false
     @State private var showMyProfile = false
+    @State private var mentionQuery: String = ""
+    @State private var mentionResults: [ProfileViewBasic] = []
+    @State private var showMentionSuggestions = false
+    @State private var mentionSearchTask: Task<Void, Never>?
 
     var body: some View {
         @Bindable var vm = viewModel
@@ -25,22 +28,16 @@ struct EditorView: View {
                         .font(Theme.monoTitle)
                         .foregroundStyle(Theme.accent)
                     Spacer()
-                    Button {
-                        showProofSidebar.toggle()
-                    } label: {
-                        Image(systemName: "chart.bar.doc.horizontal")
-                            .foregroundStyle(Theme.accent)
-                    }
                 }
                 .padding(.horizontal, Theme.lg)
                 .padding(.vertical, Theme.sm)
 
-                // Editor area
+                // Editor area with mention overlay
                 ZStack(alignment: .topLeading) {
-                    CaptureTextEditor(
+                    InputRestrictedEditor(
                         text: $vm.postText,
                         placeholder: "What's on your mind?",
-                        captureDelegate: viewModel.sessionService
+                        inputDelegate: viewModel
                     )
 
                     // Placeholder text (shown when empty)
@@ -55,6 +52,16 @@ struct EditorView: View {
                 }
                 .padding(.horizontal, Theme.lg)
                 .padding(.top, Theme.sm)
+
+                // @Mention autocomplete suggestions
+                if showMentionSuggestions && !mentionResults.isEmpty {
+                    MentionSuggestionList(
+                        results: mentionResults,
+                        onSelect: { profile in
+                            insertMention(profile)
+                        }
+                    )
+                }
 
                 // Compose toolbar
                 ComposeToolbar(
@@ -72,10 +79,6 @@ struct EditorView: View {
             }
             .background(Theme.background(colorScheme))
             .navigationBarHidden(true)
-            .sheet(isPresented: $showProofSidebar) {
-                ProofSidebarView()
-                    .presentationDetents([.medium, .large])
-            }
             .sheet(isPresented: $showMyProfile) {
                 MyProfileView()
             }
@@ -85,11 +88,120 @@ struct EditorView: View {
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
-                Text("This will delete your current draft. Keystroke data for this session will be lost.")
+                Text("This will delete your current draft.")
             }
-            // Face ID is triggered by tab selection (onChange in ContentView),
-            // not by .task here — .task fires eagerly in TabView before the user taps Compose.
+            .onChange(of: viewModel.postText) { _, newText in
+                detectMentionQuery(in: newText)
+            }
         }
+    }
+
+    // MARK: - @Mention Detection
+
+    private func detectMentionQuery(in text: String) {
+        // Find if cursor is in the middle of typing @something
+        // Look for the last @ that doesn't have a space after it
+        guard let atIndex = text.lastIndex(of: "@") else {
+            showMentionSuggestions = false
+            return
+        }
+
+        let afterAt = text[text.index(after: atIndex)...]
+        // If there's a space after the partial handle, dismiss
+        if afterAt.contains(" ") || afterAt.contains("\n") {
+            showMentionSuggestions = false
+            return
+        }
+
+        let query = String(afterAt)
+        guard query.count >= 1 else {
+            showMentionSuggestions = false
+            return
+        }
+
+        mentionQuery = query
+
+        // Cancel any previous search
+        mentionSearchTask?.cancel()
+        mentionSearchTask = Task {
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
+
+            do {
+                let results = try await viewModel.atproto.searchUsersTypeahead(query: query)
+                await MainActor.run {
+                    mentionResults = results
+                    showMentionSuggestions = !results.isEmpty
+                }
+            } catch {
+                await MainActor.run {
+                    showMentionSuggestions = false
+                }
+            }
+        }
+    }
+
+    private func insertMention(_ profile: ProfileViewBasic) {
+        // Replace @partial with @handle
+        if let atIndex = viewModel.postText.lastIndex(of: "@") {
+            viewModel.postText = String(viewModel.postText[..<atIndex]) + "@\(profile.handle) "
+        }
+        showMentionSuggestions = false
+        mentionResults = []
+    }
+}
+
+// MARK: - Mention Suggestion List
+
+struct MentionSuggestionList: View {
+    let results: [ProfileViewBasic]
+    let onSelect: (ProfileViewBasic) -> Void
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        ScrollView {
+            LazyVStack(spacing: 0) {
+                ForEach(results) { profile in
+                    Button {
+                        onSelect(profile)
+                    } label: {
+                        HStack(spacing: Theme.sm) {
+                            AsyncImage(url: profile.avatar.flatMap { URL(string: $0) }) { image in
+                                image.resizable().scaledToFill()
+                            } placeholder: {
+                                Circle().fill(Theme.surfaceElevated(colorScheme))
+                            }
+                            .frame(width: 28, height: 28)
+                            .clipShape(Circle())
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                if let name = profile.displayName, !name.isEmpty {
+                                    Text(name)
+                                        .font(.system(size: 14, weight: .medium))
+                                        .foregroundStyle(Theme.textPrimary(colorScheme))
+                                }
+                                Text("@\(profile.handle)")
+                                    .font(.system(size: 13, design: .monospaced))
+                                    .foregroundStyle(Theme.textSecondary(colorScheme))
+                            }
+
+                            Spacer()
+                        }
+                        .padding(.horizontal, Theme.lg)
+                        .padding(.vertical, 8)
+                    }
+                    .buttonStyle(.plain)
+
+                    Divider()
+                        .foregroundStyle(Theme.separator(colorScheme))
+                }
+            }
+        }
+        .frame(maxHeight: 200)
+        .background(Theme.surfaceElevated(colorScheme))
+        .cornerRadius(8)
+        .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
+        .padding(.horizontal, Theme.lg)
     }
 }
 
