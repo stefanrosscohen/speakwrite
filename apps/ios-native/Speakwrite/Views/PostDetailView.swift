@@ -69,7 +69,10 @@ struct PostDetailView: View {
             repostUri = nav.viewerRepost
             localRepostCount = nav.repostCount
         }
-        .task { await loadThread() }
+        .task {
+            viewModel.verification.verify(postUri: nav.uri, postText: nav.text, authorDID: nav.authorDID)
+            await loadThread()
+        }
         .sheet(isPresented: $showReplySheet) {
             ReplyView(
                 replyToUri: nav.uri,
@@ -111,10 +114,14 @@ struct PostDetailView: View {
                                     .font(.system(size: 16, weight: .semibold))
                                     .foregroundStyle(Theme.textPrimary(colorScheme))
                             }
-                            if nav.isVerified {
+                            if viewModel.verification.status(for: nav.uri) == .verified {
                                 Image(systemName: "checkmark.seal.fill")
                                     .font(.system(size: 13))
                                     .foregroundStyle(Theme.accent)
+                            } else if viewModel.verification.status(for: nav.uri) == .verifying {
+                                Image(systemName: "checkmark.seal")
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(Theme.textTertiary(colorScheme))
                             }
                         }
                         Text("@\(nav.authorHandle)")

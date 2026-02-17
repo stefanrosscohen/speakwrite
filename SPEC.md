@@ -8076,6 +8076,105 @@ Device attestation strengthens the proof significantly but does not provide abso
 
 **Design philosophy:** Device attestation moves the trust boundary from "trust the user's software" to "trust the user's hardware and OS vendor." This is a meaningful improvement for the vast majority of threat scenarios. A user running genuine Speakwrite on a genuine iPhone with Face ID is providing substantially stronger evidence than a user running the web app in a browser. The protocol should reward this with higher attestation levels while remaining honest about what those levels mean.
 
+### 16.7 Client-Side Proof Verification (v2 Architecture)
+
+#### 16.7.1 Simplified Proof Model
+
+The production iOS app (v2) uses a streamlined proof model compared to the full behavioral attestation described in Sections 4–8. Each published post is accompanied by a proof record stored in the author's AT Protocol data repository under the `io.speakwrite.proof` collection:
+
+**Proof Record (`io.speakwrite.proof`):**
+
+| Field | Description |
+|-------|-------------|
+| `postUri` | AT Protocol URI of the post |
+| `keyId` | App Attest key identifier (Base64) |
+| `attestationObject` | CBOR-encoded App Attest attestation with x5c certificate chain (Base64) |
+| `assertion` | CBOR-encoded P-256 ECDSA signature over content hash (Base64) |
+| `contentHash` | SHA-256 hex digest of the post text |
+| `appId` | Bundle identifier |
+| `createdAt` | ISO 8601 timestamp |
+
+```json
+{
+  "$type": "io.speakwrite.proof",
+  "postUri": "at://did:plc:xxx/app.bsky.feed.post/yyy",
+  "keyId": "base64(App Attest key identifier)",
+  "attestationObject": "base64(CBOR-encoded App Attest attestation with x5c certificate chain)",
+  "assertion": "base64(CBOR-encoded P-256 ECDSA signature over content hash)",
+  "contentHash": "hex(SHA-256(post_text))",
+  "appId": "io.speakwrite.app",
+  "createdAt": "2026-02-17T12:00:00.000Z"
+}
+```
+
+The `attestationObject` contains Apple's x5c certificate chain proving the key was generated on a genuine device. The `assertion` contains a CBOR-encoded P-256 ECDSA signature over the content hash, produced by the Secure Enclave.
+
+#### 16.7.2 Client-Side Verification Flow
+
+Verification is performed entirely on the reader's device — no server required. When a post appears in the feed, the client:
+
+1. **Resolves author's PDS.** Queries the PLC directory (`https://plc.directory/{did}`) to discover the author's Personal Data Server endpoint.
+
+2. **Fetches proofs.** Calls `{pds}/xrpc/com.atproto.repo.listRecords?repo={did}&collection=io.speakwrite.proof` to retrieve the author's proof records. Results are cached per-author to avoid redundant network calls.
+
+3. **Matches proof to post.** Finds the proof record whose `postUri` matches the displayed post.
+
+4. **Verifies content binding.** Computes `SHA-256(post_text)` and compares to `proof.contentHash`. If they don't match, verification fails.
+
+5. **Decodes attestation.** CBOR-decodes the `attestationObject` and extracts the `attStmt.x5c` certificate array.
+
+6. **Validates certificate chain.** Uses `SecTrust` to validate the x5c certificate chain against the Apple App Attest Root CA. This proves the signing key was generated on a genuine Apple device.
+
+7. **Extracts public key.** Extracts the P-256 public key from the leaf certificate in the validated chain.
+
+8. **Decodes assertion.** CBOR-decodes the `assertion` and extracts `signature` and `authenticatorData`.
+
+9. **Computes nonce.** Calculates `nonce = SHA-256(authenticatorData || contentHashBytes)`.
+
+10. **Verifies signature.** Verifies the P-256 ECDSA signature over the nonce using the extracted public key.
+
+**UI States:**
+
+| State | Display |
+|-------|---------|
+| Verifying | Grey checkmark (outline) while verification is in progress |
+| Verified | Green checkmark (filled) when proof passes all checks |
+| No proof / Failed | No badge displayed (silent failure) |
+
+#### 16.7.3 Post Record Format
+
+Posts published by Speakwrite use the standard `app.bsky.feed.post` record with a `tags` field for feed discovery:
+
+```json
+{
+  "$type": "app.bsky.feed.post",
+  "text": "the user's post text (no footer appended)",
+  "tags": ["speakwrite"],
+  "createdAt": "2026-02-17T12:00:00.000Z"
+}
+```
+
+No footer text is appended to the post body. The `tags` field enables the Speakwrite verified feed to discover posts — feed search uses a `#speakwrite` query which matches the tags array. Verification status is determined entirely by cryptographic proof, not by the presence of any tag or text marker.
+
+#### 16.7.4 Backward Compatibility
+
+Posts published by earlier versions of the app may contain a text footer (`\n\n✓ speakwrite` or `\n\n❤️‍🔥 human verified · speakwrite`). The client strips these footers before display using pattern matching. The `isSpeakwrite` check on the feed discovery side accepts both tagged posts and legacy footer-bearing posts.
+
+#### 16.7.5 Security Properties
+
+This simplified model retains three of the six security properties from Section 16.2:
+
+| Property | Status | Mechanism |
+|----------|--------|-----------|
+| Content binding | Retained | `SHA-256(post_text) == proof.contentHash` |
+| Device authenticity | Retained | App Attest certificate chain validates against Apple Root CA |
+| Signature unforgeability | Retained | P-256 ECDSA assertion signed by Secure Enclave |
+| Chain immutability | Not applicable | No commitment chain in v2 (single-post proofs) |
+| Human presence | Partial | App Attest proves genuine device; Face ID gates the session but is not cryptographically bound to individual proofs |
+| Identity binding | Implicit | Proof is stored in the author's AT Protocol repo; the `postUri` field references a specific post |
+
+The commitment chain, behavioral feature vectors, and WorldID integration described in the full specification are planned for future versions. The v2 model prioritizes deployment simplicity while retaining the strongest available hardware-backed guarantees.
+
 ---
 
 *End of Section 16: Device Attestation.*

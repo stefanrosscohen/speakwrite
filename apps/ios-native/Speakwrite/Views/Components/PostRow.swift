@@ -36,6 +36,7 @@ extension TimelinePost: PostDisplayable {
 /// - Repost → action sheet with Repost / Quote Post
 struct PostRow<Post: PostDisplayable>: View {
     let post: Post
+    var hideFollowButton: Bool = false
     @Environment(AppViewModel.self) private var viewModel
     @Environment(\.colorScheme) private var colorScheme
 
@@ -50,6 +51,10 @@ struct PostRow<Post: PostDisplayable>: View {
     @State private var showQuotePost = false
     @State private var isFollowingAuthor = false
 
+    private var verificationStatus: VerificationStatus {
+        viewModel.verification.status(for: post.uri)
+    }
+
     /// Build a PostNavigation value for detail view navigation.
     private var postNavigation: PostNavigation {
         PostNavigation(
@@ -62,7 +67,7 @@ struct PostRow<Post: PostDisplayable>: View {
             likeCount: localLikeCount, repostCount: localRepostCount,
             replyCount: post.replyCount,
             viewerLike: likeUri, viewerRepost: repostUri,
-            isVerified: post.showVerifiedBadge
+            isVerified: verificationStatus == .verified
         )
     }
 
@@ -119,6 +124,9 @@ struct PostRow<Post: PostDisplayable>: View {
         }
         .padding(.vertical, 10)
         .onAppear { syncEngagementState() }
+        .task {
+            viewModel.verification.verify(postUri: post.uri, postText: post.text, authorDID: post.author.did)
+        }
         .sheet(isPresented: $showReplySheet) {
             ReplyView(
                 replyToUri: post.uri,
@@ -172,10 +180,15 @@ struct PostRow<Post: PostDisplayable>: View {
                     .truncationMode(.tail)
             }
 
-            if post.showVerifiedBadge {
+            if verificationStatus == .verified {
                 Image(systemName: "checkmark.seal.fill")
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.accent)
+                    .padding(.leading, 2)
+            } else if verificationStatus == .verifying {
+                Image(systemName: "checkmark.seal")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.textTertiary(colorScheme))
                     .padding(.leading, 2)
             }
 
@@ -191,8 +204,8 @@ struct PostRow<Post: PostDisplayable>: View {
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
 
-            // Inline follow button for non-self, non-followed authors
-            if !isFollowingAuthor && post.author.did != viewModel.atproto.did {
+            // Inline follow button — only when viewer state is available (authenticated feed)
+            if !hideFollowButton && !isFollowingAuthor && post.author.viewer != nil && post.author.did != viewModel.atproto.did {
                 Spacer(minLength: 4)
                 Button {
                     Task { await followAuthor() }

@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Speakwrite — Prove a human wrote it</title>
-  <meta name="description" content="Speakwrite enforces input restrictions (soft keyboard only, no paste, no dictation) and cryptographically signs each checkpoint with the iPhone's Secure Enclave. The proof goes with the post.">
+  <meta name="description" content="Speakwrite enforces input restrictions (soft keyboard only, no paste, no dictation, no autocorrect) and cryptographically signs a content hash with the iPhone's Secure Enclave via App Attest. The proof lives on the author's PDS.">
   <meta property="og:title" content="Speakwrite — Prove a human wrote it">
-  <meta property="og:description" content="An AT Protocol client that enforces input restrictions (soft keyboard only, no paste, no dictation) and signs every checkpoint with the iPhone's Secure Enclave. Open protocol. Hardware-backed. No trust required.">
+  <meta property="og:description" content="An AT Protocol client that enforces input restrictions and signs every post with the iPhone's Secure Enclave via App Attest. Proofs stored on your PDS. Verification on every reader's device. No server. No trust required.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://speakwrite.io">
   <meta name="theme-color" content="#0a0a0a">
@@ -33,7 +33,7 @@
       <h1>Prove a human wrote it.</h1>
       <p class="subtitle">Open protocol. Hardware-backed. No trust required.</p>
       <p class="lede">AI can produce text indistinguishable from human writing. Every detection tool that analyzes the <em>output</em> is losing an arms race it can never win. The next model will always evade the last detector.</p>
-      <p class="lede">Speakwrite takes a different approach: instead of analyzing what was written, it restricts <em>how</em> it can be written. Soft keyboard only &mdash; no paste, no dictation, no autocorrect &mdash; with commitment chains and hardware-backed signatures that create a portable proof anyone can verify.</p>
+      <p class="lede">Speakwrite takes a different approach: instead of analyzing what was written, it restricts <em>how</em> it can be written. Soft keyboard only &mdash; no paste, no dictation, no autocorrect. A SHA-256 content hash signed by the Secure Enclave via App Attest. The proof stored on the author&rsquo;s PDS. Verification on every reader&rsquo;s device. Pure cryptography.</p>
     </section>
 
     <section id="the-problem">
@@ -46,32 +46,51 @@
     <section id="the-approach">
       <h2>The Approach</h2>
       <p>Speakwrite doesn&rsquo;t analyze what you wrote. It restricts <em>how</em> you can write.</p>
-      <p>The app enforces soft keyboard only &mdash; no paste, no dictation, no autocorrect, no hardware keyboard &mdash; and periodically creates cryptographic commitments chained together with SHA-256 hashes. Each checkpoint is signed by the iPhone&rsquo;s Secure Enclave. When you publish, the entire proof chain is attached to your post.</p>
-      <p>The result is a <strong>proof bundle</strong>: a portable JSON artifact that anyone can independently verify. No server. No API key. No central authority.</p>
+      <p>The app enforces soft keyboard only &mdash; no paste, no dictation, no autocorrect. When you publish, a SHA-256 hash of the content is signed by the iPhone&rsquo;s Secure Enclave via App Attest. The post is published with <code>tags: ["speakwrite"]</code>, and a cryptographic proof record (<code>io.speakwrite.proof</code>) is stored in the author&rsquo;s AT Protocol repository.</p>
+      <p>Verification happens entirely on the reader&rsquo;s device. Proof records are fetched from the author&rsquo;s PDS (resolved via the PLC directory). The content hash is recomputed, the attestation certificate chain is validated against Apple&rsquo;s Root CA, and the ECDSA signature is verified. Grey checkmark while verifying, green checkmark when the proof passes. No server in the loop.</p>
     </section>
 
     <section id="how-it-works">
       <h2>How It Works</h2>
+
+      <h3>Publishing</h3>
       <ol class="steps">
         <li>
           <strong>Sign in</strong>
-          <span>Use your AT Protocol handle. OAuth authentication, decentralized identity.</span>
+          <span>Authenticate with your AT Protocol handle.</span>
         </li>
         <li>
           <strong>Type</strong>
-          <span>Input restricted to soft keyboard only &mdash; no paste, no dictation, no autocorrect, no hardware keyboard. Nothing leaves your device.</span>
-        </li>
-        <li>
-          <strong>Commit</strong>
-          <span>Periodically, a document snapshot is hashed into a cryptographic commitment chain. Each link is signed by the Secure Enclave.</span>
+          <span>Soft keyboard only &mdash; no paste, no dictation, no autocorrect. Nothing else.</span>
         </li>
         <li>
           <strong>Publish</strong>
-          <span>The final content is bound to the chain tip. The proof bundle is published alongside your post on the AT Protocol network.</span>
+          <span>SHA-256 content hash signed by the Secure Enclave via App Attest. Post published with <code>tags: ["speakwrite"]</code>. Proof record (<code>io.speakwrite.proof</code>) stored in the author&rsquo;s AT Protocol repo.</span>
+        </li>
+      </ol>
+
+      <h3>Verification</h3>
+      <p>Client-side, on every reader&rsquo;s device:</p>
+      <ol class="steps">
+        <li>
+          <strong>Fetch proof</strong>
+          <span>Retrieve proof records from the author&rsquo;s PDS, resolved via the PLC directory.</span>
         </li>
         <li>
-          <strong>Verify</strong>
-          <span>Anyone can check the proof. Walk the hash chain, verify the signatures, confirm content binding. No trust required.</span>
+          <strong>Content binding</strong>
+          <span>SHA-256(post text) == proof&rsquo;s <code>contentHash</code>.</span>
+        </li>
+        <li>
+          <strong>Certificate chain</strong>
+          <span>CBOR-decode attestation, validate x5c cert chain against Apple Root CA.</span>
+        </li>
+        <li>
+          <strong>Signature check</strong>
+          <span>Extract P-256 public key, verify ECDSA assertion signature.</span>
+        </li>
+        <li>
+          <strong>Display result</strong>
+          <span>Grey checkmark while verifying, green checkmark when proof passes.</span>
         </li>
       </ol>
     </section>
@@ -83,17 +102,17 @@
         <div class="tab-card">
           <div class="tab-icon">&gt;_</div>
           <h3>Timeline</h3>
-          <p>Your AT Protocol timeline. Browse posts from people you follow. Speakwrite-verified posts are marked.</p>
+          <p>Your AT Protocol timeline. Browse posts from people you follow. Posts with valid proofs show a green checkmark; grey while verifying.</p>
         </div>
         <div class="tab-card accent-card">
           <div class="tab-icon">[&check;]</div>
           <h3>Verified</h3>
-          <p>A global feed where every post was typed by a human on a real device. Nothing else gets in.</p>
+          <p>A feed of posts tagged <code>speakwrite</code> &mdash; every one typed by a human on a real device. Nothing else gets in.</p>
         </div>
         <div class="tab-card">
           <div class="tab-icon">$ _</div>
           <h3>Compose</h3>
-          <p>Write your post. Input is restricted to soft keyboard only. Commitments are chained, and the Secure Enclave signs every checkpoint.</p>
+          <p>Write your post. Soft keyboard only &mdash; no paste, no dictation, no autocorrect. The Secure Enclave signs the content hash on publish.</p>
         </div>
         <div class="tab-card">
           <div class="tab-icon">{&middot;}</div>
@@ -105,44 +124,43 @@
 
     <section id="protocol">
       <h2>The Protocol</h2>
-      <p>The proof bundle is the protocol. It&rsquo;s a JSON object that contains everything needed to verify a post was typed by a human. No proprietary format. No server dependency.</p>
+      <p>Each post is published with <code>tags: ["speakwrite"]</code> and accompanied by a proof record (<code>io.speakwrite.proof</code>) stored in the author&rsquo;s AT Protocol repository. No footer text appended to posts. Verification is entirely client-side &mdash; no server dependency.</p>
 
-      <h3>Three layers</h3>
+      <h3>The proof record</h3>
       <dl>
-        <dt>Layer 1: Cryptographic commitment chain</dt>
-        <dd>SHA-256 hash chain with openable commitments &mdash; each link binds a document snapshot hash. Every commitment can be independently re-derived. You can&rsquo;t edit the chain or swap the content without breaking it.</dd>
+        <dt>Content hash</dt>
+        <dd>SHA-256 of the post text. Binds the proof to the exact content. Can&rsquo;t type A and publish B.</dd>
 
-        <dt>Layer 2: Device attestation</dt>
-        <dd>The iPhone&rsquo;s Secure Enclave holds a signing key that never leaves the silicon. Apple&rsquo;s App Attest certifies the key was generated on a real device running the unmodified app. Every commitment is signed.</dd>
+        <dt>Attestation object</dt>
+        <dd>CBOR-encoded App Attest attestation from Apple. Contains the x5c certificate chain proving the signing key was generated on a genuine device&rsquo;s Secure Enclave.</dd>
 
-        <dt>Layer 3: Input restriction</dt>
-        <dd>The app enforces soft keyboard only &mdash; no paste, no dictation, no autocorrect, no hardware keyboard. The input restriction is attested in the proof bundle. App Attest certifies the restriction code is unmodified.</dd>
+        <dt>Assertion</dt>
+        <dd>CBOR-encoded P-256 ECDSA signature over the content hash, produced by the Secure Enclave via App Attest. Unforgeable without the hardware key.</dd>
       </dl>
 
-      <h3>Verification</h3>
-      <p>Anyone can verify a proof bundle:</p>
+      <h3>Client-side verification</h3>
+      <p>Every reader&rsquo;s device independently verifies the proof. Proofs are fetched from the author&rsquo;s PDS, resolved via the PLC directory:</p>
       <ol class="steps">
         <li>
-          <strong>Content hash</strong>
-          <span>Compute SHA-256 of the post text. Compare to the bundle&rsquo;s <code>content_hash</code>.</span>
-        </li>
-        <li>
-          <strong>Chain integrity + re-derivation</strong>
-          <span>Walk the commitment chain. Re-derive each commitment from its nonce and document hash. Every link must match.</span>
-        </li>
-        <li>
           <strong>Content binding</strong>
-          <span>The final commitment must bind the content hash to the chain tip. The last commitment&rsquo;s document hash must match the published content hash.</span>
+          <span>Compute SHA-256 of the post text. Compare to the proof&rsquo;s <code>contentHash</code>.</span>
         </li>
         <li>
-          <strong>Signatures + identity</strong>
-          <span>Verify each domain-separated signature against the device public key (P-256 ECDSA). The author&rsquo;s AT Protocol DID is signed into the session start, binding the proof to a specific identity.</span>
+          <strong>Certificate chain</strong>
+          <span>CBOR-decode the attestation object. Extract the x5c certificates. Validate the chain against Apple&rsquo;s App Attest Root CA.</span>
         </li>
         <li>
-          <strong>Plausibility</strong>
-          <span>Check input restriction validation, timestamp monotonicity, session duration vs content length. Non-fatal warnings flag anomalies.</span>
+          <strong>Signature verification</strong>
+          <span>Extract the P-256 public key from the leaf certificate. CBOR-decode the assertion. Verify the ECDSA signature over the content hash.</span>
+        </li>
+        <li>
+          <strong>Display result</strong>
+          <span>Grey checkmark while verifying. Green checkmark only when all checks pass. No badge until proven.</span>
         </li>
       </ol>
+
+      <h3>Input restriction</h3>
+      <p>The app enforces soft keyboard only &mdash; no paste, no dictation, no autocorrect. App Attest certifies the binary is unmodified, ensuring the input restriction code hasn&rsquo;t been tampered with.</p>
     </section>
 
     <section id="why-it-matters">
@@ -154,7 +172,7 @@
         </div>
         <div>
           <h3>For readers</h3>
-          <p>A feed where everything was typed by a person. Not filtered by an algorithm guessing what&rsquo;s human. Filtered by cryptographic proof.</p>
+          <p>A feed of posts tagged <code>speakwrite</code> where everything was typed by a person. Not filtered by an algorithm guessing what&rsquo;s human. Filtered by cryptographic proof your device verifies independently.</p>
         </div>
       </div>
       <div class="two-col">
@@ -174,7 +192,7 @@
       <div class="two-col">
         <div>
           <h3>It proves</h3>
-          <p>A post was composed through physical typing on a genuine Apple device, with input restricted to soft keyboard only (no paste, no dictation, no autocorrect), signed by hardware that never left the silicon.</p>
+          <p>A post was composed through physical typing on a genuine Apple device, with input restricted to soft keyboard only (no paste, no dictation, no autocorrect), with a SHA-256 content hash signed by the Secure Enclave via App Attest.</p>
         </div>
         <div>
           <h3>It doesn&rsquo;t prove</h3>
@@ -187,20 +205,23 @@
     <section id="properties">
       <h2>Properties</h2>
       <dl>
-        <dt>Open protocol</dt>
-        <dd>The proof bundle is JSON. The verification algorithm is public. Anyone can build a verifier, a compatible client, or an alternative implementation.</dd>
+        <dt>No server in verification</dt>
+        <dd>Proofs are fetched directly from the author&rsquo;s PDS via the PLC directory. Verification is pure cryptography on the reader&rsquo;s device. No intermediary.</dd>
+
+        <dt>Proofs on author&rsquo;s PDS</dt>
+        <dd>Proof records live in the author&rsquo;s AT Protocol repository. The data lives where the author lives &mdash; not on a third-party server.</dd>
+
+        <dt>Pure cryptography</dt>
+        <dd>SHA-256 content hashing, CBOR-decoded attestation, x5c certificate chain validation, P-256 ECDSA signature verification. Math, not trust.</dd>
 
         <dt>Hardware-backed</dt>
         <dd>Secure Enclave + App Attest on every proof. The signing key never leaves the silicon. No web fallback.</dd>
 
-        <dt>On-device</dt>
-        <dd>No server sees your keystrokes. Everything runs on your iPhone. Document snapshots are committed to the proof. No behavioral data collected.</dd>
-
-        <dt>Decentralized</dt>
-        <dd>Proofs live in the author&rsquo;s AT Protocol Personal Data Server. No central server, no trusted authority. Verification is pure cryptography.</dd>
+        <dt>Green checkmark only when proven</dt>
+        <dd>Grey checkmark while verifying. Green checkmark only when every check passes &mdash; content binding, certificate chain, and signature. No badge until proven.</dd>
 
         <dt>AT Protocol native</dt>
-        <dd>Full AT Protocol client. Timeline, verified feed, compose, profiles &mdash; all in one app. Posts publish to your Personal Data Server. Your data, your server.</dd>
+        <dd>Full AT Protocol client. Timeline, verified feed, compose, profiles &mdash; all in one app. Posts tagged with <code>speakwrite</code>. Your data, your server.</dd>
 
         <dt>Progressive trust</dt>
         <dd>A single proof is weak evidence. A corpus from the same identity with consistent behavioral patterns is strong. Trust compounds over time.</dd>
@@ -209,7 +230,7 @@
 
     <section id="why-native">
       <h2>Why a Native App</h2>
-      <p>A web app can&rsquo;t do this. Hardware attestation requires a native binary &mdash; Apple&rsquo;s App Attest certifies the app hasn&rsquo;t been tampered with, and the Secure Enclave holds a signing key that never leaves the silicon. No JavaScript bridge. No web wrapper. The entire proof chain happens inside the signed binary.</p>
+      <p>A web app can&rsquo;t do this. Hardware attestation requires a native binary &mdash; Apple&rsquo;s App Attest certifies the app hasn&rsquo;t been tampered with, and the Secure Enclave holds a signing key that never leaves the silicon. No JavaScript bridge. No web wrapper. Signing happens inside the signed binary; verification happens on every reader&rsquo;s device.</p>
     </section>
 
     <section id="why-atproto">
@@ -226,7 +247,7 @@
         <dd>AT Protocol lets any app define new record types. Speakwrite publishes proof bundles alongside posts using a custom lexicon. Any AT Protocol client can read and verify them.</dd>
 
         <dt>Federated verification</dt>
-        <dd>Because proofs live on the open network, any verifier can fetch and validate them. No API key. No special access. The data is already public in the author&rsquo;s repository.</dd>
+        <dd>Proofs live on the author&rsquo;s PDS, resolved via the PLC directory. Any verifier can fetch and validate them. No API key. No special access. The data is already public in the author&rsquo;s repository.</dd>
 
         <dt>Open ecosystem</dt>
         <dd>AT Protocol is not one app. It&rsquo;s an open network of interoperable services. Speakwrite is a native client that reads, writes, and extends the protocol &mdash; not a walled garden built on top of it.</dd>
@@ -239,8 +260,6 @@
       <ul class="repo-list">
         <li>Protocol spec: <code>SPEC-v1.md</code></li>
         <li>iOS app: Native SwiftUI (iOS 17+)</li>
-        <li>Desktop app: Tauri + React</li>
-        <li>Reference lib: <code>@speakwrite/core</code> (TypeScript)</li>
       </ul>
       <p class="cta"><a href="https://github.com/stefanrosscohen/speakwrite">View on GitHub</a></p>
     </section>

@@ -126,7 +126,7 @@ struct ProfileView: View {
                 } else {
                     LazyVStack(spacing: 0) {
                         ForEach(posts) { post in
-                            PostRow(post: post)
+                            PostRow(post: post, hideFollowButton: true)
                                 .padding(.horizontal, Theme.lg)
 
                             Divider()

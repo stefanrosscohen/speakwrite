@@ -292,16 +292,13 @@ final class ATProtoService {
     func publishAttestedPost(text: String, attestation: AttestationRecord) async throws -> (uri: String, cid: String) {
         guard let pds = pdsURL, let did = did else { throw ATProtoError.notLoggedIn }
 
-        // Tags for machine readability + minimal text footer for search discoverability
-        let fullText = "\(text)\n\n✓ speakwrite"
-
         // Parse @mentions and build facets
-        let facets = try await buildMentionFacets(text: fullText)
+        let facets = try await buildMentionFacets(text: text)
 
         var postRecord: [String: Any] = [
             "$type": "app.bsky.feed.post",
-            "text": fullText,
-            "tags": ["speakwrite", "human-verified"],
+            "text": text,
+            "tags": ["speakwrite"],
             "createdAt": ISO8601DateFormatter().string(from: Date()),
         ]
 
@@ -337,7 +334,6 @@ final class ATProtoService {
 
     private func buildMentionFacets(text: String) async throws -> [[String: Any]] {
         var facets: [[String: Any]] = []
-        let utf8 = Array(text.utf8)
 
         // Find @mentions using regex
         let pattern = try NSRegularExpression(pattern: "@([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\.)+[a-zA-Z]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?")
@@ -408,99 +404,56 @@ final class ATProtoService {
     func fetchVerifiedFeed(cursor: String? = nil) async throws -> (posts: [VerifiedPost], cursor: String?) {
         let publicAPI = "https://api.bsky.app"
 
-        // Search by tag (new posts) and also text (old posts with footer)
-        // Run both searches concurrently and merge results
-        var allPosts: [VerifiedPost] = []
-        var lastCursor: String?
-
-        // 1. Primary search: finds posts with "speakwrite" in text (both footer formats)
-        do {
-            var tagURL = "\(publicAPI)/xrpc/app.bsky.feed.searchPosts?q=%22speakwrite%22&limit=25&sort=latest"
-            if let cursor {
-                let encoded = cursor.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? cursor
-                tagURL += "&cursor=\(encoded)"
-            }
-            var tagRequest = URLRequest(url: URL(string: tagURL)!)
-            tagRequest.cachePolicy = .reloadIgnoringLocalCacheData
-            let (data, response) = try await URLSession.shared.data(for: tagRequest)
-            if let httpResp = response as? HTTPURLResponse, httpResp.statusCode == 200 {
-                let decoder = JSONDecoder()
-                let result = try decoder.decode(SearchPostsResponse.self, from: data)
-                let posts = result.posts.compactMap { post -> VerifiedPost? in
-                    // Filter: only include genuine speakwrite posts (tag or old footer)
-                    guard post.record.isSpeakwrite else { return nil }
-                    return VerifiedPost(
-                        uri: post.uri, cid: post.cid, author: post.author,
-                        text: post.record.displayText, createdAt: post.record.safeCreatedAt,
-                        likeCount: post.likeCount ?? 0, repostCount: post.repostCount ?? 0,
-                        replyCount: post.replyCount ?? 0, viewer: post.viewer
-                    )
-                }
-                allPosts.append(contentsOf: posts)
-                lastCursor = result.cursor
-                print("[Feed] Primary search returned \(posts.count) verified posts")
-            } else {
-                let body = String(data: data, encoding: .utf8) ?? ""
-                print("[Feed] Tag search failed with status \((response as? HTTPURLResponse)?.statusCode ?? 0): \(body.prefix(200))")
-            }
-        } catch {
-            print("[Feed] Tag search error: \(error)")
+        // Single search: #speakwrite matches both tags array and text containing "speakwrite"
+        var urlString = "\(publicAPI)/xrpc/app.bsky.feed.searchPosts?q=%23speakwrite&limit=40&sort=latest"
+        if let cursor {
+            let encoded = cursor.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? cursor
+            urlString += "&cursor=\(encoded)"
         }
 
-        // 2. Text-based search (backward compat for old posts with footer)
-        do {
-            var textURL = "\(publicAPI)/xrpc/app.bsky.feed.searchPosts?q=%22human+verified%22+speakwrite&limit=25&sort=latest"
-            if let cursor, allPosts.isEmpty {
-                let encoded = cursor.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? cursor
-                textURL += "&cursor=\(encoded)"
-            }
-            var textRequest = URLRequest(url: URL(string: textURL)!)
-            textRequest.cachePolicy = .reloadIgnoringLocalCacheData
-            let (data, response) = try await URLSession.shared.data(for: textRequest)
-            if let httpResp = response as? HTTPURLResponse, httpResp.statusCode == 200 {
-                let decoder = JSONDecoder()
-                let result = try decoder.decode(SearchPostsResponse.self, from: data)
-                let posts = result.posts.compactMap { post -> VerifiedPost? in
-                    guard post.record.isSpeakwrite else { return nil }
-                    return VerifiedPost(
-                        uri: post.uri, cid: post.cid, author: post.author,
-                        text: post.record.displayText, createdAt: post.record.safeCreatedAt,
-                        likeCount: post.likeCount ?? 0, repostCount: post.repostCount ?? 0,
-                        replyCount: post.replyCount ?? 0, viewer: post.viewer
-                    )
-                }
-                let existingURIs = Set(allPosts.map(\.uri))
-                let newPosts = posts.filter { !existingURIs.contains($0.uri) }
-                allPosts.append(contentsOf: newPosts)
-                if lastCursor == nil { lastCursor = result.cursor }
-                print("[Feed] Text search returned \(posts.count) verified posts (\(newPosts.count) new)")
-            } else {
-                print("[Feed] Text search failed with status \((response as? HTTPURLResponse)?.statusCode ?? 0)")
-            }
-        } catch {
-            print("[Feed] Text search error: \(error)")
+        var request = URLRequest(url: URL(string: urlString)!)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResp = response as? HTTPURLResponse, httpResp.statusCode == 200 else {
+            return (posts: [], cursor: nil)
         }
 
-        // Sort by createdAt descending
-        allPosts.sort { $0.createdAt > $1.createdAt }
+        let result = try JSONDecoder().decode(SearchPostsResponse.self, from: data)
+        let posts = result.posts.compactMap { post -> VerifiedPost? in
+            guard post.record.isSpeakwrite else { return nil }
+            return VerifiedPost(
+                uri: post.uri, cid: post.cid, author: post.author,
+                text: post.record.displayText, createdAt: post.record.safeCreatedAt,
+                likeCount: post.likeCount ?? 0, repostCount: post.repostCount ?? 0,
+                replyCount: post.replyCount ?? 0, viewer: post.viewer
+            )
+        }
 
-        return (posts: allPosts, cursor: lastCursor)
+        return (posts: posts, cursor: result.cursor)
     }
 
     // MARK: - Timeline (Discover / For You Feed)
 
     func fetchTimeline(cursor: String? = nil) async throws -> (posts: [TimelinePost], cursor: String?) {
-        let publicAPI = "https://api.bsky.app"
-
         let feedURI = "at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.generator/whats-hot"
         let encodedFeed = feedURI.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? feedURI
 
-        var urlString = "\(publicAPI)/xrpc/app.bsky.feed.getFeed?feed=\(encodedFeed)&limit=30"
-        if let cursor { urlString += "&cursor=\(cursor)" }
-
-        var request = URLRequest(url: URL(string: urlString)!)
-        request.cachePolicy = .reloadIgnoringLocalCacheData
-        let (data, _) = try await URLSession.shared.data(for: request)
+        let data: Data
+        if let pds = pdsURL, accessToken != nil {
+            // Authenticated — viewer state (following, etc.) will be included
+            var urlString = "\(pds)/xrpc/app.bsky.feed.getFeed?feed=\(encodedFeed)&limit=30"
+            if let cursor { urlString += "&cursor=\(cursor)" }
+            (data, _) = try await authenticatedRequest(url: urlString, method: "GET")
+        } else {
+            // Fallback to public API (no viewer state)
+            let publicAPI = "https://api.bsky.app"
+            var urlString = "\(publicAPI)/xrpc/app.bsky.feed.getFeed?feed=\(encodedFeed)&limit=30"
+            if let cursor { urlString += "&cursor=\(cursor)" }
+            var request = URLRequest(url: URL(string: urlString)!)
+            request.cachePolicy = .reloadIgnoringLocalCacheData
+            (data, _) = try await URLSession.shared.data(for: request)
+        }
 
         let result = try JSONDecoder().decode(FeedResponse.self, from: data)
 
@@ -535,17 +488,13 @@ final class ATProtoService {
         return (posts: filtered, cursor: result.cursor)
     }
 
-    /// Parse feed items into TimelinePost array with verified detection.
+    /// Parse feed items into TimelinePost array.
     private func parseFeedPosts(_ feedItems: [FeedItem]) -> [TimelinePost] {
         return feedItems.compactMap { item -> TimelinePost? in
             let post = item.post
             guard let text = post.record?.text else { return nil }
-            let hasSpeakwriteTag = post.record?.tags?.contains("speakwrite") == true
-            let isVerified = hasSpeakwriteTag ||
-                (text.contains("human verified") && text.contains("speakwrite")) ||
-                (text.contains("keystrokes") && text.contains("commitments"))
 
-            // Strip speakwrite footer for clean display
+            // Strip speakwrite footer for clean display (backward compat with old posts)
             let displayText = Self.stripSpeakwriteFooter(text)
 
             // Extract repost attribution
@@ -561,7 +510,7 @@ final class ATProtoService {
                 uri: post.uri, cid: post.cid, author: post.author,
                 text: displayText, createdAt: post.record?.createdAt ?? "",
                 likeCount: post.likeCount ?? 0, repostCount: post.repostCount ?? 0,
-                replyCount: post.replyCount ?? 0, isVerified: isVerified,
+                replyCount: post.replyCount ?? 0, isVerified: false,
                 viewer: post.viewer, repostedBy: repostedBy
             )
         }
@@ -570,39 +519,47 @@ final class ATProtoService {
     // MARK: - Profile
 
     func getProfile(actor: String) async throws -> ProfileViewDetailed {
-        let publicAPI = "https://api.bsky.app"
         let encoded = actor.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? actor
-        let urlString = "\(publicAPI)/xrpc/app.bsky.actor.getProfile?actor=\(encoded)"
 
-        let (data, _) = try await URLSession.shared.data(from: URL(string: urlString)!)
+        let data: Data
+        if let pds = pdsURL, accessToken != nil {
+            let urlString = "\(pds)/xrpc/app.bsky.actor.getProfile?actor=\(encoded)"
+            (data, _) = try await authenticatedRequest(url: urlString, method: "GET")
+        } else {
+            let publicAPI = "https://api.bsky.app"
+            let urlString = "\(publicAPI)/xrpc/app.bsky.actor.getProfile?actor=\(encoded)"
+            (data, _) = try await URLSession.shared.data(from: URL(string: urlString)!)
+        }
 
         return try JSONDecoder().decode(ProfileViewDetailed.self, from: data)
     }
 
     func getAuthorFeed(actor: String, cursor: String? = nil) async throws -> (posts: [TimelinePost], cursor: String?) {
-        let publicAPI = "https://api.bsky.app"
         let encoded = actor.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? actor
 
-        var urlString = "\(publicAPI)/xrpc/app.bsky.feed.getAuthorFeed?actor=\(encoded)&limit=30"
-        if let cursor { urlString += "&cursor=\(cursor)" }
-
-        let (data, _) = try await URLSession.shared.data(from: URL(string: urlString)!)
+        let data: Data
+        if let pds = pdsURL, accessToken != nil {
+            var urlString = "\(pds)/xrpc/app.bsky.feed.getAuthorFeed?actor=\(encoded)&limit=30"
+            if let cursor { urlString += "&cursor=\(cursor)" }
+            (data, _) = try await authenticatedRequest(url: urlString, method: "GET")
+        } else {
+            let publicAPI = "https://api.bsky.app"
+            var urlString = "\(publicAPI)/xrpc/app.bsky.feed.getAuthorFeed?actor=\(encoded)&limit=30"
+            if let cursor { urlString += "&cursor=\(cursor)" }
+            (data, _) = try await URLSession.shared.data(from: URL(string: urlString)!)
+        }
 
         let result = try JSONDecoder().decode(FeedResponse.self, from: data)
 
         let posts = result.feed.compactMap { item -> TimelinePost? in
             let post = item.post
             guard let text = post.record?.text else { return nil }
-            let hasSpeakwriteTag = post.record?.tags?.contains("speakwrite") == true
-            let isVerified = hasSpeakwriteTag ||
-                (text.contains("human verified") && text.contains("speakwrite")) ||
-                (text.contains("keystrokes") && text.contains("commitments"))
 
             return TimelinePost(
                 uri: post.uri, cid: post.cid, author: post.author,
                 text: Self.stripSpeakwriteFooter(text), createdAt: post.record?.createdAt ?? "",
                 likeCount: post.likeCount ?? 0, repostCount: post.repostCount ?? 0,
-                replyCount: post.replyCount ?? 0, isVerified: isVerified,
+                replyCount: post.replyCount ?? 0, isVerified: false,
                 viewer: post.viewer, repostedBy: nil
             )
         }
@@ -900,7 +857,7 @@ final class ATProtoService {
     private func resolveTokenEndpoint() -> String? {
         // Synchronous check — for restored sessions that didn't persist the token endpoint.
         // The caller can fall back to re-login if this returns nil.
-        guard let pds = pdsURL else { return nil }
+        guard pdsURL != nil else { return nil }
         // We can't do async from here, so return nil and let the refresh fail gracefully.
         // The user will need to re-login (one-time migration).
         return nil
@@ -1041,6 +998,7 @@ final class ATProtoService {
 
     /// Strip speakwrite footer from post text for clean display.
     static func stripSpeakwriteFooter(_ text: String) -> String {
+        // Legacy footer formats (old app versions)
         if let range = text.range(of: "\n\n✓ speakwrite", options: .backwards) {
             return String(text[..<range.lowerBound])
         }
@@ -1207,16 +1165,16 @@ private struct PostRecord: Decodable {
     /// Whether this post is a genuine Speakwrite post (has tag or old-format footer).
     var isSpeakwrite: Bool {
         tags?.contains("speakwrite") == true ||
+        text.contains("#speakwrite") ||
         (text.contains("human verified") && text.contains("speakwrite"))
     }
 
     /// Post text with speakwrite footer stripped for display.
     var displayText: String {
-        // Strip new footer: "\n\n✓ speakwrite"
+        // Legacy footer formats (old app versions)
         if let range = text.range(of: "\n\n✓ speakwrite", options: .backwards) {
             return String(text[..<range.lowerBound])
         }
-        // Strip old footer: "\n\n❤️‍🔥 human verified · speakwrite"
         if let range = text.range(of: "\n\n❤️‍🔥 human verified · speakwrite", options: .backwards) {
             return String(text[..<range.lowerBound])
         }

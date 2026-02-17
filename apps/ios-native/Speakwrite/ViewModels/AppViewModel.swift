@@ -6,6 +6,7 @@ import Foundation
 @MainActor
 final class AppViewModel: InputRestrictedDelegate {
     let attestation = DeviceAttestationService()
+    let verification = VerificationService()
     var atproto: ATProtoService
 
     // Navigation — default to feed for preview
