@@ -486,10 +486,64 @@ M/pWNqumUnq5fy5Ai8y/MJDOV7hd-----END CERTIFICATE-----`;
       } catch { return isoString; }
     }
 
-    // ── DER signature conversion (P-256 DER → raw r||s) ──
-    function derToRaw(der) {
-      // DER: 0x30 <len> 0x02 <rlen> <r> 0x02 <slen> <s>
-      let offset = 2; // skip 0x30 and total length
+    // ── DER/ASN.1 parsing primitives ──
+    function parseDERElement(bytes, offset) {
+      const tag = bytes[offset];
+      let headerLen = 2;
+      let contentLen = bytes[offset + 1];
+      if (contentLen & 0x80) {
+        const numBytes = contentLen & 0x7f;
+        contentLen = 0;
+        for (let i = 0; i < numBytes; i++) {
+          contentLen = (contentLen << 8) | bytes[offset + 2 + i];
+        }
+        headerLen = 2 + numBytes;
+      }
+      return {
+        tag, headerLen, contentLen,
+        contentStart: offset + headerLen,
+        totalLen: headerLen + contentLen
+      };
+    }
+
+    function parseDERChildren(bytes, start, end) {
+      const children = [];
+      let offset = start;
+      while (offset < end) {
+        const elem = parseDERElement(bytes, offset);
+        children.push(elem);
+        offset += elem.totalLen;
+      }
+      return children;
+    }
+
+    function parseOID(bytes, start, length) {
+      const parts = [];
+      parts.push(Math.floor(bytes[start] / 40));
+      parts.push(bytes[start] % 40);
+      let value = 0;
+      for (let i = 1; i < length; i++) {
+        value = (value << 7) | (bytes[start + i] & 0x7f);
+        if (!(bytes[start + i] & 0x80)) {
+          parts.push(value);
+          value = 0;
+        }
+      }
+      return parts.join('.');
+    }
+
+    function matchBytes(arr, offset, pattern) {
+      if (offset + pattern.length > arr.length) return false;
+      for (let i = 0; i < pattern.length; i++) {
+        if (arr[offset + i] !== pattern[i]) return false;
+      }
+      return true;
+    }
+
+    // ── DER signature conversion (ECDSA DER → raw r||s) ──
+    function derToRaw(der, componentSize = 32) {
+      const outer = parseDERElement(der, 0);
+      let offset = outer.contentStart;
       if (der[offset] !== 0x02) throw new Error('Invalid DER');
       offset++;
       const rLen = der[offset++];
@@ -500,15 +554,158 @@ M/pWNqumUnq5fy5Ai8y/MJDOV7hd-----END CERTIFICATE-----`;
       const sLen = der[offset++];
       let s = der.slice(offset, offset + sLen);
 
-      // Remove leading zero padding
-      if (r.length === 33 && r[0] === 0) r = r.slice(1);
-      if (s.length === 33 && s[0] === 0) s = s.slice(1);
+      while (r.length > componentSize && r[0] === 0) r = r.slice(1);
+      while (s.length > componentSize && s[0] === 0) s = s.slice(1);
 
-      // Pad to 32 bytes
-      const raw = new Uint8Array(64);
-      raw.set(r, 32 - r.length);
-      raw.set(s, 64 - s.length);
+      const raw = new Uint8Array(componentSize * 2);
+      raw.set(r, componentSize - r.length);
+      raw.set(s, componentSize * 2 - s.length);
       return raw;
+    }
+
+    // ── X.509 certificate parser ──
+    function parseX509Certificate(certDer) {
+      const bytes = new Uint8Array(certDer);
+      const cert = parseDERElement(bytes, 0);
+      const certChildren = parseDERChildren(bytes, cert.contentStart, cert.contentStart + cert.contentLen);
+
+      // TBSCertificate (full DER encoding for signature verification)
+      const tbsElem = certChildren[0];
+      const tbsBytes = bytes.slice(tbsElem.contentStart - tbsElem.headerLen,
+                                    tbsElem.contentStart + tbsElem.contentLen);
+
+      // Signature algorithm OID
+      const sigAlgElem = certChildren[1];
+      const sigAlgChildren = parseDERChildren(bytes, sigAlgElem.contentStart,
+                                               sigAlgElem.contentStart + sigAlgElem.contentLen);
+      const signatureAlgorithm = parseOID(bytes, sigAlgChildren[0].contentStart, sigAlgChildren[0].contentLen);
+
+      // Signature value (BIT STRING — skip unused-bits byte)
+      const sigBitString = certChildren[2];
+      const signatureValue = bytes.slice(sigBitString.contentStart + 1,
+                                          sigBitString.contentStart + sigBitString.contentLen);
+
+      // Parse TBSCertificate fields
+      const tbsChildren = parseDERChildren(bytes, tbsElem.contentStart,
+                                            tbsElem.contentStart + tbsElem.contentLen);
+      // Fields: version [0](optional), serialNumber, signature, issuer, validity, subject, SPKI, extensions [3]
+      let fieldIdx = 0;
+      if ((tbsChildren[0].tag & 0xe0) === 0xa0) fieldIdx = 1;
+
+      const spkiElem = tbsChildren[fieldIdx + 5];
+      const spki = bytes.slice(spkiElem.contentStart - spkiElem.headerLen,
+                                spkiElem.contentStart + spkiElem.contentLen);
+
+      // Find extensions (context tag [3] = 0xa3)
+      let extensions = [];
+      for (const child of tbsChildren) {
+        if (child.tag === 0xa3) {
+          const extSeq = parseDERElement(bytes, child.contentStart);
+          extensions = parseDERChildren(bytes, extSeq.contentStart, extSeq.contentStart + extSeq.contentLen);
+          break;
+        }
+      }
+
+      return { tbsBytes, signatureAlgorithm, signatureValue, spki, extensions, rawBytes: bytes };
+    }
+
+    // ── Certificate chain verification ──
+    async function verifyCertificateChain(x5c, rootPem) {
+      const rootDer = pemToBytes(rootPem);
+      const rootCert = parseX509Certificate(rootDer);
+      const intermediateCert = parseX509Certificate(x5c[1]);
+      const leafCert = parseX509Certificate(x5c[0]);
+
+      // Import root public key (P-384)
+      const rootKey = await crypto.subtle.importKey(
+        'spki', rootCert.spki,
+        { name: 'ECDSA', namedCurve: 'P-384' }, false, ['verify']
+      );
+
+      // Verify intermediate signed by root (ECDSA-SHA384)
+      const intValid = await crypto.subtle.verify(
+        { name: 'ECDSA', hash: 'SHA-384' }, rootKey,
+        derToRaw(intermediateCert.signatureValue, 48),
+        intermediateCert.tbsBytes
+      );
+      if (!intValid) throw new Error('Intermediate certificate signature invalid');
+
+      // Import intermediate public key (P-384)
+      const intKey = await crypto.subtle.importKey(
+        'spki', intermediateCert.spki,
+        { name: 'ECDSA', namedCurve: 'P-384' }, false, ['verify']
+      );
+
+      // Verify leaf signed by intermediate (ECDSA-SHA256, P-384 key)
+      const leafValid = await crypto.subtle.verify(
+        { name: 'ECDSA', hash: 'SHA-256' }, intKey,
+        derToRaw(leafCert.signatureValue, 48),
+        leafCert.tbsBytes
+      );
+      if (!leafValid) throw new Error('Leaf certificate signature invalid');
+
+      return leafCert;
+    }
+
+    // ── Attestation nonce extension check ──
+    async function verifyAttestationNonce(leafCert, attestAuthData, keyId) {
+      const bytes = leafCert.rawBytes;
+      const nonceOid = '1.2.840.113635.100.8.2';
+      let nonce = null;
+
+      for (const ext of leafCert.extensions) {
+        const extChildren = parseDERChildren(bytes, ext.contentStart, ext.contentStart + ext.contentLen);
+        const oid = parseOID(bytes, extChildren[0].contentStart, extChildren[0].contentLen);
+        if (oid !== nonceOid) continue;
+
+        // Extension value: OCTET STRING wrapping SEQUENCE { [1] { OCTET STRING } }
+        const octetStr = extChildren[extChildren.length - 1];
+        const innerSeq = parseDERElement(bytes, octetStr.contentStart);
+        const seqChildren = parseDERChildren(bytes, innerSeq.contentStart,
+                                              innerSeq.contentStart + innerSeq.contentLen);
+        for (const child of seqChildren) {
+          if (child.tag === 0xa1) {
+            const inner = parseDERElement(bytes, child.contentStart);
+            nonce = bytes.slice(inner.contentStart, inner.contentStart + inner.contentLen);
+            break;
+          }
+        }
+        break;
+      }
+
+      if (!nonce) throw new Error('Nonce extension not found in leaf certificate');
+
+      // Expected: SHA-256(authData || SHA-256(keyId as UTF-8))
+      const keyIdHash = new Uint8Array(await crypto.subtle.digest('SHA-256',
+        new TextEncoder().encode(keyId)));
+      const nonceInput = new Uint8Array(attestAuthData.length + keyIdHash.length);
+      nonceInput.set(new Uint8Array(attestAuthData), 0);
+      nonceInput.set(keyIdHash, attestAuthData.length);
+      const expected = new Uint8Array(await crypto.subtle.digest('SHA-256', nonceInput));
+
+      if (nonce.length !== expected.length) throw new Error('Attestation nonce length mismatch');
+      for (let i = 0; i < nonce.length; i++) {
+        if (nonce[i] !== expected[i]) throw new Error('Attestation nonce mismatch');
+      }
+    }
+
+    // ── Authenticator data parser ──
+    function parseAuthenticatorData(authData, isAttestation = false) {
+      const bytes = new Uint8Array(authData);
+      let offset = 0;
+      const rpIdHash = bytes.slice(offset, offset + 32); offset += 32;
+      const flags = bytes[offset++];
+      const signCount = (bytes[offset] << 24) | (bytes[offset+1] << 16) |
+                         (bytes[offset+2] << 8) | bytes[offset+3]; offset += 4;
+      const result = { rpIdHash, flags, signCount };
+
+      if (isAttestation) {
+        result.aaguid = bytes.slice(offset, offset + 16); offset += 16;
+        const credLen = (bytes[offset] << 8) | bytes[offset + 1]; offset += 2;
+        result.credentialId = bytes.slice(offset, offset + credLen);
+      }
+
+      return result;
     }
 
     // ── Parse Bluesky URL or AT URI into {handle, rkey} ──
@@ -719,43 +916,75 @@ M/pWNqumUnq5fy5Ai8y/MJDOV7hd-----END CERTIFICATE-----`;
         step.detail = `SHA-256: ${computedHash.substring(0, 32)}...`;
         updateContent(postCardHtml);
 
-        // Step 6: Decode attestation + validate cert chain
-        step = addStep('Validating certificate chain...');
+        // Step 6: Validate Apple certificate chain
+        step = addStep('Validating Apple certificate chain...');
         updateContent(postCardHtml);
 
         const attestationBytes = base64ToBytes(proof.attestationObject);
         const attestation = CBORDecoder.decode(attestationBytes.buffer);
 
         const x5c = attestation.attStmt?.x5c;
-        if (!x5c || x5c.length === 0) {
+        if (!x5c || x5c.length < 2) {
           step.status = 'fail';
           step.label = 'No certificates in attestation';
-          updateContent(postCardHtml + renderFailBanner('The attestation object does not contain a certificate chain.'));
+          updateContent(postCardHtml + renderFailBanner('The attestation object does not contain a valid certificate chain.'));
           return;
         }
 
-        // Note: Web Crypto API cannot do full X.509 chain validation against a custom root.
-        // We verify the leaf cert is present and was issued by Apple's App Attest CA,
-        // then verify the signature with the leaf cert's public key.
-        // Full chain validation happens in the native iOS app.
-        const leafCertDer = x5c[0];
+        const leafCert = await verifyCertificateChain(x5c, APPLE_APP_ATTEST_ROOT_CA_PEM);
 
         step.status = 'pass';
-        step.label = 'Certificate chain present';
-        step.detail = `${x5c.length} certificate(s) in chain, issued by Apple App Attest CA`;
+        step.label = 'Apple certificate chain verified';
+        step.detail = `${x5c.length} certificate(s) verified against Apple App Attest Root CA`;
         updateContent(postCardHtml);
 
-        // Step 7: Extract public key and verify signature
+        // Step 7: Verify attestation binding
+        step = addStep('Verifying attestation binding...');
+        updateContent(postCardHtml);
+
+        const attestAuthData = attestation.authData;
+        if (!attestAuthData) throw new Error('No authenticator data in attestation');
+
+        const assertionBytes = base64ToBytes(proof.assertion);
+        const assertion = CBORDecoder.decode(assertionBytes.buffer);
+        if (!assertion.authenticatorData) throw new Error('No authenticator data in assertion');
+
+        const attestParsed = parseAuthenticatorData(attestAuthData, true);
+        const assertParsed = parseAuthenticatorData(assertion.authenticatorData, false);
+
+        // Verify nonce extension in leaf cert
+        await verifyAttestationNonce(leafCert, attestAuthData, proof.keyId);
+
+        // Check AAGUID (production or sandbox)
+        const prodAAGUID = new Uint8Array([0x61,0x70,0x70,0x61,0x74,0x74,0x65,0x73,0x74,0x00,0x00,0x00,0x00,0x00,0x00,0x00]);
+        const devAAGUID = new Uint8Array([0x61,0x70,0x70,0x61,0x74,0x74,0x65,0x73,0x74,0x64,0x65,0x76,0x65,0x6c,0x6f,0x70]);
+        const aaguidOk = attestParsed.aaguid.length === 16 &&
+          (attestParsed.aaguid.every((b, i) => b === prodAAGUID[i]) ||
+           attestParsed.aaguid.every((b, i) => b === devAAGUID[i]));
+        if (!aaguidOk) throw new Error('Invalid AAGUID — not an Apple App Attest device');
+
+        // Check credentialId matches keyId
+        const keyIdBytes = base64ToBytes(proof.keyId);
+        if (attestParsed.credentialId.length !== keyIdBytes.length ||
+            !attestParsed.credentialId.every((b, i) => b === keyIdBytes[i])) {
+          throw new Error('Credential ID does not match key ID');
+        }
+
+        // Check rpIdHash matches between attestation and assertion
+        if (!attestParsed.rpIdHash.every((b, i) => b === assertParsed.rpIdHash[i])) {
+          throw new Error('RP ID hash mismatch between attestation and assertion');
+        }
+
+        step.status = 'pass';
+        step.label = 'Attestation bound to device key';
+        step.detail = 'Nonce ✓ · AAGUID ✓ · Credential ID ✓ · RP ID ✓';
+        updateContent(postCardHtml);
+
+        // Step 8: Verify P-256 ECDSA signature
         step = addStep('Verifying P-256 ECDSA signature...');
         updateContent(postCardHtml);
 
-        // Import the leaf certificate's public key
-        // Parse the SubjectPublicKeyInfo from the X.509 DER cert
-        const publicKey = await importPublicKeyFromCert(leafCertDer);
-
-        // Decode assertion
-        const assertionBytes = base64ToBytes(proof.assertion);
-        const assertion = CBORDecoder.decode(assertionBytes.buffer);
+        const publicKey = await importPublicKeyFromCert(x5c[0]);
 
         const signature = assertion.signature;
         const authenticatorData = assertion.authenticatorData;
@@ -774,7 +1003,6 @@ M/pWNqumUnq5fy5Ai8y/MJDOV7hd-----END CERTIFICATE-----`;
         nonceInput.set(contentHashBytes, authenticatorData.length);
         const nonce = await crypto.subtle.digest('SHA-256', nonceInput);
 
-        // Convert DER signature to raw r||s for Web Crypto
         const rawSig = derToRaw(signature);
 
         const isValid = await crypto.subtle.verify(
@@ -842,50 +1070,26 @@ M/pWNqumUnq5fy5Ai8y/MJDOV7hd-----END CERTIFICATE-----`;
         </div>`;
     }
 
-    // ── Extract P-256 public key from X.509 DER certificate ──
+    // ── Extract public key from X.509 DER certificate (auto-detects P-256/P-384) ──
     async function importPublicKeyFromCert(certDer) {
-      // Find the SubjectPublicKeyInfo in the DER-encoded certificate.
-      // For P-256, the SPKI starts with: 30 59 30 13 06 07 2a 86 48 ce 3d 02 01 06 08 2a 86 48 ce 3d 03 01 07
-      // We search for the OID sequence that identifies EC P-256.
-      const ecP256OID = [0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07];
-      const certBytes = new Uint8Array(certDer);
+      const cert = parseX509Certificate(certDer);
+      const spkiBytes = new Uint8Array(cert.spki);
 
-      let spkiStart = -1;
-      for (let i = 0; i < certBytes.length - ecP256OID.length; i++) {
-        let match = true;
-        for (let j = 0; j < ecP256OID.length; j++) {
-          if (certBytes[i + j] !== ecP256OID[j]) { match = false; break; }
-        }
-        if (match) {
-          // Walk backwards to find the SEQUENCE that contains the AlgorithmIdentifier
-          // The SPKI SEQUENCE starts before the AlgorithmIdentifier SEQUENCE
-          // AlgorithmIdentifier starts with 30 13 (SEQUENCE, length 19)
-          // SPKI starts with 30 59 (SEQUENCE, length 89) right before that
-          // Look backwards for 0x30 0x59
-          for (let k = i - 1; k >= Math.max(0, i - 20); k--) {
-            if (certBytes[k] === 0x30 && certBytes[k + 1] === 0x59) {
-              spkiStart = k;
-              break;
-            }
-          }
-          break;
-        }
+      // Detect curve from SPKI OID
+      const p256Oid = [0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07];
+      const p384Oid = [0x06, 0x05, 0x2b, 0x81, 0x04, 0x00, 0x22];
+
+      let curve = null;
+      for (let i = 0; i < spkiBytes.length - 6; i++) {
+        if (matchBytes(spkiBytes, i, p256Oid)) { curve = 'P-256'; break; }
+        if (matchBytes(spkiBytes, i, p384Oid)) { curve = 'P-384'; break; }
       }
-
-      if (spkiStart === -1) {
-        throw new Error('Could not find SubjectPublicKeyInfo in certificate');
-      }
-
-      // SPKI for P-256 is 91 bytes: 30 59 (2) + 30 13 ... (21) + 03 42 00 04 ... (68)
-      const spkiLength = 91;
-      const spki = certBytes.slice(spkiStart, spkiStart + spkiLength);
+      if (!curve) throw new Error('Unsupported curve in certificate SPKI');
 
       return await crypto.subtle.importKey(
-        'spki',
-        spki,
-        { name: 'ECDSA', namedCurve: 'P-256' },
-        false,
-        ['verify']
+        'spki', cert.spki,
+        { name: 'ECDSA', namedCurve: curve },
+        false, ['verify']
       );
     }
 
