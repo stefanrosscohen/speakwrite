@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <script>
+    // GitHub Pages SPA redirect: rewrite /verify/{handle}/{rkey} to /verify/?p={handle}/{rkey}
+    var path = window.location.pathname;
+    if (path.startsWith('/verify/')) {
+      var rest = path.slice('/verify/'.length);
+      if (rest) {
+        window.location.replace('/verify/?p=' + encodeURIComponent(rest));
+      } else {
+        window.location.replace('/verify/');
+      }
+    }
+  </script>
+</head>
+<body></body>
+</html>

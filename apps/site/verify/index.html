@@ -545,15 +545,27 @@ M/pWNqumUnq5fy5Ai8y/MJDOV7hd-----END CERTIFICATE-----`;
     async function verify() {
       const content = document.getElementById('content');
 
-      // Parse URL: /verify/{handle}/{rkey}
+      // Parse URL: /verify/{handle}/{rkey} or /verify/?p={handle}/{rkey} (GitHub Pages 404 redirect)
       const path = window.location.pathname;
       const parts = path.split('/').filter(Boolean);
-      // parts = ['verify', handle, rkey]
-      if (parts.length < 3) {
-        // No handle/rkey in URL — show input form
+      const queryP = new URLSearchParams(window.location.search).get('p');
+
+      let handle, rkey;
+      if (parts.length >= 3) {
+        handle = parts[1];
+        rkey = parts[2];
+      } else if (queryP) {
+        const qParts = queryP.replace(/\/$/, '').split('/');
+        if (qParts.length >= 2) {
+          handle = qParts[0];
+          rkey = qParts[1];
+        }
+      }
+
+      if (!handle || !rkey) {
+        // No handle/rkey — show input form
         document.getElementById('input-section').style.display = 'block';
         content.innerHTML = '';
-        // Allow Enter key to submit
         document.getElementById('post-url').addEventListener('keydown', e => {
           if (e.key === 'Enter') verifyFromInput();
         });
@@ -561,8 +573,6 @@ M/pWNqumUnq5fy5Ai8y/MJDOV7hd-----END CERTIFICATE-----`;
         return;
       }
 
-      const handle = parts[1];
-      const rkey = parts[2];
       runVerification(handle, rkey);
     }
 
