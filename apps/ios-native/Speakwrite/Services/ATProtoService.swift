@@ -289,15 +289,45 @@ final class ATProtoService {
 
     // MARK: - Publishing
 
-    func publishAttestedPost(text: String, attestation: AttestationRecord) async throws -> (uri: String, cid: String) {
-        guard let pds = pdsURL, let did = did else { throw ATProtoError.notLoggedIn }
+    private static let testFlightURL = "https://testflight.apple.com/join/speakwrite"
 
-        // Parse @mentions and build facets
-        let facets = try await buildMentionFacets(text: text)
+    func publishAttestedPost(text: String, attestation: AttestationRecord) async throws -> (uri: String, cid: String) {
+        guard let pds = pdsURL, let did = did, let handle = handle else { throw ATProtoError.notLoggedIn }
+
+        // Generate rkey upfront so we can construct the verify URL
+        let rkey = generateTID()
+        let verifyURL = "https://speakwrite.io/verify/\(handle)/\(rkey)"
+
+        // Build footer (hidden in Speakwrite app, visible on Bluesky and other clients)
+        let footer = "\n\n✓ Verify a human wrote this · Try Speakwrite"
+        let publishText = text + footer
+
+        // Parse @mentions from the original text and build facets
+        var facets = try await buildMentionFacets(text: publishText)
+
+        // Add link facets for the footer
+        let footerStart = Array(text.utf8).count + Array("\n\n✓ ".utf8).count
+        // "Verify a human wrote this" → speakwrite.io verification page
+        let verifyText = "Verify a human wrote this"
+        let verifyByteStart = footerStart
+        let verifyByteEnd = verifyByteStart + Array(verifyText.utf8).count
+        facets.append([
+            "index": ["byteStart": verifyByteStart, "byteEnd": verifyByteEnd],
+            "features": [["$type": "app.bsky.richtext.facet#link", "uri": verifyURL]]
+        ])
+        // "Try Speakwrite" → TestFlight download
+        let separatorBytes = Array(" · ".utf8).count
+        let tryText = "Try Speakwrite"
+        let tryByteStart = verifyByteEnd + separatorBytes
+        let tryByteEnd = tryByteStart + Array(tryText.utf8).count
+        facets.append([
+            "index": ["byteStart": tryByteStart, "byteEnd": tryByteEnd],
+            "features": [["$type": "app.bsky.richtext.facet#link", "uri": Self.testFlightURL]]
+        ])
 
         var postRecord: [String: Any] = [
             "$type": "app.bsky.feed.post",
-            "text": text,
+            "text": publishText,
             "tags": ["speakwrite"],
             "createdAt": ISO8601DateFormatter().string(from: Date()),
         ]
@@ -307,7 +337,7 @@ final class ATProtoService {
         }
 
         let postResult: CreateRecordResponse = try await createRecord(
-            pds: pds, did: did, collection: "app.bsky.feed.post", record: postRecord
+            pds: pds, did: did, collection: "app.bsky.feed.post", record: postRecord, rkey: rkey
         )
 
         // Attestation proof record — verifiers check the attestationObject cert chain
@@ -671,13 +701,29 @@ final class ATProtoService {
     // MARK: - XRPC Helpers
 
     private func createRecord<T: Decodable>(
-        pds: String, did: String, collection: String, record: [String: Any]
+        pds: String, did: String, collection: String, record: [String: Any], rkey: String? = nil
     ) async throws -> T {
         let url = "\(pds)/xrpc/com.atproto.repo.createRecord"
-        let body: [String: Any] = ["repo": did, "collection": collection, "record": record]
+        var body: [String: Any] = ["repo": did, "collection": collection, "record": record]
+        if let rkey { body["rkey"] = rkey }
         let bodyData = try JSONSerialization.data(withJSONObject: body)
         let (data, _) = try await authenticatedRequest(url: url, method: "POST", body: bodyData)
         return try JSONDecoder().decode(T.self, from: data)
+    }
+
+    /// Generate an AT Protocol TID (timestamp-based record key).
+    private func generateTID() -> String {
+        let base32 = Array("234567abcdefghijklmnopqrstuvwxyz")
+        let now = UInt64(Date().timeIntervalSince1970 * 1_000_000)
+        let clockId = UInt64.random(in: 0..<1024)
+        let tid = (now << 10) | clockId
+        var chars = [Character]()
+        var remaining = tid
+        for _ in 0..<13 {
+            chars.insert(base32[Int(remaining & 0x1F)], at: 0)
+            remaining >>= 5
+        }
+        return String(chars)
     }
 
     private func deleteRecord(collection: String, recordUri: String) async throws {
@@ -998,6 +1044,10 @@ final class ATProtoService {
 
     /// Strip speakwrite footer from post text for clean display.
     static func stripSpeakwriteFooter(_ text: String) -> String {
+        // Current footer: "✓ Verify a human wrote this · Try Speakwrite"
+        if let range = text.range(of: "\n\n✓ Verify a human wrote this", options: .backwards) {
+            return String(text[..<range.lowerBound])
+        }
         // Legacy footer formats (old app versions)
         if let range = text.range(of: "\n\n✓ speakwrite", options: .backwards) {
             return String(text[..<range.lowerBound])
@@ -1171,6 +1221,10 @@ private struct PostRecord: Decodable {
 
     /// Post text with speakwrite footer stripped for display.
     var displayText: String {
+        // Current footer
+        if let range = text.range(of: "\n\n✓ Verify a human wrote this", options: .backwards) {
+            return String(text[..<range.lowerBound])
+        }
         // Legacy footer formats (old app versions)
         if let range = text.range(of: "\n\n✓ speakwrite", options: .backwards) {
             return String(text[..<range.lowerBound])
