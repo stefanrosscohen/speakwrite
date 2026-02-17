@@ -46,11 +46,12 @@ export async function sha256Hex(
   return hexEncode(new Uint8Array(hashBuffer));
 }
 
-/** Compute incremental commitment: SHA-256(previous || nonce || data) */
+/** Compute incremental commitment: SHA-256(previous || nonce || data || documentHash?) */
 export async function commitmentHash(
   previous: string | null,
   nonce: Uint8Array,
   data: Uint8Array,
+  documentHash?: string,
 ): Promise<string> {
   const parts: Uint8Array[] = [];
   if (previous) {
@@ -58,6 +59,9 @@ export async function commitmentHash(
   }
   parts.push(nonce);
   parts.push(data);
+  if (documentHash) {
+    parts.push(hexDecode(documentHash));
+  }
   const combined = concatBytes(...parts);
   const hashBuffer = await sha256(combined);
   return hexEncode(new Uint8Array(hashBuffer));

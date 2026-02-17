@@ -193,11 +193,17 @@ final class SessionService: KeystrokeCaptureDelegate {
         // Get the previous commitment hash (chain tip)
         let previousHash = commitments.last?.commitmentHash
 
-        // Compute chained commitment hash
+        // Compute document hash at this checkpoint (binds content to chain)
+        let documentContent = document.contentJSON ?? ""
+        let docHash = SpeakwriteCrypto.sha256Hex(documentContent)
+        let docLength = documentContent.count
+
+        // Compute chained commitment hash (now includes document hash)
         let hash = SpeakwriteCrypto.commitmentHash(
             previous: previousHash,
             nonce: nonce,
-            data: featureData
+            data: featureData,
+            documentHash: docHash
         )
 
         let nowMs = ProcessInfo.processInfo.systemUptime * 1000
@@ -217,7 +223,10 @@ final class SessionService: KeystrokeCaptureDelegate {
             nonce: Hex.encode(nonce),
             timestampMs: nowMs,
             commitmentType: "behavioral",
-            featureJSON: String(data: tier1Data, encoding: .utf8)
+            featureJSON: String(data: tier1Data, encoding: .utf8),
+            documentHash: docHash,
+            documentLength: docLength,
+            keystrokeCountAtCommit: keystrokeCount
         )
         modelContext.insert(commitment)
         commitments.append(commitment)
@@ -252,10 +261,16 @@ final class SessionService: KeystrokeCaptureDelegate {
         let nonce = SpeakwriteCrypto.randomNonce()
         let previousHash = commitments.last?.commitmentHash
 
+        // Compute document hash at this checkpoint
+        let documentContent = document.contentJSON ?? ""
+        let docHash = SpeakwriteCrypto.sha256Hex(documentContent)
+        let docLength = documentContent.count
+
         let hash = SpeakwriteCrypto.commitmentHash(
             previous: previousHash,
             nonce: nonce,
-            data: featureData
+            data: featureData,
+            documentHash: docHash
         )
 
         let nowMs = ProcessInfo.processInfo.systemUptime * 1000
@@ -274,7 +289,10 @@ final class SessionService: KeystrokeCaptureDelegate {
             nonce: Hex.encode(nonce),
             timestampMs: nowMs,
             commitmentType: "behavioral",
-            featureJSON: String(data: featureData, encoding: .utf8)
+            featureJSON: String(data: featureData, encoding: .utf8),
+            documentHash: docHash,
+            documentLength: docLength,
+            keystrokeCountAtCommit: keystrokeCount
         )
         modelContext.insert(commitment)
         commitments.append(commitment)

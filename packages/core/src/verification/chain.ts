@@ -1,5 +1,5 @@
 import type { ProofBundleCommitment } from "../types/proofs";
-import { contentBindingHash } from "../crypto/hashing";
+import { contentBindingHash, commitmentHash, hexDecode } from "../crypto/hashing";
 
 export interface ChainIntegrityResult {
   valid: boolean;
@@ -10,6 +10,7 @@ export interface ChainIntegrityResult {
 /**
  * Verify chain integrity only (no content hash check).
  * Walks the commitment chain and verifies each link.
+ * v2: Also re-derives behavioral commitment hashes when features_json is present.
  */
 export async function verifyChainIntegrity(
   commitments: ProofBundleCommitment[],
@@ -34,6 +35,25 @@ export async function verifyChainIntegrity(
           valid: false,
           brokenAt: commitment.sequence_num,
           message: `C${commitment.sequence_num}: previous hash mismatch`,
+        };
+      }
+    }
+
+    // Re-derive behavioral commitment hash if features_json is present (openable)
+    if (commitment.commitment_type === "behavioral" && commitment.features_json !== undefined) {
+      const nonceBytes = hexDecode(commitment.nonce);
+      const featuresBytes = new TextEncoder().encode(commitment.features_json);
+      const expected = await commitmentHash(
+        commitment.previous_hash,
+        nonceBytes,
+        featuresBytes,
+        commitment.document_hash,
+      );
+      if (expected !== commitment.commitment_hash) {
+        return {
+          valid: false,
+          brokenAt: commitment.sequence_num,
+          message: `C${commitment.sequence_num}: behavioral commitment could not be re-derived`,
         };
       }
     }

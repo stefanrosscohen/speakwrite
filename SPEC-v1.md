@@ -1,8 +1,8 @@
 # Speakwrite v1 Specification
 
-**Version:** 1.0-draft
+**Version:** 2.0-draft
 **Status:** Working Draft
-**Date:** 2026-02-14
+**Date:** 2026-02-16
 **Authors:** Stefan Cohen
 
 ---
@@ -70,7 +70,7 @@ The proof bundle is a JSON object. This IS the protocol — anyone who can compu
 
 ```json
 {
-  "version": "1.0.0",
+  "version": "2.0.0",
   "document_id": "uuid",
   "content_hash": "hex-encoded SHA-256",
   "binding_hash": "hex-encoded SHA-256",
@@ -85,7 +85,11 @@ The proof bundle is a JSON object. This IS the protocol — anyone who can compu
       "nonce": "hex-encoded 32 bytes",
       "timestamp_ms": 1739530800000,
       "commitment_type": "behavioral",
-      "content_hash": null
+      "content_hash": null,
+      "features_json": "{\"typing_speed_cpm\":420,...}",
+      "document_hash": "hex-encoded SHA-256 of document at checkpoint",
+      "document_length": 312,
+      "keystroke_count": 127
     },
     {
       "sequence_num": 1,
@@ -94,7 +98,11 @@ The proof bundle is a JSON object. This IS the protocol — anyone who can compu
       "nonce": "hex-encoded 32 bytes",
       "timestamp_ms": 1739530860000,
       "commitment_type": "behavioral",
-      "content_hash": null
+      "content_hash": null,
+      "features_json": "{\"typing_speed_cpm\":380,...}",
+      "document_hash": "hex-encoded SHA-256 of document at checkpoint",
+      "document_length": 647,
+      "keystroke_count": 312
     },
     {
       "sequence_num": 2,
@@ -156,6 +164,10 @@ The proof bundle is a JSON object. This IS the protocol — anyone who can compu
 | `timestamp_ms` | number | Millisecond timestamp |
 | `commitment_type` | string | `"behavioral"` or `"content_binding"` |
 | `content_hash` | string \| null | Only set for `content_binding` type |
+| `features_json` | string \| undefined | Raw Tier1 feature JSON (v2, behavioral only) |
+| `document_hash` | string \| undefined | SHA-256 hex of document content at checkpoint (v2, behavioral only) |
+| `document_length` | number \| undefined | Character count of document at checkpoint (v2) |
+| `keystroke_count` | number \| undefined | Cumulative keystroke count at checkpoint (v2) |
 
 **Device attestation fields:**
 
@@ -186,12 +198,12 @@ Lowercase hex-encoded SHA-256 digest. Used for `content_hash`.
 ### 3.2 Commitment Hash
 
 ```
-commitmentHash(previous: string | null, nonce: Uint8Array, data: Uint8Array) → hex string
+commitmentHash(previous: string | null, nonce: Uint8Array, data: Uint8Array, documentHash?: string) → hex string
 ```
 
-Computes: `SHA-256(previous_bytes || nonce || data)`
+Computes: `SHA-256(previous_bytes || nonce || data || document_hash_bytes?)`
 
-Where `previous_bytes` is the hex-decoded previous hash (or empty if null).
+Where `previous_bytes` is the hex-decoded previous hash (or empty if null), and `document_hash_bytes` is the hex-decoded document hash (omitted if not provided, required in v2).
 
 ### 3.3 Content Binding Hash
 
@@ -221,19 +233,34 @@ Anyone can verify a proof bundle. No server, no API key, no trust required.
 
 1. **Content hash:** Compute `SHA-256(post_content)`. Compare to `content_hash` in bundle.
 
-2. **Chain integrity:** Walk the commitment chain. Each `commitment_hash` at position N must reference the hash at position N-1 as its `previous_hash`. Timestamps must be monotonically increasing.
+2. **Chain integrity:** Walk the commitment chain. Each `commitment_hash` at position N must reference the hash at position N-1 as its `previous_hash`.
 
-3. **Content binding:** The final commitment (type `content_binding`) must satisfy:
+3. **Openable commitment re-derivation (v2):** For each behavioral commitment with `features_json`, re-derive the commitment hash:
+   ```
+   expected = SHA-256(previous_hash_bytes || hex_decode(nonce) || features_json_bytes || hex_decode(document_hash))
+   assert expected == commitment_hash
+   ```
+
+4. **Content binding:** The final commitment (type `content_binding`) must satisfy:
    ```
    commitment_hash == SHA-256(previous_hash_bytes || "CONTENT_BINDING" || content_hash_bytes)
    ```
 
-4. **Device attestation:**
-   - Verify the `attestation_certificate` chains to Apple's App Attest Root CA.
-   - Verify each `checkpoint_signature` against the public key and corresponding `commitment_hash`.
-   - Verify the `final_signature` against the public key and `content_hash|binding_hash`.
+5. **Document hash binding (v2):** Verify the last behavioral commitment's `document_hash` matches the bundle's `content_hash`.
 
-5. **Behavioral plausibility (optional):** Check that `total_keystroke_count` is plausible for the content length.
+6. **Device attestation signature verification:**
+   - Import the `device_public_key` as a P-256 public key.
+   - Verify each `checkpoint_signature`: `ECDSA-SHA256("sequence_num|commitment_hash")`.
+   - Verify `session_start_signature`: `ECDSA-SHA256("session_id|timestamp")`.
+   - Verify `final_signature`: `ECDSA-SHA256("content_hash|binding_hash")`.
+   - (TODO: Verify `attestation_certificate` chains to Apple's App Attest Root CA.)
+
+7. **Consistency checks (non-fatal warnings):**
+   - `total_keystroke_count` >= `document_length * 0.5` (plausibility).
+   - `keystroke_count` per commitment is monotonically non-decreasing.
+   - `document_length` per commitment is generally non-decreasing (tolerance for deletions).
+   - Timestamps are monotonically increasing.
+   - `typing_speed_cpm` in `features_json` is between 1 and 1000 (human range).
 
 ### 4.2 Reference Implementation
 

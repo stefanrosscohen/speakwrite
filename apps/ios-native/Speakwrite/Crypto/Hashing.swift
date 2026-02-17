@@ -14,16 +14,19 @@ enum SpeakwriteCrypto {
         return Hex.encode(Data(digest))
     }
 
-    /// Incremental commitment hash: SHA-256(previous_bytes || nonce || data).
-    /// If `previous` is nil (first commitment), only nonce || data are hashed.
+    /// Incremental commitment hash: SHA-256(previous_bytes || nonce || data || documentHash_bytes?).
+    /// If `previous` is nil (first commitment), only nonce || data [|| documentHash] are hashed.
     /// Must produce identical output to the TypeScript `commitmentHash()`.
-    static func commitmentHash(previous: String?, nonce: Data, data: Data) -> String {
+    static func commitmentHash(previous: String?, nonce: Data, data: Data, documentHash: String? = nil) -> String {
         var combined = Data()
         if let previous, let previousBytes = Hex.decode(previous) {
             combined.append(previousBytes)
         }
         combined.append(nonce)
         combined.append(data)
+        if let documentHash, let docHashBytes = Hex.decode(documentHash) {
+            combined.append(docHashBytes)
+        }
         let digest = SHA256.hash(data: combined)
         return Hex.encode(Data(digest))
     }

@@ -32,6 +32,11 @@ struct ProofCommitment: Codable {
     let timestampMs: Double
     let commitmentType: String
     let contentHash: String?
+    // v2 fields — openable commitments + incremental content hashing
+    let featuresJson: String?
+    let documentHash: String?
+    let documentLength: Int?
+    let keystrokeCount: Int?
 
     enum CodingKeys: String, CodingKey {
         case sequenceNum = "sequence_num"
@@ -41,6 +46,10 @@ struct ProofCommitment: Codable {
         case timestampMs = "timestamp_ms"
         case commitmentType = "commitment_type"
         case contentHash = "content_hash"
+        case featuresJson = "features_json"
+        case documentHash = "document_hash"
+        case documentLength = "document_length"
+        case keystrokeCount = "keystroke_count"
     }
 }
 
@@ -144,7 +153,11 @@ final class ProofService {
                 nonce: c.nonce,
                 timestampMs: c.timestampMs,
                 commitmentType: c.commitmentType,
-                contentHash: nil
+                contentHash: nil,
+                featuresJson: c.featureJSON,
+                documentHash: c.documentHash,
+                documentLength: c.documentLength,
+                keystrokeCount: c.keystrokeCountAtCommit
             )
         }
 
@@ -156,7 +169,11 @@ final class ProofService {
             nonce: "",
             timestampMs: bindingTimestampMs,
             commitmentType: "content_binding",
-            contentHash: contentHash
+            contentHash: contentHash,
+            featuresJson: nil,
+            documentHash: nil,
+            documentLength: nil,
+            keystrokeCount: nil
         )
         proofCommitments.append(bindingCommitment)
 
@@ -197,7 +214,7 @@ final class ProofService {
         document.updatedAt = Date()
 
         return ProofBundle(
-            version: "1.0.0",
+            version: "2.0.0",
             documentId: document.id,
             contentHash: contentHash,
             bindingHash: bindingHash,

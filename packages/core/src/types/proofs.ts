@@ -6,6 +6,11 @@ export interface ProofBundleCommitment {
   timestamp_ms: number;
   commitment_type: string;
   content_hash: string | null;
+  // v2 fields — openable commitments + incremental content hashing
+  features_json?: string;
+  document_hash?: string;
+  document_length?: number;
+  keystroke_count?: number;
 }
 
 export interface DeviceAttestationCheckpoint {
@@ -50,4 +55,9 @@ export interface VerifyResult {
   expected_content_hash: string | null;
   actual_content_hash: string;
   message: string;
+  // v2 fields — attestation verification + consistency checks
+  signatures_valid?: boolean;
+  attestation_level?: string | null;
+  signature_count?: number;
+  consistency_warnings?: string[];
 }

@@ -12,6 +12,9 @@ final class Commitment {
     var commitmentType: String  // "behavioral" or "content_binding"
     var contentHash: String?
     var featureJSON: String?
+    var documentHash: String?   // SHA-256 hex of document content at checkpoint
+    var documentLength: Int
+    var keystrokeCountAtCommit: Int
 
     init(
         document: Document? = nil,
@@ -22,7 +25,10 @@ final class Commitment {
         timestampMs: Double,
         commitmentType: String,
         contentHash: String? = nil,
-        featureJSON: String? = nil
+        featureJSON: String? = nil,
+        documentHash: String? = nil,
+        documentLength: Int = 0,
+        keystrokeCountAtCommit: Int = 0
     ) {
         self.document = document
         self.sequenceNum = sequenceNum
@@ -33,5 +39,8 @@ final class Commitment {
         self.commitmentType = commitmentType
         self.contentHash = contentHash
         self.featureJSON = featureJSON
+        self.documentHash = documentHash
+        self.documentLength = documentLength
+        self.keystrokeCountAtCommit = keystrokeCountAtCommit
     }
 }
