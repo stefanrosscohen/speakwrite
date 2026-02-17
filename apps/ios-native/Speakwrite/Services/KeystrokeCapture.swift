@@ -14,7 +14,7 @@ protocol InputRestrictedDelegate: AnyObject {
 /// Blocks paste, dictation, autocorrect, hardware keyboard, and other non-typing input methods.
 /// This is the v3 replacement for behavioral analysis — the restriction IS the guarantee.
 class InputRestrictedTextView: UITextView {
-    weak var inputDelegate: InputRestrictedDelegate?
+    weak var restrictionDelegate: InputRestrictedDelegate?
     private var keystrokeCount = 0
     private var isComposing = false
 
@@ -35,7 +35,7 @@ class InputRestrictedTextView: UITextView {
         ]
         if blockedActions.contains(action) {
             violationCount += 1
-            inputDelegate?.violationCountDidChange(violationCount)
+            restrictionDelegate?.violationCountDidChange(violationCount)
             return false
         }
         return super.canPerformAction(action, withSender: sender)
@@ -50,21 +50,21 @@ class InputRestrictedTextView: UITextView {
         if text.count > 1 && !isComposing {
             // Likely dictation or programmatic insertion — block it
             violationCount += 1
-            inputDelegate?.violationCountDidChange(violationCount)
+            restrictionDelegate?.violationCountDidChange(violationCount)
             return
         }
 
         super.insertText(text)
         keystrokeCount += 1
-        inputDelegate?.keystrokeCountDidChange(keystrokeCount)
-        inputDelegate?.textDidChange(self.text)
+        restrictionDelegate?.keystrokeCountDidChange(keystrokeCount)
+        restrictionDelegate?.textDidChange(self.text)
     }
 
     override func deleteBackward() {
         super.deleteBackward()
         keystrokeCount += 1
-        inputDelegate?.keystrokeCountDidChange(keystrokeCount)
-        inputDelegate?.textDidChange(self.text)
+        restrictionDelegate?.keystrokeCountDidChange(keystrokeCount)
+        restrictionDelegate?.textDidChange(self.text)
     }
 
     // MARK: - Block hardware keyboard
@@ -72,7 +72,7 @@ class InputRestrictedTextView: UITextView {
     override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
         // Consume hardware keyboard events without calling super
         violationCount += presses.count
-        inputDelegate?.violationCountDidChange(violationCount)
+        restrictionDelegate?.violationCountDidChange(violationCount)
     }
 
     override func pressesEnded(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
@@ -97,7 +97,7 @@ class InputRestrictedTextView: UITextView {
     override func unmarkText() {
         isComposing = false
         super.unmarkText()
-        inputDelegate?.textDidChange(self.text)
+        restrictionDelegate?.textDidChange(self.text)
     }
 
     /// Reset counters (call when starting a new session).
@@ -128,7 +128,7 @@ struct InputRestrictedEditor: UIViewRepresentable {
         textView.smartDashesType = .no
         textView.smartInsertDeleteType = .no
 
-        textView.inputDelegate = inputDelegate
+        textView.restrictionDelegate = inputDelegate
         textView.delegate = context.coordinator
         textView.text = text
         return textView
@@ -138,7 +138,7 @@ struct InputRestrictedEditor: UIViewRepresentable {
         if textView.text != text {
             textView.text = text
         }
-        textView.inputDelegate = inputDelegate
+        textView.restrictionDelegate = inputDelegate
     }
 
     func makeCoordinator() -> Coordinator {
