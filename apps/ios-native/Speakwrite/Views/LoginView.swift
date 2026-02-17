@@ -5,8 +5,19 @@ struct LoginView: View {
     @Environment(AppViewModel.self) private var viewModel
     @Environment(\.colorScheme) private var colorScheme
     @State private var handle = ""
+    @State private var customServer = ""
+    @State private var useCustomServer = false
     @State private var isLoading = false
     @State private var error: String?
+
+    private var serviceHost: String {
+        if useCustomServer {
+            let trimmed = customServer.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty { return "https://bsky.social" }
+            return trimmed.hasPrefix("https://") ? trimmed : "https://\(trimmed)"
+        }
+        return "https://bsky.social"
+    }
 
     var body: some View {
         VStack(spacing: Theme.xxxl) {
@@ -29,6 +40,34 @@ struct LoginView: View {
                     .autocorrectionDisabled()
                     .font(Theme.monoHeadline)
                     .padding(.horizontal)
+
+                // Server toggle
+                VStack(spacing: Theme.sm) {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            useCustomServer.toggle()
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(useCustomServer ? "Custom PDS" : "Bluesky (bsky.social)")
+                                .font(Theme.mono)
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 10))
+                                .rotationEffect(.degrees(useCustomServer ? 180 : 0))
+                        }
+                        .foregroundStyle(Theme.textTertiary(colorScheme))
+                    }
+
+                    if useCustomServer {
+                        TextField("your-pds.example.com", text: $customServer)
+                            .textFieldStyle(.roundedBorder)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .font(Theme.mono)
+                            .padding(.horizontal)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
+                }
 
                 Button {
                     Task { await signIn() }
@@ -69,9 +108,13 @@ struct LoginView: View {
                 .first?.windows.first else {
                 throw ATProtoError.authCancelled
             }
-            try await viewModel.atproto.signIn(handle: handle, presentationAnchor: window)
+            try await viewModel.atproto.signIn(
+                handle: handle,
+                serviceHost: serviceHost,
+                presentationAnchor: window
+            )
         } catch let err as ASWebAuthenticationSessionError where err.code == .canceledLogin {
-            self.error = nil // User cancelled — don't show error
+            self.error = nil
         } catch {
             self.error = "\(error)"
         }

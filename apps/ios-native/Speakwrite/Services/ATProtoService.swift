@@ -73,8 +73,8 @@ final class ATProtoService {
 
     // MARK: - OAuth Flow
 
-    func resolveHandle(_ handle: String) async throws -> (did: String, pds: String) {
-        let url = URL(string: "https://bsky.social/xrpc/com.atproto.identity.resolveHandle?handle=\(handle)")!
+    func resolveHandle(_ handle: String, serviceHost: String = "https://bsky.social") async throws -> (did: String, pds: String) {
+        let url = URL(string: "\(serviceHost)/xrpc/com.atproto.identity.resolveHandle?handle=\(handle)")!
         let (data, _) = try await URLSession.shared.data(from: url)
         let result = try JSONDecoder().decode(ResolveHandleResponse.self, from: data)
 
@@ -100,8 +100,8 @@ final class ATProtoService {
         return server
     }
 
-    func signIn(handle: String, presentationAnchor: ASPresentationAnchor) async throws {
-        let (resolvedDID, pds) = try await resolveHandle(handle)
+    func signIn(handle: String, serviceHost: String = "https://bsky.social", presentationAnchor: ASPresentationAnchor) async throws {
+        let (resolvedDID, pds) = try await resolveHandle(handle, serviceHost: serviceHost)
 
         // Discover the authorization server from the PDS's protected resource metadata
         let authServer = try await discoverAuthorizationServer(pds: pds)
