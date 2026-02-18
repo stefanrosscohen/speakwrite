@@ -2,9 +2,11 @@ import { AtpAgent } from '@atproto/api';
 
 export interface ProofRecord {
   postUri: string;
+  keyId: string;
   contentHash: string;
   attestationObject: string;
   assertion: string;
+  appId: string;
   mediaHashes?: string[];
   createdAt?: string;
 }

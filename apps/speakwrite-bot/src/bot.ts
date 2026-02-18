@@ -230,12 +230,22 @@ export async function pollNotifications(agent: AtpAgent): Promise<void> {
       return;
     }
 
-    const res = await agent.listNotifications({ limit: 50 });
-    const notifications = res.data.notifications;
-
-    const mentions = notifications.filter(
-      (n) => n.reason === 'mention' && !n.isRead
-    );
+    // Paginate through all unread notifications to avoid missing any
+    type Notification = Awaited<ReturnType<typeof agent.listNotifications>>['data']['notifications'][number];
+    const mentions: Notification[] = [];
+    let notifCursor: string | undefined;
+    let foundRead = false;
+    while (!foundRead) {
+      const res = await agent.listNotifications({ limit: 50, cursor: notifCursor });
+      const notifications = res.data.notifications;
+      for (const n of notifications) {
+        if (n.isRead) { foundRead = true; break; }
+        if (n.reason === 'mention') mentions.push(n);
+      }
+      if (notifications.length < 50) break;
+      notifCursor = res.data.cursor;
+      if (!notifCursor) break;
+    }
 
     if (mentions.length === 0) {
       return;

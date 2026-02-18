@@ -81,32 +81,32 @@ export async function verifyPost(
       };
     }
 
-    // Step 3: Validate certificate chain — verify issuer names trace to Apple root
-    // Note: checkIssued() does strict crypto verification that can fail across
-    // key types (P-256 intermediate signed by P-384 root). We verify issuer names
-    // and rely on the ECDSA signature check (step 7) as the cryptographic proof.
+    // Step 3: Validate certificate chain cryptographically against Apple root
+    const rootCert = new crypto.X509Certificate(APPLE_APP_ATTEST_ROOT_CA_PEM);
     const leafCert = new crypto.X509Certificate(x5c[0]);
 
     if (x5c.length >= 2) {
       const intermediateCert = new crypto.X509Certificate(x5c[1]);
+      // Verify leaf was issued by intermediate (name check)
       if (!leafCert.checkIssued(intermediateCert)) {
         return {
           verified: false,
           reason: 'Leaf cert not issued by intermediate',
         };
       }
-      // Verify intermediate's issuer matches Apple App Attest Root CA
-      if (!intermediateCert.issuer.includes('Apple App Attestation Root CA')) {
+      // Cryptographically verify intermediate was signed by Apple root
+      if (!intermediateCert.verify(rootCert.publicKey)) {
         return {
           verified: false,
-          reason: 'Intermediate cert not issued by Apple App Attestation Root CA',
+          reason: 'Intermediate cert not signed by Apple App Attestation Root CA',
         };
       }
     } else {
-      if (!leafCert.issuer.includes('Apple App Attestation')) {
+      // Single cert — verify it was signed directly by the root
+      if (!leafCert.verify(rootCert.publicKey)) {
         return {
           verified: false,
-          reason: 'Leaf cert not issued by Apple',
+          reason: 'Leaf cert not signed by Apple App Attestation Root CA',
         };
       }
     }
@@ -137,10 +137,11 @@ export async function verifyPost(
     const nonce = crypto.createHash('sha256').update(nonceInput).digest();
 
     // Step 7: Verify ECDSA signature
-    // Node's crypto.verify with 'sha256' will hash the nonce again,
-    // matching Web Crypto's behavior (which also applies SHA-256 internally)
+    // nonce is already SHA-256(authenticatorData || contentHash).
+    // Use null algorithm so crypto.verify checks the signature against
+    // the raw hash without hashing again.
     const isValid = crypto.verify(
-      'sha256',
+      null,
       nonce,
       { key: publicKey, dsaEncoding: 'der' },
       Buffer.from(signature)

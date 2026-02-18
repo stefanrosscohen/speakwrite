@@ -878,11 +878,25 @@ oyFraWVIyd/dganmrduC1bmTBGwD
         step = addStep('Fetching proof records...');
         updateContent(postCardHtml);
 
-        const proofsResp = await fetch(`${pds}/xrpc/com.atproto.repo.listRecords?repo=${encodeURIComponent(did)}&collection=io.speakwrite.proof&limit=100`);
-        if (!proofsResp.ok) throw new Error('Could not fetch proof records');
-        const proofsData = await proofsResp.json();
+        let proof = null;
+        let proofCursor = undefined;
+        do {
+          const proofUrl = new URL(`${pds}/xrpc/com.atproto.repo.listRecords`);
+          proofUrl.searchParams.set('repo', did);
+          proofUrl.searchParams.set('collection', 'io.speakwrite.proof');
+          proofUrl.searchParams.set('limit', '100');
+          proofUrl.searchParams.set('reverse', 'true');
+          if (proofCursor) proofUrl.searchParams.set('cursor', proofCursor);
 
-        const proof = proofsData.records?.find(r => r.value?.postUri === postUri)?.value;
+          const proofsResp = await fetch(proofUrl.toString());
+          if (!proofsResp.ok) throw new Error('Could not fetch proof records');
+          const proofsData = await proofsResp.json();
+
+          const match = proofsData.records?.find(r => r.value?.postUri === postUri);
+          if (match) { proof = match.value; break; }
+          proofCursor = proofsData.cursor;
+        } while (proofCursor);
+
         if (!proof) {
           step.status = 'fail';
           step.label = 'No proof record found for this post';

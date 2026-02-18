@@ -70,18 +70,27 @@ export async function fetchProofForPost(
   authorDid: string
 ): Promise<ProofRecord | null> {
   const pds = await resolvePds(authorDid);
+  let cursor: string | undefined;
 
-  const resp = await fetch(
-    `${pds}/xrpc/com.atproto.repo.listRecords?repo=${encodeURIComponent(
-      authorDid
-    )}&collection=io.speakwrite.proof&limit=100`
-  );
-  if (!resp.ok) return null;
+  do {
+    const url = new URL(`${pds}/xrpc/com.atproto.repo.listRecords`);
+    url.searchParams.set('repo', authorDid);
+    url.searchParams.set('collection', 'io.speakwrite.proof');
+    url.searchParams.set('limit', '100');
+    url.searchParams.set('reverse', 'true');
+    if (cursor) url.searchParams.set('cursor', cursor);
 
-  const data = await resp.json();
-  const record = data.records?.find(
-    (r: { value: ProofRecord }) => r.value?.postUri === postUri
-  );
+    const resp = await fetch(url.toString());
+    if (!resp.ok) return null;
 
-  return record?.value ?? null;
+    const data = await resp.json();
+    const record = data.records?.find(
+      (r: { value: ProofRecord }) => r.value?.postUri === postUri
+    );
+    if (record) return record.value;
+
+    cursor = data.cursor;
+  } while (cursor);
+
+  return null;
 }
