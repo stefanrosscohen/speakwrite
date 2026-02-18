@@ -23,6 +23,12 @@ struct ReplyView: View {
     @State private var cameraMode: CameraMode = .photo
     @State private var videoProcessingStatus: String? = nil
 
+    // @Mention autocomplete
+    @State private var mentionQuery: String = ""
+    @State private var mentionResults: [ProfileViewBasic] = []
+    @State private var showMentionSuggestions = false
+    @State private var mentionSearchTask: Task<Void, Never>?
+
     private var hasMedia: Bool {
         !capturedPhotos.isEmpty || capturedVideo != nil
     }
@@ -90,6 +96,16 @@ struct ReplyView: View {
                 }
                 .padding(.horizontal, Theme.lg)
                 .padding(.top, Theme.md)
+
+                // @Mention autocomplete suggestions
+                if showMentionSuggestions && !mentionResults.isEmpty {
+                    MentionSuggestionList(
+                        results: mentionResults,
+                        onSelect: { profile in
+                            insertMention(profile)
+                        }
+                    )
+                }
 
                 // Media preview strip
                 if hasMedia {
@@ -189,6 +205,9 @@ struct ReplyView: View {
                     }
                 }
             }
+            .onChange(of: replyText) { _, newText in
+                detectMentionQuery(in: newText)
+            }
             .fullScreenCover(isPresented: $showCamera) {
                 CameraCaptureView(mode: cameraMode) { media in
                     if media.mimeType.starts(with: "video/") {
@@ -203,6 +222,53 @@ struct ReplyView: View {
                 }
             }
         }
+    }
+
+    // MARK: - @Mention Detection
+
+    private func detectMentionQuery(in text: String) {
+        guard let atIndex = text.lastIndex(of: "@") else {
+            showMentionSuggestions = false
+            return
+        }
+
+        let afterAt = text[text.index(after: atIndex)...]
+        if afterAt.contains(" ") || afterAt.contains("\n") {
+            showMentionSuggestions = false
+            return
+        }
+
+        let query = String(afterAt)
+        guard query.count >= 1 else {
+            showMentionSuggestions = false
+            return
+        }
+
+        mentionQuery = query
+        mentionSearchTask?.cancel()
+        mentionSearchTask = Task {
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
+            do {
+                let results = try await viewModel.atproto.searchUsersTypeahead(query: query)
+                await MainActor.run {
+                    mentionResults = results
+                    showMentionSuggestions = !results.isEmpty
+                }
+            } catch {
+                await MainActor.run {
+                    showMentionSuggestions = false
+                }
+            }
+        }
+    }
+
+    private func insertMention(_ profile: ProfileViewBasic) {
+        if let atIndex = replyText.lastIndex(of: "@") {
+            replyText = String(replyText[..<atIndex]) + "@\(profile.handle) "
+        }
+        showMentionSuggestions = false
+        mentionResults = []
     }
 
     // MARK: - Send

@@ -289,7 +289,7 @@ final class ATProtoService {
 
     // MARK: - Publishing
 
-    private static let testFlightURL = "https://testflight.apple.com/join/speakwrite"
+    private static let testFlightURL = "https://testflight.apple.com/join/TtPndBU4"
 
     func publishAttestedPost(text: String, attestation: AttestationRecord, embed: [String: Any]? = nil, reply: (parentUri: String, parentCid: String)? = nil) async throws -> (uri: String, cid: String) {
         guard let pds = pdsURL, let did = did, let handle = handle else { throw ATProtoError.notLoggedIn }
@@ -963,6 +963,11 @@ final class ATProtoService {
                     }
                     let errorBody = String(data: retryData, encoding: .utf8) ?? ""
                     print("[Auth] Refresh retry failed: \(errorBody)")
+                    if errorBody.contains("invalid_grant") {
+                        print("[Auth] Session expired (invalid_grant) — logging out")
+                        logout()
+                        throw ATProtoError.sessionExpired
+                    }
                     throw ATProtoError.oauthError("refresh_failed_\(retryHttp.statusCode)", errorBody)
                 }
                 // Fallback: try to decode anyway
@@ -984,6 +989,11 @@ final class ATProtoService {
 
             let errorBody = String(data: data, encoding: .utf8) ?? "HTTP \(httpResponse.statusCode)"
             print("[Auth] Refresh failed: \(errorBody)")
+            if errorBody.contains("invalid_grant") {
+                print("[Auth] Session expired (invalid_grant) — logging out")
+                logout()
+                throw ATProtoError.sessionExpired
+            }
             throw ATProtoError.oauthError("refresh_failed_\(httpResponse.statusCode)", errorBody)
         }
 
@@ -1576,7 +1586,7 @@ private class PresentationContextProvider: NSObject, ASWebAuthenticationPresenta
 // MARK: - Errors
 
 enum ATProtoError: Error, LocalizedError {
-    case noPDS, authCancelled, noAuthCode, notLoggedIn
+    case noPDS, authCancelled, noAuthCode, notLoggedIn, sessionExpired
     case oauthError(String, String?) // error code, description
     var errorDescription: String? {
         switch self {
@@ -1584,6 +1594,7 @@ enum ATProtoError: Error, LocalizedError {
         case .authCancelled: return "Authentication was cancelled"
         case .noAuthCode: return "No authorization code received"
         case .notLoggedIn: return "Not logged in"
+        case .sessionExpired: return "Your session has expired. Please sign in again."
         case .oauthError(let code, let desc): return "OAuth error (\(code)): \(desc ?? "unknown")"
         }
     }

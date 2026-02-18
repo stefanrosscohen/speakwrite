@@ -16,6 +16,12 @@ struct QuotePostView: View {
     @State private var isSending = false
     @State private var error: String?
 
+    // @Mention autocomplete
+    @State private var mentionQuery: String = ""
+    @State private var mentionResults: [ProfileViewBasic] = []
+    @State private var showMentionSuggestions = false
+    @State private var mentionSearchTask: Task<Void, Never>?
+
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 0) {
@@ -33,6 +39,16 @@ struct QuotePostView: View {
                 .padding(.horizontal, Theme.lg)
                 .padding(.top, Theme.md)
 
+                // @Mention autocomplete suggestions
+                if showMentionSuggestions && !mentionResults.isEmpty {
+                    MentionSuggestionList(
+                        results: mentionResults,
+                        onSelect: { profile in
+                            insertMention(profile)
+                        }
+                    )
+                }
+
                 // Quoted post card
                 quotedPostCard
                     .padding(.horizontal, Theme.lg)
@@ -49,6 +65,9 @@ struct QuotePostView: View {
                 Spacer()
             }
             .background(Theme.background(colorScheme))
+            .onChange(of: postText) { _, newText in
+                detectMentionQuery(in: newText)
+            }
             .navigationTitle("")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -106,6 +125,53 @@ struct QuotePostView: View {
             RoundedRectangle(cornerRadius: Theme.cornerRadiusMd)
                 .stroke(Theme.separator(colorScheme), lineWidth: 1)
         )
+    }
+
+    // MARK: - @Mention Detection
+
+    private func detectMentionQuery(in text: String) {
+        guard let atIndex = text.lastIndex(of: "@") else {
+            showMentionSuggestions = false
+            return
+        }
+
+        let afterAt = text[text.index(after: atIndex)...]
+        if afterAt.contains(" ") || afterAt.contains("\n") {
+            showMentionSuggestions = false
+            return
+        }
+
+        let query = String(afterAt)
+        guard query.count >= 1 else {
+            showMentionSuggestions = false
+            return
+        }
+
+        mentionQuery = query
+        mentionSearchTask?.cancel()
+        mentionSearchTask = Task {
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
+            do {
+                let results = try await viewModel.atproto.searchUsersTypeahead(query: query)
+                await MainActor.run {
+                    mentionResults = results
+                    showMentionSuggestions = !results.isEmpty
+                }
+            } catch {
+                await MainActor.run {
+                    showMentionSuggestions = false
+                }
+            }
+        }
+    }
+
+    private func insertMention(_ profile: ProfileViewBasic) {
+        if let atIndex = postText.lastIndex(of: "@") {
+            postText = String(postText[..<atIndex]) + "@\(profile.handle) "
+        }
+        showMentionSuggestions = false
+        mentionResults = []
     }
 
     // MARK: - Send
