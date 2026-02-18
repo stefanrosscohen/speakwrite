@@ -296,7 +296,7 @@ final class ATProtoService {
 
         // Generate rkey upfront so we can construct the verify URL
         let rkey = generateTID()
-        let verifyURL = "https://speakwrite.io/verify/\(handle)/\(rkey)"
+        let verifyURL = "https://www.speakwrite.io/verify/\(handle)/\(rkey)"
 
         // Build footer (hidden in Speakwrite app, visible on Bluesky and other clients)
         let hasMedia = embed != nil
@@ -343,8 +343,8 @@ final class ATProtoService {
 
         if let reply {
             postRecord["reply"] = [
-                "root": ["uri": reply.parentUri, "cid": reply.parentCid],
-                "parent": ["uri": reply.parentUri, "cid": reply.parentCid],
+                "root": ["uri": reply.parentUri, "cid": reply.parentCid] as [String: Any],
+                "parent": ["uri": reply.parentUri, "cid": reply.parentCid] as [String: Any],
             ] as [String: Any]
         }
 
@@ -466,6 +466,8 @@ final class ATProtoService {
         let result = try JSONDecoder().decode(SearchPostsResponse.self, from: data)
         let posts = result.posts.compactMap { post -> VerifiedPost? in
             guard post.record.isSpeakwrite else { return nil }
+            // Skip replies — they belong in their thread, not the top-level feed
+            if post.record.reply != nil { return nil }
             let embed = post.embed
             return VerifiedPost(
                 uri: post.uri, cid: post.cid, author: post.author,
@@ -1356,6 +1358,12 @@ private struct SearchPostsResponse: Decodable {
     let cursor: String?
 }
 
+private struct PostReplyRef: Decodable {
+    let root: StrongRef?
+    let parent: StrongRef?
+    struct StrongRef: Decodable { let uri: String; let cid: String }
+}
+
 private struct SearchPost: Decodable {
     let uri: String; let cid: String; let author: PostAuthor
     let record: PostRecord
@@ -1368,6 +1376,7 @@ private struct PostRecord: Decodable {
     let text: String
     let createdAt: String?
     let tags: [String]?
+    let reply: PostReplyRef?
 
     var safeCreatedAt: String { createdAt ?? "" }
 
@@ -1403,9 +1412,10 @@ private struct PostRecord: Decodable {
         text = (try? container.decode(String.self, forKey: .text)) ?? ""
         createdAt = try? container.decode(String.self, forKey: .createdAt)
         tags = try? container.decode([String].self, forKey: .tags)
+        reply = try? container.decode(PostReplyRef.self, forKey: .reply)
     }
 
-    enum CodingKeys: String, CodingKey { case text, createdAt, tags }
+    enum CodingKeys: String, CodingKey { case text, createdAt, tags, reply }
 }
 
 // MARK: - Public Response Types
