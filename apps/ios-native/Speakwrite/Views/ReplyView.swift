@@ -15,7 +15,6 @@ struct ReplyView: View {
     @State private var replyText = ""
     @State private var isSending = false
     @State private var error: String?
-    @FocusState private var isEditorFocused: Bool
 
     var body: some View {
         NavigationStack {
@@ -74,21 +73,8 @@ struct ReplyView: View {
                         .padding(.bottom, 12)
 
                         // Compose area — flows right after the thread connector
-                        TextEditor(text: $replyText)
-                            .font(.system(size: 16))
-                            .scrollContentBackground(.hidden)
-                            .focused($isEditorFocused)
+                        InputRestrictedEditor(text: $replyText, placeholder: "Post your reply", inputDelegate: nil)
                             .frame(minHeight: 100)
-                            .overlay(alignment: .topLeading) {
-                                if replyText.isEmpty {
-                                    Text("Post your reply")
-                                        .font(.system(size: 16))
-                                        .foregroundStyle(Theme.textTertiary(colorScheme))
-                                        .allowsHitTesting(false)
-                                        .padding(.top, 8)
-                                        .padding(.leading, 5)
-                                }
-                            }
                     }
                 }
                 .padding(.horizontal, Theme.lg)
@@ -124,17 +110,18 @@ struct ReplyView: View {
                     }
                 }
             }
-            .onAppear { isEditorFocused = true }
         }
     }
 
     // MARK: - Send
 
     private func sendReply() async {
+        let text = replyText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
         isSending = true
         error = nil
         do {
-            try await viewModel.atproto.replyToPost(text: replyText, parentUri: replyToUri, parentCid: replyToCid)
+            try await viewModel.publishReply(text: text, parentUri: replyToUri, parentCid: replyToCid)
             dismiss()
         } catch {
             self.error = error.localizedDescription

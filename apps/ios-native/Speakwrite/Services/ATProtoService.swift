@@ -291,7 +291,7 @@ final class ATProtoService {
 
     private static let testFlightURL = "https://testflight.apple.com/join/speakwrite"
 
-    func publishAttestedPost(text: String, attestation: AttestationRecord) async throws -> (uri: String, cid: String) {
+    func publishAttestedPost(text: String, attestation: AttestationRecord, embed: [String: Any]? = nil, reply: (parentUri: String, parentCid: String)? = nil) async throws -> (uri: String, cid: String) {
         guard let pds = pdsURL, let did = did, let handle = handle else { throw ATProtoError.notLoggedIn }
 
         // Generate rkey upfront so we can construct the verify URL
@@ -299,7 +299,9 @@ final class ATProtoService {
         let verifyURL = "https://speakwrite.io/verify/\(handle)/\(rkey)"
 
         // Build footer (hidden in Speakwrite app, visible on Bluesky and other clients)
-        let footer = "\n\n✓ Verify a human wrote this · Try Speakwrite"
+        let hasMedia = embed != nil
+        let verifyText = hasMedia ? "Verify authentic content" : "Verify a human wrote this"
+        let footer = "\n\n✓ \(verifyText) · Try Speakwrite"
         let publishText = text + footer
 
         // Parse @mentions from the original text and build facets
@@ -307,8 +309,7 @@ final class ATProtoService {
 
         // Add link facets for the footer
         let footerStart = Array(text.utf8).count + Array("\n\n✓ ".utf8).count
-        // "Verify a human wrote this" → speakwrite.io verification page
-        let verifyText = "Verify a human wrote this"
+        // Verify link → speakwrite.io verification page
         let verifyByteStart = footerStart
         let verifyByteEnd = verifyByteStart + Array(verifyText.utf8).count
         facets.append([
@@ -336,13 +337,24 @@ final class ATProtoService {
             postRecord["facets"] = facets
         }
 
+        if let embed {
+            postRecord["embed"] = embed
+        }
+
+        if let reply {
+            postRecord["reply"] = [
+                "root": ["uri": reply.parentUri, "cid": reply.parentCid],
+                "parent": ["uri": reply.parentUri, "cid": reply.parentCid],
+            ] as [String: Any]
+        }
+
         let postResult: CreateRecordResponse = try await createRecord(
             pds: pds, did: did, collection: "app.bsky.feed.post", record: postRecord, rkey: rkey
         )
 
         // Attestation proof record — verifiers check the attestationObject cert chain
         // against Apple's App Attest root CA, then verify the assertion signature
-        let proofRecord: [String: Any] = [
+        var proofRecord: [String: Any] = [
             "$type": "io.speakwrite.proof",
             "postUri": postResult.uri,
             "keyId": attestation.keyId,
@@ -352,6 +364,10 @@ final class ATProtoService {
             "appId": attestation.appId,
             "createdAt": ISO8601DateFormatter().string(from: Date()),
         ]
+
+        if let mediaHashes = attestation.mediaHashes, !mediaHashes.isEmpty {
+            proofRecord["mediaHashes"] = mediaHashes
+        }
 
         let _: CreateRecordResponse? = try? await createRecord(
             pds: pds, did: did, collection: "io.speakwrite.proof", record: proofRecord
@@ -450,11 +466,14 @@ final class ATProtoService {
         let result = try JSONDecoder().decode(SearchPostsResponse.self, from: data)
         let posts = result.posts.compactMap { post -> VerifiedPost? in
             guard post.record.isSpeakwrite else { return nil }
+            let embed = post.embed
             return VerifiedPost(
                 uri: post.uri, cid: post.cid, author: post.author,
                 text: post.record.displayText, createdAt: post.record.safeCreatedAt,
                 likeCount: post.likeCount ?? 0, repostCount: post.repostCount ?? 0,
-                replyCount: post.replyCount ?? 0, viewer: post.viewer
+                replyCount: post.replyCount ?? 0, viewer: post.viewer,
+                images: embed?.images,
+                videoURL: embed?.playlist, videoThumbnail: embed?.thumbnail
             )
         }
 
@@ -539,7 +558,9 @@ final class ATProtoService {
                 text: displayText, createdAt: post.record?.createdAt ?? "",
                 likeCount: post.likeCount ?? 0, repostCount: post.repostCount ?? 0,
                 replyCount: post.replyCount ?? 0, isVerified: false,
-                viewer: post.viewer, repostedBy: repostedBy
+                viewer: post.viewer, repostedBy: repostedBy,
+                images: post.embed?.images,
+                videoURL: post.embed?.playlist, videoThumbnail: post.embed?.thumbnail
             )
         }
     }
@@ -588,7 +609,9 @@ final class ATProtoService {
                 text: Self.stripSpeakwriteFooter(text), createdAt: post.record?.createdAt ?? "",
                 likeCount: post.likeCount ?? 0, repostCount: post.repostCount ?? 0,
                 replyCount: post.replyCount ?? 0, isVerified: false,
-                viewer: post.viewer, repostedBy: nil
+                viewer: post.viewer, repostedBy: nil,
+                images: post.embed?.images,
+                videoURL: post.embed?.playlist, videoThumbnail: post.embed?.thumbnail
             )
         }
 
@@ -736,6 +759,78 @@ final class ATProtoService {
     /// Delete a post by URI.
     func deletePost(uri: String) async throws {
         try await deleteRecord(collection: "app.bsky.feed.post", recordUri: uri)
+    }
+
+    // MARK: - Video Upload
+
+    /// Get a service auth token for video upload. The token is scoped to the user's PDS
+    /// and the `com.atproto.repo.uploadBlob` lexicon, as required by video.bsky.app.
+    func getServiceAuth() async throws -> String {
+        guard let pds = pdsURL else { throw ATProtoError.notLoggedIn }
+        // aud = did:web:{pds_host}
+        guard let pdsHost = URL(string: pds)?.host else { throw ATProtoError.notLoggedIn }
+        let aud = "did:web:\(pdsHost)"
+        let exp = Int(Date().timeIntervalSince1970) + 1800 // 30 minutes
+
+        let url = "\(pds)/xrpc/com.atproto.server.getServiceAuth?aud=\(aud)&lxm=com.atproto.repo.uploadBlob&exp=\(exp)"
+        let (data, _) = try await authenticatedRequest(url: url, method: "GET")
+        let result = try JSONDecoder().decode(ServiceAuthResponse.self, from: data)
+        return result.token
+    }
+
+    /// Upload a video to Bluesky's video processing service.
+    /// Returns the initial job status (may or may not include the blob yet).
+    func uploadVideo(videoData: Data, did: String, filename: String = "video.mp4") async throws -> VideoJobStatus {
+        let serviceToken = try await getServiceAuth()
+
+        var urlComponents = URLComponents(string: "https://video.bsky.app/xrpc/app.bsky.video.uploadVideo")!
+        urlComponents.queryItems = [
+            URLQueryItem(name: "did", value: did),
+            URLQueryItem(name: "name", value: filename),
+        ]
+
+        var request = URLRequest(url: urlComponents.url!)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(serviceToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("video/mp4", forHTTPHeaderField: "Content-Type")
+        request.setValue("\(videoData.count)", forHTTPHeaderField: "Content-Length")
+        request.httpBody = videoData
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        if let httpResp = response as? HTTPURLResponse, httpResp.statusCode >= 400 {
+            let body = String(data: data, encoding: .utf8) ?? "HTTP \(httpResp.statusCode)"
+            throw ATProtoError.oauthError("video_upload_\(httpResp.statusCode)", body)
+        }
+
+        return try JSONDecoder().decode(VideoJobStatus.self, from: data)
+    }
+
+    /// Poll video.bsky.app until the video is processed and a blob reference is available.
+    /// Calls `onProgress` with status updates for UI feedback.
+    func pollVideoJob(jobId: String, onProgress: ((String) -> Void)? = nil) async throws -> [String: Any] {
+        let urlString = "https://video.bsky.app/xrpc/app.bsky.video.getJobStatus?jobId=\(jobId)"
+
+        for _ in 0..<120 { // Max ~2 minutes of polling
+            let (data, _) = try await URLSession.shared.data(from: URL(string: urlString)!)
+            let result = try JSONDecoder().decode(VideoJobStatusWrapper.self, from: data)
+            let status = result.jobStatus
+
+            onProgress?(status.state)
+
+            if let blob = status.blob {
+                return blob
+            }
+
+            if status.state == "JOB_STATE_FAILED" {
+                let errorMsg = status.error ?? status.message ?? "Video processing failed"
+                throw ATProtoError.oauthError("video_processing_failed", errorMsg)
+            }
+
+            try await Task.sleep(for: .seconds(1))
+        }
+
+        throw ATProtoError.oauthError("video_timeout", "Video processing timed out")
     }
 
     /// Upload an image blob to the PDS. Returns the blob JSON for use in profile updates.
@@ -1042,8 +1137,11 @@ final class ATProtoService {
 
     /// Strip speakwrite footer from post text for clean display.
     static func stripSpeakwriteFooter(_ text: String) -> String {
-        // Current footer: "✓ Verify a human wrote this · Try Speakwrite"
+        // Current footers: "✓ Verify a human wrote this · Try Speakwrite" / "✓ Verify authentic content · Try Speakwrite"
         if let range = text.range(of: "\n\n✓ Verify a human wrote this", options: .backwards) {
+            return String(text[..<range.lowerBound])
+        }
+        if let range = text.range(of: "\n\n✓ Verify authentic content", options: .backwards) {
             return String(text[..<range.lowerBound])
         }
         // Legacy footer formats (old app versions)
@@ -1191,6 +1289,68 @@ private struct TokenResponse: Decodable {
 
 private struct CreateRecordResponse: Decodable { let uri: String; let cid: String }
 
+// MARK: - Video Upload Types
+
+private struct ServiceAuthResponse: Decodable { let token: String }
+
+struct VideoJobStatus: Decodable {
+    let jobId: String
+    let did: String?
+    let state: String
+    let progress: Int?
+    let blob: [String: Any]?
+    let error: String?
+    let message: String?
+
+    enum CodingKeys: String, CodingKey {
+        case jobId, did, state, progress, error, message, blob
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        jobId = try container.decode(String.self, forKey: .jobId)
+        did = try container.decodeIfPresent(String.self, forKey: .did)
+        state = try container.decode(String.self, forKey: .state)
+        progress = try container.decodeIfPresent(Int.self, forKey: .progress)
+        error = try container.decodeIfPresent(String.self, forKey: .error)
+        message = try container.decodeIfPresent(String.self, forKey: .message)
+        // Decode blob as raw JSON dict
+        if let blobContainer = try? container.decode(AnyCodable.self, forKey: .blob) {
+            blob = blobContainer.value as? [String: Any]
+        } else {
+            blob = nil
+        }
+    }
+}
+
+private struct VideoJobStatusWrapper: Decodable {
+    let jobStatus: VideoJobStatus
+}
+
+/// Helper to decode arbitrary JSON values.
+private struct AnyCodable: Decodable {
+    let value: Any
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let dict = try? container.decode([String: AnyCodable].self) {
+            value = dict.mapValues { $0.value }
+        } else if let arr = try? container.decode([AnyCodable].self) {
+            value = arr.map { $0.value }
+        } else if let str = try? container.decode(String.self) {
+            value = str
+        } else if let num = try? container.decode(Int.self) {
+            value = num
+        } else if let num = try? container.decode(Double.self) {
+            value = num
+        } else if let bool = try? container.decode(Bool.self) {
+            value = bool
+        } else {
+            value = NSNull()
+        }
+    }
+}
+
 private struct SearchPostsResponse: Decodable {
     let posts: [SearchPost]
     let cursor: String?
@@ -1199,6 +1359,7 @@ private struct SearchPostsResponse: Decodable {
 private struct SearchPost: Decodable {
     let uri: String; let cid: String; let author: PostAuthor
     let record: PostRecord
+    let embed: PostEmbedView?
     let likeCount: Int?; let repostCount: Int?; let replyCount: Int?
     let viewer: PostViewer?
 }
@@ -1219,8 +1380,11 @@ private struct PostRecord: Decodable {
 
     /// Post text with speakwrite footer stripped for display.
     var displayText: String {
-        // Current footer
+        // Current footers
         if let range = text.range(of: "\n\n✓ Verify a human wrote this", options: .backwards) {
+            return String(text[..<range.lowerBound])
+        }
+        if let range = text.range(of: "\n\n✓ Verify authentic content", options: .backwards) {
             return String(text[..<range.lowerBound])
         }
         // Legacy footer formats (old app versions)
@@ -1275,6 +1439,7 @@ struct FeedReason: Decodable {
 struct FeedPost: Decodable {
     let uri: String; let cid: String; let author: PostAuthor
     let record: FeedPostRecord?
+    let embed: PostEmbedView?
     let likeCount: Int?; let repostCount: Int?; let replyCount: Int?
     let viewer: PostViewer?
 }
@@ -1285,6 +1450,9 @@ struct VerifiedPost: Identifiable {
     let text: String; let createdAt: String
     let likeCount: Int; let repostCount: Int; let replyCount: Int
     let viewer: PostViewer?
+    let images: [EmbedImageView]?
+    let videoURL: String?         // HLS playlist URL
+    let videoThumbnail: String?   // Thumbnail image URL
     var id: String { uri }
 }
 
@@ -1294,7 +1462,36 @@ struct TimelinePost: Identifiable {
     let likeCount: Int; let repostCount: Int; let replyCount: Int
     let isVerified: Bool; let viewer: PostViewer?
     let repostedBy: String? // Display name or handle of the reposter
+    let images: [EmbedImageView]?
+    let videoURL: String?
+    let videoThumbnail: String?
     var id: String { uri }
+}
+
+// MARK: - Embed Types
+
+struct EmbedImageView: Decodable, Hashable, Identifiable {
+    let thumb: String
+    let fullsize: String
+    let alt: String?
+    var id: String { thumb }
+}
+
+struct PostEmbedView: Decodable {
+    let type: String?
+    let images: [EmbedImageView]?
+    // Video embed fields (app.bsky.embed.video#view)
+    let playlist: String?      // HLS playlist URL
+    let thumbnail: String?     // Thumbnail image URL
+    let aspectRatio: EmbedAspectRatio?
+    enum CodingKeys: String, CodingKey {
+        case type = "$type"; case images; case playlist; case thumbnail; case aspectRatio
+    }
+}
+
+struct EmbedAspectRatio: Decodable, Hashable {
+    let width: Int
+    let height: Int
 }
 
 struct ProfileViewDetailed: Codable {
@@ -1353,6 +1550,9 @@ struct PostNavigation: Hashable {
     let viewerLike: String?
     let viewerRepost: String?
     let isVerified: Bool
+    let images: [EmbedImageView]?
+    let videoURL: String?
+    let videoThumbnail: String?
 }
 
 // MARK: - ASWebAuthenticationSession presentation
