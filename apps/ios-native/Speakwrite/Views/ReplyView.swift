@@ -16,6 +16,17 @@ struct ReplyView: View {
     @State private var isSending = false
     @State private var error: String?
 
+    // Media capture state
+    @State private var capturedPhotos: [CapturedMedia] = []
+    @State private var capturedVideo: CapturedMedia? = nil
+    @State private var showCamera = false
+    @State private var cameraMode: CameraMode = .photo
+    @State private var videoProcessingStatus: String? = nil
+
+    private var hasMedia: Bool {
+        !capturedPhotos.isEmpty || capturedVideo != nil
+    }
+
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 0) {
@@ -80,6 +91,74 @@ struct ReplyView: View {
                 .padding(.horizontal, Theme.lg)
                 .padding(.top, Theme.md)
 
+                // Media preview strip
+                if hasMedia {
+                    MediaPreviewStrip(
+                        photos: capturedPhotos,
+                        video: capturedVideo,
+                        onRemovePhoto: { id in
+                            capturedPhotos.removeAll { $0.id == id }
+                        },
+                        onRemoveVideo: {
+                            capturedVideo = nil
+                        }
+                    )
+                }
+
+                // Video processing status
+                if let status = videoProcessingStatus {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text(status)
+                            .font(.system(size: 13))
+                            .foregroundStyle(Theme.textSecondary(colorScheme))
+                    }
+                    .padding(.horizontal, Theme.lg)
+                    .padding(.top, Theme.xs)
+                }
+
+                // Camera menu
+                HStack(spacing: Theme.xl) {
+                    Menu {
+                        Button {
+                            cameraMode = .photo
+                            showCamera = true
+                        } label: {
+                            Label("Take Photo", systemImage: "camera")
+                        }
+                        .disabled(capturedPhotos.count >= 4 || capturedVideo != nil)
+
+                        Button {
+                            cameraMode = .video
+                            showCamera = true
+                        } label: {
+                            Label("Record Video", systemImage: "video")
+                        }
+                        .disabled(!capturedPhotos.isEmpty || capturedVideo != nil)
+                    } label: {
+                        ZStack(alignment: .topTrailing) {
+                            Image(systemName: "camera")
+                                .font(.system(size: 15))
+                                .foregroundStyle(Theme.accent.opacity(0.8))
+
+                            let mediaCount = capturedPhotos.count + (capturedVideo != nil ? 1 : 0)
+                            if mediaCount > 0 {
+                                Text("\(mediaCount)")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 14, height: 14)
+                                    .background(Circle().fill(Theme.accent))
+                                    .offset(x: 6, y: -6)
+                            }
+                        }
+                    }
+
+                    Spacer()
+                }
+                .padding(.horizontal, Theme.lg)
+                .padding(.vertical, 6)
+
                 if let error {
                     Text(error)
                         .font(.system(size: 13))
@@ -106,7 +185,20 @@ struct ReplyView: View {
                         }
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(Theme.accent)
-                        .disabled(replyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .disabled(replyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !hasMedia)
+                    }
+                }
+            }
+            .fullScreenCover(isPresented: $showCamera) {
+                CameraCaptureView(mode: cameraMode) { media in
+                    if media.mimeType.starts(with: "video/") {
+                        capturedPhotos = []
+                        capturedVideo = media
+                    } else {
+                        capturedVideo = nil
+                        if capturedPhotos.count < 4 {
+                            capturedPhotos.append(media)
+                        }
                     }
                 }
             }
@@ -117,11 +209,20 @@ struct ReplyView: View {
 
     private func sendReply() async {
         let text = replyText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
+        guard !text.isEmpty || hasMedia else { return }
         isSending = true
         error = nil
         do {
-            try await viewModel.publishReply(text: text, parentUri: replyToUri, parentCid: replyToCid)
+            try await viewModel.publishReply(
+                text: text,
+                parentUri: replyToUri,
+                parentCid: replyToCid,
+                capturedPhotos: capturedPhotos,
+                capturedVideo: capturedVideo,
+                onVideoStatus: { status in
+                    videoProcessingStatus = status
+                }
+            )
             dismiss()
         } catch {
             self.error = error.localizedDescription

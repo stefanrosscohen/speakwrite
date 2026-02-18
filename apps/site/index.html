@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Speakwrite — Prove a human wrote it</title>
-  <meta name="description" content="Speakwrite enforces input restrictions (soft keyboard only, no paste, no dictation, no autocorrect) and cryptographically signs a content hash with the iPhone's Secure Enclave via App Attest. The proof lives on the author's PDS.">
+  <meta name="description" content="Speakwrite enforces input restrictions (soft keyboard only, no paste, no dictation, no autocorrect) and signs every post with the iPhone's Secure Enclave via App Attest. Photos and video captured live through the camera. Proofs on your PDS. Verification on every reader's device.">
   <meta property="og:title" content="Speakwrite — Prove a human wrote it">
-  <meta property="og:description" content="An AT Protocol client that enforces input restrictions and signs every post with the iPhone's Secure Enclave via App Attest. Proofs stored on your PDS. Verification on every reader's device. No server. No trust required.">
+  <meta property="og:description" content="An AT Protocol client that enforces input restrictions and signs every post — text, photos, and video — with the iPhone's Secure Enclave via App Attest. Proofs stored on your PDS. Verification on every reader's device. No server. No trust required.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://speakwrite.io">
   <meta name="theme-color" content="#0a0a0a">
@@ -22,6 +22,7 @@
       <a href="/" class="wordmark">speakwrite</a>
       <div class="nav-links">
         <a href="#protocol" class="nav-link">Protocol</a>
+        <a href="#verification" class="nav-link">Verify</a>
         <a href="https://github.com/stefanrosscohen/speakwrite" class="nav-link">GitHub</a>
       </div>
     </nav>
@@ -33,7 +34,7 @@
       <h1>Prove a human wrote it.</h1>
       <p class="subtitle">Open protocol. Hardware-backed. No trust required.</p>
       <p class="lede">AI can produce text indistinguishable from human writing. Every detection tool that analyzes the <em>output</em> is losing an arms race it can never win. The next model will always evade the last detector.</p>
-      <p class="lede">Speakwrite takes a different approach: instead of analyzing what was written, it restricts <em>how</em> it can be written. Soft keyboard only &mdash; no paste, no dictation, no autocorrect. A SHA-256 content hash signed by the Secure Enclave via App Attest. The proof stored on the author&rsquo;s PDS. Verification on every reader&rsquo;s device. Pure cryptography.</p>
+      <p class="lede">Speakwrite takes a different approach: instead of analyzing what was written, it restricts <em>how</em> it can be written. Soft keyboard only &mdash; no paste, no dictation, no autocorrect. Photos and video captured live through the camera &mdash; no gallery, no uploads. A SHA-256 content hash signed by the Secure Enclave via App Attest. The proof stored on the author&rsquo;s PDS. Verification on every reader&rsquo;s device. Pure cryptography.</p>
     </section>
 
     <section id="the-problem">
@@ -45,8 +46,8 @@
 
     <section id="the-approach">
       <h2>The Approach</h2>
-      <p>Speakwrite doesn&rsquo;t analyze what you wrote. It restricts <em>how</em> you can write.</p>
-      <p>The app enforces soft keyboard only &mdash; no paste, no dictation, no autocorrect. When you publish, a SHA-256 hash of the content is signed by the iPhone&rsquo;s Secure Enclave via App Attest. The post is published with <code>tags: ["speakwrite"]</code>, and a cryptographic proof record (<code>io.speakwrite.proof</code>) is stored in the author&rsquo;s AT Protocol repository.</p>
+      <p>Speakwrite doesn&rsquo;t analyze what you wrote. It restricts <em>how</em> you can write &mdash; and <em>how</em> you can capture media.</p>
+      <p>The app enforces soft keyboard only &mdash; no paste, no dictation, no autocorrect. Photos and videos are captured live through the device camera &mdash; no gallery picker, no file uploads. When you publish, a SHA-256 content hash (covering both text and media) is signed by the iPhone&rsquo;s Secure Enclave via App Attest. The post is published with <code>tags: ["speakwrite"]</code>, and a cryptographic proof record (<code>io.speakwrite.proof</code>) is stored in the author&rsquo;s AT Protocol repository.</p>
       <p>Verification happens entirely on the reader&rsquo;s device. Proof records are fetched from the author&rsquo;s PDS (resolved via the PLC directory). The content hash is recomputed, the attestation certificate chain is validated against Apple&rsquo;s Root CA, and the ECDSA signature is verified. Grey checkmark while verifying, green checkmark when the proof passes. No server in the loop.</p>
     </section>
 
@@ -64,8 +65,12 @@
           <span>Soft keyboard only &mdash; no paste, no dictation, no autocorrect. Nothing else.</span>
         </li>
         <li>
+          <strong>Capture</strong>
+          <span>Photos and video recorded live through the device camera. No gallery. No uploads. Each media file is SHA-256 hashed at capture time.</span>
+        </li>
+        <li>
           <strong>Publish</strong>
-          <span>SHA-256 content hash signed by the Secure Enclave via App Attest. Post published with <code>tags: ["speakwrite"]</code>. Proof record (<code>io.speakwrite.proof</code>) stored in the author&rsquo;s AT Protocol repo.</span>
+          <span>Content hash (text + media hashes) signed by the Secure Enclave via App Attest. Post published with <code>tags: ["speakwrite"]</code>. Proof record (<code>io.speakwrite.proof</code>) stored in the author&rsquo;s AT Protocol repo.</span>
         </li>
       </ol>
 
@@ -78,7 +83,7 @@
         </li>
         <li>
           <strong>Content binding</strong>
-          <span>SHA-256(post text) == proof&rsquo;s <code>contentHash</code>.</span>
+          <span>Recompute content hash &mdash; <code>SHA-256(text)</code> for text-only posts, or <code>SHA-256(SHA-256(text) + sorted_media_hashes)</code> for posts with media. Must match the proof&rsquo;s <code>contentHash</code>.</span>
         </li>
         <li>
           <strong>Certificate chain</strong>
@@ -112,7 +117,7 @@
         <div class="tab-card">
           <div class="tab-icon">$ _</div>
           <h3>Compose</h3>
-          <p>Write your post. Soft keyboard only &mdash; no paste, no dictation, no autocorrect. The Secure Enclave signs the content hash on publish.</p>
+          <p>Write your post. Soft keyboard only &mdash; no paste, no dictation, no autocorrect. Capture photos (up to 4) or video live through the camera. The Secure Enclave signs the content hash on publish.</p>
         </div>
         <div class="tab-card">
           <div class="tab-icon">{&middot;}</div>
@@ -124,18 +129,21 @@
 
     <section id="protocol">
       <h2>The Protocol</h2>
-      <p>Each post is published with <code>tags: ["speakwrite"]</code> and accompanied by a proof record (<code>io.speakwrite.proof</code>) stored in the author&rsquo;s AT Protocol repository. No footer text appended to posts. Verification is entirely client-side &mdash; no server dependency.</p>
+      <p>Each post is published with <code>tags: ["speakwrite"]</code> and accompanied by a proof record (<code>io.speakwrite.proof</code>) stored in the author&rsquo;s AT Protocol repository. Verification is entirely client-side &mdash; no server dependency.</p>
 
       <h3>The proof record</h3>
       <dl>
         <dt>Content hash</dt>
-        <dd>SHA-256 of the post text. Binds the proof to the exact content. Can&rsquo;t type A and publish B.</dd>
+        <dd>SHA-256 of the post text for text-only posts. For posts with media: <code>SHA-256(SHA-256(text) + sorted_media_hashes)</code> &mdash; a composite hash that binds both text and media to the attestation. Can&rsquo;t type A and publish B.</dd>
 
         <dt>Attestation object</dt>
         <dd>CBOR-encoded App Attest attestation from Apple. Contains the x5c certificate chain proving the signing key was generated on a genuine device&rsquo;s Secure Enclave.</dd>
 
         <dt>Assertion</dt>
         <dd>CBOR-encoded P-256 ECDSA signature over the content hash, produced by the Secure Enclave via App Attest. Unforgeable without the hardware key.</dd>
+
+        <dt>Media hashes</dt>
+        <dd>Optional array of SHA-256 digests of attached photos or video. Stored alongside the proof so verifiers can reconstruct the composite content hash.</dd>
       </dl>
 
       <h3>Client-side verification</h3>
@@ -143,7 +151,7 @@
       <ol class="steps">
         <li>
           <strong>Content binding</strong>
-          <span>Compute SHA-256 of the post text. Compare to the proof&rsquo;s <code>contentHash</code>.</span>
+          <span>Recompute content hash &mdash; <code>SHA-256(text)</code> or composite <code>SHA-256(SHA-256(text) + sorted_media_hashes)</code>. Compare to the proof&rsquo;s <code>contentHash</code>.</span>
         </li>
         <li>
           <strong>Certificate chain</strong>
@@ -160,7 +168,7 @@
       </ol>
 
       <h3>Input restriction</h3>
-      <p>The app enforces soft keyboard only &mdash; no paste, no dictation, no autocorrect. App Attest certifies the binary is unmodified, ensuring the input restriction code hasn&rsquo;t been tampered with.</p>
+      <p>The app enforces soft keyboard only &mdash; no paste, no dictation, no autocorrect. Photos and videos must be captured live through the device camera &mdash; no gallery picker, no file uploads. App Attest certifies the binary is unmodified, ensuring the restriction code hasn&rsquo;t been tampered with.</p>
     </section>
 
     <section id="why-it-matters">
@@ -168,7 +176,7 @@
       <div class="two-col">
         <div>
           <h3>For writers</h3>
-          <p>Say &ldquo;I typed this&rdquo; and have it mean something cryptographically verifiable. Not a badge from a platform. Not a claim on your honor. A proof anyone can check.</p>
+          <p>Say &ldquo;I typed this&rdquo; and &ldquo;I captured this&rdquo; and have it mean something cryptographically verifiable. Not a badge from a platform. Not a claim on your honor. A proof anyone can check.</p>
         </div>
         <div>
           <h3>For readers</h3>
@@ -192,7 +200,7 @@
       <div class="two-col">
         <div>
           <h3>It proves</h3>
-          <p>A post was composed through physical typing on a genuine Apple device, with input restricted to soft keyboard only (no paste, no dictation, no autocorrect), with a SHA-256 content hash signed by the Secure Enclave via App Attest.</p>
+          <p>A post was composed through physical typing on a genuine Apple device, with input restricted to soft keyboard only (no paste, no dictation, no autocorrect). Photos and video were captured live through the device camera. A SHA-256 content hash covering text and media was signed by the Secure Enclave via App Attest.</p>
         </div>
         <div>
           <h3>It doesn&rsquo;t prove</h3>
@@ -230,7 +238,29 @@
 
     <section id="why-native">
       <h2>Why a Native App</h2>
-      <p>A web app can&rsquo;t do this. Hardware attestation requires a native binary &mdash; Apple&rsquo;s App Attest certifies the app hasn&rsquo;t been tampered with, and the Secure Enclave holds a signing key that never leaves the silicon. No JavaScript bridge. No web wrapper. Signing happens inside the signed binary; verification happens on every reader&rsquo;s device.</p>
+      <p>A web app can&rsquo;t do this. Hardware attestation requires a native binary &mdash; Apple&rsquo;s App Attest certifies the app hasn&rsquo;t been tampered with, and the Secure Enclave holds a signing key that never leaves the silicon. Camera-only media capture requires native APIs to enforce that photos and video come from the live camera, not the photo library. No JavaScript bridge. No web wrapper. Signing happens inside the signed binary; verification happens on every reader&rsquo;s device.</p>
+    </section>
+
+    <section id="verification">
+      <h2>Verification</h2>
+      <p>Three ways to verify a Speakwrite post:</p>
+      <div class="tabs-preview">
+        <div class="tab-card">
+          <div class="tab-icon">[&check;]</div>
+          <h3>In-app</h3>
+          <p>The Speakwrite app verifies every post client-side. Grey checkmark while verifying, green when the proof passes. No server. Pure cryptography on your device.</p>
+        </div>
+        <div class="tab-card accent-card">
+          <div class="tab-icon">@_</div>
+          <h3>Verification bot</h3>
+          <p>Mention <a href="https://bsky.app/profile/verify.speakwrite.io">@verify.speakwrite.io</a> under any Speakwrite post. The bot fetches the proof, runs the full verification pipeline, and replies with results.</p>
+        </div>
+        <div class="tab-card">
+          <div class="tab-icon">{&rarr;}</div>
+          <h3>Web verify</h3>
+          <p>Every Speakwrite post includes a link to <code>speakwrite.io/verify</code>. The page fetches the proof and runs client-side verification in the browser using Web Crypto.</p>
+        </div>
+      </div>
     </section>
 
     <section id="why-atproto">
@@ -258,8 +288,9 @@
       <h2>Open Source</h2>
       <p>Everything is public under CC BY-SA 4.0.</p>
       <ul class="repo-list">
-        <li>Protocol spec: <code>SPEC-v1.md</code></li>
         <li>iOS app: Native SwiftUI (iOS 17+)</li>
+        <li>Verification bot: TypeScript (Fly.io)</li>
+        <li>Web verifier: Client-side Web Crypto</li>
       </ul>
       <p class="cta"><a href="https://github.com/stefanrosscohen/speakwrite">View on GitHub</a></p>
     </section>

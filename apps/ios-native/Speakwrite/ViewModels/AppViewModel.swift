@@ -271,36 +271,112 @@ final class AppViewModel: InputRestrictedDelegate {
 
     // MARK: - Reply Flow (Attested)
 
-    func publishReply(text: String, parentUri: String, parentCid: String) async throws {
+    func publishReply(
+        text: String,
+        parentUri: String,
+        parentCid: String,
+        capturedPhotos: [CapturedMedia] = [],
+        capturedVideo: CapturedMedia? = nil,
+        onVideoStatus: ((String?) -> Void)? = nil
+    ) async throws {
         // 1. Initialize attestation (generates + attests App Attest key if needed)
         let keyId = try await attestation.initialize()
 
-        // 2. Compute content hash (text-only — no media for replies)
+        // 2. Collect media hashes (hex) for the proof record
+        var mediaHashesHex: [String] = []
+        if let video = capturedVideo {
+            mediaHashesHex.append(video.sha256Hash.map { String(format: "%02x", $0) }.joined())
+        } else {
+            for photo in capturedPhotos {
+                mediaHashesHex.append(photo.sha256Hash.map { String(format: "%02x", $0) }.joined())
+            }
+        }
+
+        // 3. Compute content hash
+        // Text-only: SHA256(text) — backward compatible
+        // With media: SHA256(SHA256(text) + sorted_media_sha256_hashes)
         let textHashData = Data(SHA256.hash(data: Data(text.utf8)))
-        let contentHashHex = textHashData.map { String(format: "%02x", $0) }.joined()
+        let contentHashData: Data
+        if mediaHashesHex.isEmpty {
+            contentHashData = textHashData
+        } else {
+            var compositeInput = textHashData
+            for hashHex in mediaHashesHex.sorted() {
+                if let hashData = Data(hexString: hashHex) {
+                    compositeInput.append(hashData)
+                }
+            }
+            contentHashData = Data(SHA256.hash(data: compositeInput))
+        }
+        let contentHashHex = contentHashData.map { String(format: "%02x", $0) }.joined()
 
-        // 3. Generate App Attest assertion over the content hash
-        let assertionData = try await attestation.generateAssertion(contentHash: textHashData)
+        // 4. Generate App Attest assertion over the content hash
+        let assertionData = try await attestation.generateAssertion(contentHash: contentHashData)
 
-        // 4. Get attestation object (Apple's cert chain)
+        // 5. Get attestation object (Apple's cert chain)
         guard let attestationObject = await attestation.attestationObjectBase64 else {
             throw AttestationError.notAttested
         }
 
-        // 5. Build attestation record
+        // 6. Build attestation record
         let record = AttestationRecord(
             keyId: keyId,
             attestationObject: attestationObject,
             assertion: assertionData.base64EncodedString(),
             contentHash: contentHashHex,
             appId: Bundle.main.bundleIdentifier ?? "io.speakwrite.app",
-            mediaHashes: nil
+            mediaHashes: mediaHashesHex.isEmpty ? nil : mediaHashesHex
         )
 
-        // 6. Publish with reply field
+        // 7. Upload media blobs
+        var embed: [String: Any]? = nil
+
+        if let video = capturedVideo {
+            guard let did = atproto.did else { throw ATProtoError.notLoggedIn }
+
+            onVideoStatus?("Uploading video...")
+            let jobStatus = try await atproto.uploadVideo(
+                videoData: video.data, did: did, filename: "speakwrite_\(Int(Date().timeIntervalSince1970)).mp4"
+            )
+
+            let blob: [String: Any]
+            if let immediateBlob = jobStatus.blob {
+                blob = immediateBlob
+            } else {
+                onVideoStatus?("Processing video...")
+                blob = try await atproto.pollVideoJob(jobId: jobStatus.jobId) { state in
+                    Task { @MainActor in
+                        switch state {
+                        case "JOB_STATE_CREATED": onVideoStatus?("Processing video...")
+                        case "JOB_STATE_COMPLETED": onVideoStatus?("Video ready!")
+                        default: onVideoStatus?("Processing video...")
+                        }
+                    }
+                }
+            }
+            onVideoStatus?(nil)
+
+            embed = [
+                "$type": "app.bsky.embed.video",
+                "video": blob,
+            ]
+        } else if !capturedPhotos.isEmpty {
+            var imageEntries: [[String: Any]] = []
+            for photo in capturedPhotos {
+                let blob = try await atproto.uploadBlob(imageData: photo.data, mimeType: photo.mimeType)
+                imageEntries.append(["alt": "", "image": blob])
+            }
+            embed = [
+                "$type": "app.bsky.embed.images",
+                "images": imageEntries,
+            ]
+        }
+
+        // 8. Publish with reply field + embed
         let _ = try await atproto.publishAttestedPost(
             text: text,
             attestation: record,
+            embed: embed,
             reply: (parentUri: parentUri, parentCid: parentCid)
         )
     }
