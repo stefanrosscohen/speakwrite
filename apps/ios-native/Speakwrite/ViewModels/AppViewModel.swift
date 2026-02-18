@@ -305,6 +305,44 @@ final class AppViewModel: InputRestrictedDelegate {
         )
     }
 
+    // MARK: - Quote Post Flow (Attested)
+
+    func publishQuotePost(text: String, quotedUri: String, quotedCid: String) async throws {
+        let keyId = try await attestation.initialize()
+
+        let textHashData = Data(SHA256.hash(data: Data(text.utf8)))
+        let contentHashHex = textHashData.map { String(format: "%02x", $0) }.joined()
+
+        let assertionData = try await attestation.generateAssertion(contentHash: textHashData)
+
+        guard let attestationObject = await attestation.attestationObjectBase64 else {
+            throw AttestationError.notAttested
+        }
+
+        let record = AttestationRecord(
+            keyId: keyId,
+            attestationObject: attestationObject,
+            assertion: assertionData.base64EncodedString(),
+            contentHash: contentHashHex,
+            appId: Bundle.main.bundleIdentifier ?? "io.speakwrite.app",
+            mediaHashes: nil
+        )
+
+        let embed: [String: Any] = [
+            "$type": "app.bsky.embed.record",
+            "record": [
+                "uri": quotedUri,
+                "cid": quotedCid,
+            ] as [String: Any],
+        ]
+
+        let _ = try await atproto.publishAttestedPost(
+            text: text,
+            attestation: record,
+            embed: embed
+        )
+    }
+
     // MARK: - Verified Feed
 
     func loadFeed() async {

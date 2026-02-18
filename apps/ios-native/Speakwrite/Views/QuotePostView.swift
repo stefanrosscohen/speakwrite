@@ -15,7 +15,6 @@ struct QuotePostView: View {
     @State private var postText = ""
     @State private var isSending = false
     @State private var error: String?
-    @FocusState private var isEditorFocused: Bool
 
     var body: some View {
         NavigationStack {
@@ -28,21 +27,8 @@ struct QuotePostView: View {
                         size: .medium
                     )
 
-                    TextEditor(text: $postText)
-                        .font(.system(size: 16))
-                        .scrollContentBackground(.hidden)
-                        .focused($isEditorFocused)
+                    InputRestrictedEditor(text: $postText, placeholder: "Add your thoughts", inputDelegate: nil)
                         .frame(minHeight: 80)
-                        .overlay(alignment: .topLeading) {
-                            if postText.isEmpty {
-                                Text("Add your thoughts")
-                                    .font(.system(size: 16))
-                                    .foregroundStyle(Theme.textTertiary(colorScheme))
-                                    .allowsHitTesting(false)
-                                    .padding(.top, 8)
-                                    .padding(.leading, 5)
-                            }
-                        }
                 }
                 .padding(.horizontal, Theme.lg)
                 .padding(.top, Theme.md)
@@ -82,7 +68,6 @@ struct QuotePostView: View {
                     }
                 }
             }
-            .onAppear { isEditorFocused = true }
         }
     }
 
@@ -126,11 +111,13 @@ struct QuotePostView: View {
     // MARK: - Send
 
     private func sendQuotePost() async {
+        let text = postText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
         isSending = true
         error = nil
         do {
-            try await viewModel.atproto.quotePost(
-                text: postText,
+            try await viewModel.publishQuotePost(
+                text: text,
                 quotedUri: quotedUri,
                 quotedCid: quotedCid
             )

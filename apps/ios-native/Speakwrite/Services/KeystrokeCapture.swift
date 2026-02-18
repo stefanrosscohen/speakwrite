@@ -131,14 +131,52 @@ struct InputRestrictedEditor: UIViewRepresentable {
         textView.restrictionDelegate = inputDelegate
         textView.delegate = context.coordinator
         textView.text = text
+        Self.applyMentionHighlighting(textView)
         return textView
     }
 
     func updateUIView(_ textView: InputRestrictedTextView, context: Context) {
         if textView.text != text {
             textView.text = text
+            Self.applyMentionHighlighting(textView)
+            // Place cursor at end — programmatic text changes (e.g. mention insertion)
+            // should leave the cursor ready for the user to keep typing
+            let endPos = (textView.text as NSString).length
+            textView.selectedRange = NSRange(location: endPos, length: 0)
         }
         textView.restrictionDelegate = inputDelegate
+    }
+
+    /// Applies blue foreground color to @mention handles in the text view.
+    static func applyMentionHighlighting(_ textView: UITextView) {
+        guard let text = textView.text, !text.isEmpty else { return }
+
+        let defaultColor = UIColor(named: "textPrimary") ?? .label
+        let accentColor = UIColor(named: "AccentColor") ?? .systemBlue
+
+        let attributed = NSMutableAttributedString(string: text, attributes: [
+            .font: textView.font ?? .monospacedSystemFont(ofSize: 17, weight: .regular),
+            .foregroundColor: defaultColor
+        ])
+
+        let pattern = try? NSRegularExpression(
+            pattern: "@([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\.)+[a-zA-Z]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?"
+        )
+        if let pattern {
+            let matches = pattern.matches(in: text, range: NSRange(location: 0, length: (text as NSString).length))
+            for match in matches {
+                attributed.addAttribute(.foregroundColor, value: accentColor, range: match.range)
+            }
+        }
+
+        let selectedRange = textView.selectedRange
+        textView.attributedText = attributed
+        textView.selectedRange = selectedRange
+        // Reset typing attributes so new text after a mention is default color
+        textView.typingAttributes = [
+            .font: textView.font ?? .monospacedSystemFont(ofSize: 17, weight: .regular),
+            .foregroundColor: defaultColor
+        ]
     }
 
     func makeCoordinator() -> Coordinator {
@@ -154,6 +192,7 @@ struct InputRestrictedEditor: UIViewRepresentable {
 
         func textViewDidChange(_ textView: UITextView) {
             parent.text = textView.text
+            InputRestrictedEditor.applyMentionHighlighting(textView)
         }
     }
 }
