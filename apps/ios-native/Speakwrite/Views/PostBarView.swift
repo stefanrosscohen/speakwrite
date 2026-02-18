@@ -15,9 +15,16 @@ struct PostBarView: View {
                 Spacer()
 
                 if viewModel.isPublishing {
-                    ProgressView()
-                        .tint(Theme.accent)
-                        .padding(.trailing, Theme.sm)
+                    HStack(spacing: Theme.sm) {
+                        ProgressView()
+                            .tint(Theme.accent)
+                        if let status = viewModel.videoProcessingStatus {
+                            Text(status)
+                                .font(Theme.monoSmall)
+                                .foregroundStyle(Theme.textSecondary(colorScheme))
+                        }
+                    }
+                    .padding(.trailing, Theme.sm)
                 } else if viewModel.lastPublishedURI != nil {
                     HStack(spacing: Theme.xs) {
                         Image(systemName: "checkmark.circle.fill")
@@ -40,7 +47,12 @@ struct PostBarView: View {
                     .tint(Theme.accent)
                     .foregroundStyle(.black)
                     .clipShape(Capsule())
-                    .disabled(viewModel.postText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isOverLimit)
+                    .disabled(
+                        (viewModel.postText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                         && viewModel.capturedPhotos.isEmpty
+                         && viewModel.capturedVideo == nil)
+                        || isOverLimit
+                    )
                 }
             }
             .padding(.horizontal, Theme.lg)

@@ -36,6 +36,9 @@
 		A10001010000000000000040 /* AppAttestVerifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000040 /* AppAttestVerifier.swift */; };
 		A10001010000000000000041 /* VerificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000041 /* VerificationService.swift */; };
 		A10001010000000000000042 /* AppleAppAttestRootCA.cer in Resources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000042 /* AppleAppAttestRootCA.cer */; };
+		A10001010000000000000043 /* CameraCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000043 /* CameraCaptureView.swift */; };
+		A10001010000000000000044 /* PostImagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000044 /* PostImagesView.swift */; };
+		A10001010000000000000045 /* MediaPreviewStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000045 /* MediaPreviewStrip.swift */; };
 		A10003010000000000000001 /* CryptoKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A10004010000000000000001 /* CryptoKit.framework */; };
 		A10003010000000000000002 /* DeviceCheck.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A10004010000000000000002 /* DeviceCheck.framework */; };
 		A10003010000000000000004 /* AuthenticationServices.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A10004010000000000000004 /* AuthenticationServices.framework */; };
@@ -71,6 +74,9 @@
 		A10002010000000000000040 /* AppAttestVerifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppAttestVerifier.swift; sourceTree = "<group>"; };
 		A10002010000000000000041 /* VerificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerificationService.swift; sourceTree = "<group>"; };
 		A10002010000000000000042 /* AppleAppAttestRootCA.cer */ = {isa = PBXFileReference; lastKnownFileType = file; path = AppleAppAttestRootCA.cer; sourceTree = "<group>"; };
+		A10002010000000000000043 /* CameraCaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraCaptureView.swift; sourceTree = "<group>"; };
+		A10002010000000000000044 /* PostImagesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostImagesView.swift; sourceTree = "<group>"; };
+		A10002010000000000000045 /* MediaPreviewStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaPreviewStrip.swift; sourceTree = "<group>"; };
 		A10004010000000000000001 /* CryptoKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CryptoKit.framework; path = System/Library/Frameworks/CryptoKit.framework; sourceTree = SDKROOT; };
 		A10004010000000000000002 /* DeviceCheck.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = DeviceCheck.framework; path = System/Library/Frameworks/DeviceCheck.framework; sourceTree = SDKROOT; };
 		A10004010000000000000004 /* AuthenticationServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AuthenticationServices.framework; path = System/Library/Frameworks/AuthenticationServices.framework; sourceTree = SDKROOT; };
@@ -174,6 +180,7 @@
 				A10002010000000000000036 /* PostDetailView.swift */,
 				A10002010000000000000037 /* QuotePostView.swift */,
 				A10002010000000000000038 /* SearchUsersView.swift */,
+				A10002010000000000000043 /* CameraCaptureView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -184,6 +191,8 @@
 				A10002010000000000000033 /* PostRow.swift */,
 				A10002010000000000000034 /* AvatarView.swift */,
 				A10002010000000000000035 /* StatView.swift */,
+				A10002010000000000000044 /* PostImagesView.swift */,
+				A10002010000000000000045 /* MediaPreviewStrip.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -303,6 +312,9 @@
 				A10001010000000000000039 /* CBORDecoder.swift in Sources */,
 				A10001010000000000000040 /* AppAttestVerifier.swift in Sources */,
 				A10001010000000000000041 /* VerificationService.swift in Sources */,
+				A10001010000000000000043 /* CameraCaptureView.swift in Sources */,
+				A10001010000000000000044 /* PostImagesView.swift in Sources */,
+				A10001010000000000000045 /* MediaPreviewStrip.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -453,7 +465,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.1;
+				MARKETING_VERSION = 1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = io.speakwrite.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -489,7 +501,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.1;
+				MARKETING_VERSION = 1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = io.speakwrite.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";

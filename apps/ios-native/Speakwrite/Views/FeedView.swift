@@ -5,9 +5,10 @@ struct VerifiedFeedView: View {
     @Environment(AppViewModel.self) private var viewModel
     @Environment(\.colorScheme) private var colorScheme
     @State private var showMyProfile = false
+    @State private var path = NavigationPath()
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             VStack(spacing: 0) {
                 // App header
                 HStack(spacing: Theme.sm) {
@@ -89,6 +90,14 @@ struct VerifiedFeedView: View {
                 // Always refresh; cached posts show instantly while search completes
                 await viewModel.loadFeed()
             }
+            .environment(\.openURL, OpenURLAction { url in
+                if url.scheme == "speakwrite", url.host == "profile",
+                   let handle = url.pathComponents.dropFirst().first {
+                    path.append(handle)
+                    return .handled
+                }
+                return .systemAction
+            })
         }
     }
 }

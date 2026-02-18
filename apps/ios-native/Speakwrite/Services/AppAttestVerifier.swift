@@ -34,11 +34,29 @@ actor AppAttestVerifier {
         let assertion: String          // Base64
         let contentHash: String        // Hex
         let appId: String
+        let mediaHashes: [String]?     // Hex SHA-256 of each media blob
     }
 
     func verify(proof: ProofData, postText: String) -> VerificationStatus {
-        // 1. Content hash: SHA256(postText) must match proof.contentHash
-        let expectedHash = Data(SHA256.hash(data: Data(postText.utf8)))
+        // 1. Content hash verification
+        // Text-only (no media): SHA256(text) == contentHash
+        // With media: SHA256(SHA256(text) + sorted_media_hashes) == contentHash
+        let textHash = Data(SHA256.hash(data: Data(postText.utf8)))
+
+        let expectedHash: Data
+        if let mediaHashes = proof.mediaHashes, !mediaHashes.isEmpty {
+            // Composite hash: SHA256(SHA256(text) + sorted media hash bytes)
+            var compositeInput = textHash
+            for hashHex in mediaHashes.sorted() {
+                if let hashData = Data(hexString: hashHex) {
+                    compositeInput.append(hashData)
+                }
+            }
+            expectedHash = Data(SHA256.hash(data: compositeInput))
+        } else {
+            expectedHash = textHash
+        }
+
         let expectedHex = expectedHash.map { String(format: "%02x", $0) }.joined()
 
         guard expectedHex == proof.contentHash else {
@@ -121,7 +139,7 @@ actor AppAttestVerifier {
         }
 
         // 6. Verify signature: nonce = SHA256(authenticatorData || clientDataHash)
-        //    clientDataHash = SHA256(postText) (the content hash bytes, not hex)
+        //    clientDataHash = content hash bytes (text-only or composite with media)
         let contentHashBytes = expectedHash
         var nonceInput = Data()
         nonceInput.append(authenticatorData)

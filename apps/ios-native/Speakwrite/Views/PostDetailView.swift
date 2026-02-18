@@ -135,10 +135,19 @@ struct PostDetailView: View {
             }
 
             // Full post text — no line limit in detail view
-            Text(nav.text)
-                .font(.system(size: 16))
-                .foregroundStyle(Theme.textPrimary(colorScheme))
-                .fixedSize(horizontal: false, vertical: true)
+            if !nav.text.isEmpty {
+                Text(mentionHighlightedText(nav.text))
+                    .font(.system(size: 16))
+                    .foregroundStyle(Theme.textPrimary(colorScheme))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            // Post images / video
+            if let images = nav.images, !images.isEmpty {
+                PostImagesView(images: images)
+            } else if let videoURL = nav.videoURL, let thumb = nav.videoThumbnail {
+                PostVideoView(thumbnailURL: thumb, playlistURL: videoURL)
+            }
 
             // Timestamp
             Text(fullDateString(from: nav.createdAt))
@@ -240,7 +249,7 @@ struct PostDetailView: View {
 
                 // Reply text
                 if !reply.text.isEmpty {
-                    Text(reply.text)
+                    Text(mentionHighlightedText(reply.text))
                         .font(.system(size: 15))
                         .foregroundStyle(Theme.textPrimary(colorScheme))
                         .fixedSize(horizontal: false, vertical: true)

@@ -1,0 +1,24 @@
+{
+  "name": "verify-speakwrite-bot",
+  "version": "1.0.0",
+  "description": "Bluesky bot that verifies Speakwrite App Attest proofs",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "npx tsx src/index.ts",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.76.0",
+    "@atproto/api": "^0.13.0",
+    "cbor": "^9.0.0",
+    "dotenv": "^16.4.0",
+    "express": "^4.21.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.13.0",
+    "typescript": "^5.7.0"
+  }
+}

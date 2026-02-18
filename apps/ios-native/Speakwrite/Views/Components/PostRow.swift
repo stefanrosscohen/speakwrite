@@ -15,6 +15,9 @@ protocol PostDisplayable: Identifiable {
     var viewer: PostViewer? { get }
     var showVerifiedBadge: Bool { get }
     var repostAttribution: String? { get }
+    var images: [EmbedImageView]? { get }
+    var videoURL: String? { get }
+    var videoThumbnail: String? { get }
 }
 
 extension VerifiedPost: PostDisplayable {
@@ -25,6 +28,29 @@ extension VerifiedPost: PostDisplayable {
 extension TimelinePost: PostDisplayable {
     var showVerifiedBadge: Bool { isVerified }
     var repostAttribution: String? { repostedBy }
+}
+
+// MARK: - Mention-Highlighted Text
+
+/// Build an AttributedString with @mentions as tappable blue links.
+func mentionHighlightedText(_ text: String) -> AttributedString {
+    var result = AttributedString(text)
+    let pattern = try? NSRegularExpression(
+        pattern: "@([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\.)+[a-zA-Z]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?"
+    )
+    guard let pattern else { return result }
+    let matches = pattern.matches(in: text, range: NSRange(text.startIndex..., in: text))
+    for match in matches {
+        guard let range = Range(match.range, in: text),
+              let attrRange = Range(range, in: result) else { continue }
+        // Strip leading @ to get the bare handle for the URL
+        let handle = String(text[range]).dropFirst()
+        result[attrRange].foregroundColor = Theme.accent
+        if let url = URL(string: "speakwrite://profile/\(handle)") {
+            result[attrRange].link = url
+        }
+    }
+    return result
 }
 
 // MARK: - PostRow (Bluesky-style)
@@ -67,7 +93,9 @@ struct PostRow<Post: PostDisplayable>: View {
             likeCount: localLikeCount, repostCount: localRepostCount,
             replyCount: post.replyCount,
             viewerLike: likeUri, viewerRepost: repostUri,
-            isVerified: verificationStatus == .verified
+            isVerified: verificationStatus == .verified,
+            images: post.images,
+            videoURL: post.videoURL, videoThumbnail: post.videoThumbnail
         )
     }
 
@@ -107,12 +135,22 @@ struct PostRow<Post: PostDisplayable>: View {
 
                     // Post body → post detail
                     NavigationLink(value: postNavigation) {
-                        Text(post.text)
-                            .font(.system(size: 15))
-                            .foregroundStyle(Theme.textPrimary(colorScheme))
-                            .lineLimit(12)
-                            .multilineTextAlignment(.leading)
-                            .fixedSize(horizontal: false, vertical: true)
+                        VStack(alignment: .leading, spacing: 8) {
+                            if !post.text.isEmpty {
+                                Text(mentionHighlightedText(post.text))
+                                    .font(.system(size: 15))
+                                    .foregroundStyle(Theme.textPrimary(colorScheme))
+                                    .lineLimit(12)
+                                    .multilineTextAlignment(.leading)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+
+                            if let images = post.images, !images.isEmpty {
+                                PostImagesView(images: images)
+                            } else if let videoURL = post.videoURL, let thumb = post.videoThumbnail {
+                                PostVideoView(thumbnailURL: thumb, playlistURL: videoURL)
+                            }
+                        }
                     }
                     .buttonStyle(.plain)
 

@@ -13,6 +13,7 @@ struct MyProfileView: View {
     @State private var showEditProfile = false
     @State private var postToDelete: TimelinePost?
     @State private var showDeleteConfirm = false
+    @State private var path = NavigationPath()
 
     // Photo pickers
     @State private var avatarItem: PhotosPickerItem?
@@ -21,7 +22,7 @@ struct MyProfileView: View {
     @State private var isUploadingBanner = false
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     // Banner
@@ -220,6 +221,14 @@ struct MyProfileView: View {
                 await viewModel.loadMyProfile()
                 await loadPosts()
             }
+            .environment(\.openURL, OpenURLAction { url in
+                if url.scheme == "speakwrite", url.host == "profile",
+                   let handle = url.pathComponents.dropFirst().first {
+                    path.append(handle)
+                    return .handled
+                }
+                return .systemAction
+            })
         }
     }
 

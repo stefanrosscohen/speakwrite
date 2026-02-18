@@ -7,6 +7,7 @@ struct TimelineView: View {
     @State private var showMyProfile = false
     @State private var showSearch = false
     @State private var selectedFeed: FeedType = .following
+    @State private var path = NavigationPath()
 
     enum FeedType: String, CaseIterable {
         case following = "Following"
@@ -14,7 +15,7 @@ struct TimelineView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             VStack(spacing: 0) {
                 // App header
                 HStack(spacing: Theme.sm) {
@@ -76,6 +77,14 @@ struct TimelineView: View {
                     await viewModel.loadTimeline()
                 }
             }
+            .environment(\.openURL, OpenURLAction { url in
+                if url.scheme == "speakwrite", url.host == "profile",
+                   let handle = url.pathComponents.dropFirst().first {
+                    path.append(handle)
+                    return .handled
+                }
+                return .systemAction
+            })
         }
     }
 

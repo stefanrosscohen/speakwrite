@@ -65,7 +65,8 @@ final class VerificationService {
             attestationObject: proof.attestationObject,
             assertion: proof.assertion,
             contentHash: proof.contentHash,
-            appId: proof.appId
+            appId: proof.appId,
+            mediaHashes: proof.mediaHashes
         )
 
         return await verifier.verify(proof: proofData, postText: postText)
@@ -115,7 +116,8 @@ final class VerificationService {
                 attestationObject: value.attestationObject ?? "",
                 assertion: value.assertion ?? "",
                 contentHash: value.contentHash ?? "",
-                appId: value.appId ?? ""
+                appId: value.appId ?? "",
+                mediaHashes: value.mediaHashes
             )
         }
     }
@@ -140,6 +142,7 @@ private struct ProofRecordValue: Decodable {
     let assertion: String?
     let contentHash: String?
     let appId: String?
+    let mediaHashes: [String]?
 }
 
 private struct ProofRecord {
@@ -149,4 +152,5 @@ private struct ProofRecord {
     let assertion: String
     let contentHash: String
     let appId: String
+    let mediaHashes: [String]?
 }

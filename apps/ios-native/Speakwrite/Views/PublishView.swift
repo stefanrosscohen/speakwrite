@@ -14,14 +14,43 @@ struct PublishView: View {
                         .font(Theme.monoBold)
                         .foregroundStyle(Theme.textSecondary(colorScheme))
 
-                    Text(viewModel.postText)
-                        .font(Theme.monoBody)
-                        .foregroundStyle(Theme.textPrimary(colorScheme))
-                        .lineLimit(8)
-                        .padding()
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Theme.surface(colorScheme))
-                        .clipShape(RoundedRectangle(cornerRadius: Theme.radiusSm))
+                    if !viewModel.postText.isEmpty {
+                        Text(viewModel.postText)
+                            .font(Theme.monoBody)
+                            .foregroundStyle(Theme.textPrimary(colorScheme))
+                            .lineLimit(8)
+                            .padding()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Theme.surface(colorScheme))
+                            .clipShape(RoundedRectangle(cornerRadius: Theme.radiusSm))
+                    }
+
+                    // Media thumbnail preview
+                    if !viewModel.capturedPhotos.isEmpty || viewModel.capturedVideo != nil {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(viewModel.capturedPhotos) { photo in
+                                    Image(uiImage: photo.thumbnail)
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: 60, height: 60)
+                                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                                }
+                                if let video = viewModel.capturedVideo {
+                                    ZStack {
+                                        Image(uiImage: video.thumbnail)
+                                            .resizable()
+                                            .scaledToFill()
+                                            .frame(width: 60, height: 60)
+                                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                                        Image(systemName: "play.fill")
+                                            .font(.system(size: 14))
+                                            .foregroundStyle(.white)
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
                 .padding(.horizontal)
 

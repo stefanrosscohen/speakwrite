@@ -53,6 +53,20 @@ struct EditorView: View {
                 .padding(.horizontal, Theme.lg)
                 .padding(.top, Theme.sm)
 
+                // Media preview strip (attached photos/video)
+                if !viewModel.capturedPhotos.isEmpty || viewModel.capturedVideo != nil {
+                    MediaPreviewStrip(
+                        photos: viewModel.capturedPhotos,
+                        video: viewModel.capturedVideo,
+                        onRemovePhoto: { id in
+                            viewModel.capturedPhotos.removeAll { $0.id == id }
+                        },
+                        onRemoveVideo: {
+                            viewModel.capturedVideo = nil
+                        }
+                    )
+                }
+
                 // @Mention autocomplete suggestions
                 if showMentionSuggestions && !mentionResults.isEmpty {
                     MentionSuggestionList(
@@ -68,7 +82,18 @@ struct EditorView: View {
                     showClearConfirm: $showClearConfirm,
                     onDismissKeyboard: {
                         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                    }
+                    },
+                    onPhotoTap: {
+                        viewModel.cameraMode = .photo
+                        viewModel.showCamera = true
+                    },
+                    onVideoTap: {
+                        viewModel.cameraMode = .video
+                        viewModel.showCamera = true
+                    },
+                    mediaCount: viewModel.capturedPhotos.count + (viewModel.capturedVideo != nil ? 1 : 0),
+                    isPhotoDisabled: viewModel.capturedPhotos.count >= 4 || viewModel.capturedVideo != nil,
+                    isVideoDisabled: !viewModel.capturedPhotos.isEmpty || viewModel.capturedVideo != nil
                 )
 
                 Divider()
@@ -85,10 +110,27 @@ struct EditorView: View {
             .alert("Clear post?", isPresented: $showClearConfirm) {
                 Button("Clear", role: .destructive) {
                     viewModel.postText = ""
+                    viewModel.capturedPhotos = []
+                    viewModel.capturedVideo = nil
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text("This will delete your current draft.")
+            }
+            .fullScreenCover(isPresented: $vm.showCamera) {
+                CameraCaptureView(mode: viewModel.cameraMode) { media in
+                    if media.mimeType.starts(with: "video/") {
+                        // Video replaces any photos (mutually exclusive per AT Protocol)
+                        viewModel.capturedPhotos = []
+                        viewModel.capturedVideo = media
+                    } else {
+                        // Photo: clear any video, append (max 4)
+                        viewModel.capturedVideo = nil
+                        if viewModel.capturedPhotos.count < 4 {
+                            viewModel.capturedPhotos.append(media)
+                        }
+                    }
+                }
             }
             .onChange(of: viewModel.postText) { _, newText in
                 detectMentionQuery(in: newText)
@@ -210,6 +252,11 @@ struct MentionSuggestionList: View {
 struct ComposeToolbar: View {
     @Binding var showClearConfirm: Bool
     var onDismissKeyboard: () -> Void
+    var onPhotoTap: () -> Void
+    var onVideoTap: () -> Void
+    var mediaCount: Int
+    var isPhotoDisabled: Bool
+    var isVideoDisabled: Bool
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
@@ -220,6 +267,40 @@ struct ComposeToolbar: View {
                 Image(systemName: "keyboard.chevron.compact.down")
                     .font(.system(size: 16))
                     .foregroundStyle(Theme.accent.opacity(0.8))
+            }
+
+            Divider()
+                .frame(height: 18)
+
+            Menu {
+                Button {
+                    onPhotoTap()
+                } label: {
+                    Label("Take Photo", systemImage: "camera")
+                }
+                .disabled(isPhotoDisabled)
+
+                Button {
+                    onVideoTap()
+                } label: {
+                    Label("Record Video", systemImage: "video")
+                }
+                .disabled(isVideoDisabled)
+            } label: {
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: "camera")
+                        .font(.system(size: 15))
+                        .foregroundStyle((isPhotoDisabled && isVideoDisabled) ? Theme.textTertiary(colorScheme) : Theme.accent.opacity(0.8))
+
+                    if mediaCount > 0 {
+                        Text("\(mediaCount)")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 14, height: 14)
+                            .background(Circle().fill(Theme.accent))
+                            .offset(x: 6, y: -6)
+                    }
+                }
             }
 
             Divider()

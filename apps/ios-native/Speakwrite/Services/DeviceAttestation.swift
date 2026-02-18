@@ -10,6 +10,7 @@ struct AttestationRecord: Codable {
     let assertion: String          // Base64 — App Attest assertion over content hash
     let contentHash: String
     let appId: String
+    let mediaHashes: [String]?     // SHA-256 hex of each attached media blob (optional for backward compat)
 }
 
 // MARK: - Service
