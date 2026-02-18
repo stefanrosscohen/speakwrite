@@ -152,7 +152,6 @@ async function buildReplyText(
   reason?: string,
   mentionText?: string
 ): Promise<{ text: string; facets: Facet[] }> {
-  const linkText = `www.speakwrite.io/verify/${target.handle}/${target.rkey}`;
   const linkUrl = `https://www.speakwrite.io/verify/${target.handle}/${target.rkey}`;
 
   let line1: string;
@@ -165,10 +164,10 @@ async function buildReplyText(
     );
     line1 = '✓ ' + (generated || pick(VERIFIED_FALLBACK));
     const linkLabel = 'Verify independently →';
-    const text = `${line1}\n\n${linkLabel} ${linkText}`;
+    const text = `${line1}\n\n${linkLabel}`;
 
-    const linkByteStart = Buffer.byteLength(`${line1}\n\n${linkLabel} `, 'utf8');
-    const linkByteEnd = linkByteStart + Buffer.byteLength(linkText, 'utf8');
+    const linkByteStart = Buffer.byteLength(`${line1}\n\n`, 'utf8');
+    const linkByteEnd = linkByteStart + Buffer.byteLength(linkLabel, 'utf8');
 
     return {
       text,
@@ -198,10 +197,10 @@ async function buildReplyText(
   }
 
   const linkLabel = 'Check for yourself →';
-  const text = `${line1}\n\n${linkLabel} ${linkText}`;
+  const text = `${line1}\n\n${linkLabel}`;
 
-  const linkByteStart = Buffer.byteLength(`${line1}\n\n${linkLabel} `, 'utf8');
-  const linkByteEnd = linkByteStart + Buffer.byteLength(linkText, 'utf8');
+  const linkByteStart = Buffer.byteLength(`${line1}\n\n`, 'utf8');
+  const linkByteEnd = linkByteStart + Buffer.byteLength(linkLabel, 'utf8');
 
   return {
     text,
