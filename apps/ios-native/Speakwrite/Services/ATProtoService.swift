@@ -1616,6 +1616,17 @@ struct SearchActorsTypeaheadResponse: Decodable {
     let actors: [ProfileViewBasic]
 }
 
+#if DEBUG
+extension ATProtoService {
+    /// Configure for SwiftUI preview use — sets login state without network calls.
+    func configureForPreview(handle: String = "alice.bsky.social", did: String = "did:plc:preview123") {
+        self.isLoggedIn = true
+        self.handle = handle
+        self.did = did
+    }
+}
+#endif
+
 extension Data {
     var base64URLEncoded: String {
         base64EncodedString()

@@ -1,0 +1,35 @@
+appId: io.speakwrite.app
+tags:
+  - smoke
+  - navigation
+name: Switch Tabs
+---
+- launchApp
+
+# Start on Feed tab
+- assertVisible: "Following"
+
+# Switch to Verified tab
+- tapOn: "Verified"
+- assertVisible:
+    id: "verified-feed"
+
+# Switch to Compose tab
+- tapOn: "Compose"
+- assertVisible: "What's on your mind?"
+
+# Switch to Settings tab
+- tapOn: "Settings"
+- assertVisible: "Appearance"
+
+# Go back through tabs
+- tapOn: "Verified"
+- tapOn: "Feed"
+
+# Rapid tab switching stress test
+- tapOn: "Settings"
+- tapOn: "Compose"
+- tapOn: "Verified"
+- tapOn: "Feed"
+- tapOn: "Settings"
+- tapOn: "Feed"

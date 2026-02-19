@@ -41,6 +41,7 @@ struct SettingsView: View {
                             }
                         }
                         .padding(.vertical, Theme.xs)
+                        .accessibilityIdentifier("account-info")
                         .listRowBackground(Theme.surfaceElevated(colorScheme))
                     }
 
@@ -123,3 +124,10 @@ struct SettingsView: View {
         }
     }
 }
+
+#if DEBUG
+#Preview {
+    SettingsView()
+        .environment(AppViewModel.preview)
+}
+#endif

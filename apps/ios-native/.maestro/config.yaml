@@ -1,0 +1,4 @@
+appId: io.speakwrite.app
+tags:
+  - smoke
+  - regression

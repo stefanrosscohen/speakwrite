@@ -177,6 +177,7 @@ struct PostDetailView: View {
                 PostDetailButton(icon: "bubble.left", color: Theme.textTertiary(colorScheme)) {
                     showReplySheet = true
                 }
+                .accessibilityIdentifier("reply-button")
 
                 Spacer()
 
@@ -186,6 +187,7 @@ struct PostDetailView: View {
                 ) {
                     showRepostMenu = true
                 }
+                .accessibilityIdentifier("repost-button")
                 .confirmationDialog("", isPresented: $showRepostMenu, titleVisibility: .hidden) {
                     Button(isReposted ? "Undo repost" : "Repost") {
                         Task { await toggleRepost() }
@@ -204,12 +206,14 @@ struct PostDetailView: View {
                 ) {
                     Task { await toggleLike() }
                 }
+                .accessibilityIdentifier("like-button")
 
                 Spacer()
 
                 PostDetailButton(icon: "square.and.arrow.up", color: Theme.textTertiary(colorScheme)) {
                     sharePost()
                 }
+                .accessibilityIdentifier("share-button")
             }
         }
     }
@@ -432,3 +436,12 @@ private struct PostDetailButton: View {
         .buttonStyle(.plain)
     }
 }
+
+#if DEBUG
+#Preview {
+    NavigationStack {
+        PostDetailView(nav: .preview)
+    }
+    .environment(AppViewModel.preview)
+}
+#endif

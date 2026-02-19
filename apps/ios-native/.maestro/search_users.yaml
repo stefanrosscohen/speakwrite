@@ -1,0 +1,36 @@
+appId: io.speakwrite.app
+tags:
+  - smoke
+  - search
+name: Search Users
+---
+- launchApp
+
+# Open search
+- tapOn:
+    id: "search-button"
+
+# Search field should appear
+- assertVisible:
+    id: "search-field"
+
+# Type a query
+- inputText: "alice"
+
+# Wait for results
+- extendedWaitUntil:
+    visible:
+      id: "search-result"
+    timeout: 5000
+
+# Tap on a result to view profile
+- tapOn:
+    index: 0
+    id: "search-result"
+
+# Profile view should show
+- assertVisible:
+    id: "profile-view"
+
+# Go back
+- back

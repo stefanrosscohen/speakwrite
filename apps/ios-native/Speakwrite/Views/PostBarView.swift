@@ -111,3 +111,27 @@ struct CharacterCountRing: View {
         .animation(.easeInOut(duration: 0.15), value: count)
     }
 }
+
+#if DEBUG
+#Preview("Empty") {
+    PostBarView()
+        .environment(AppViewModel.preview)
+}
+
+#Preview("With Text") {
+    let vm = AppViewModel.preview
+    vm.postText = "Hello, this is a test post with some content!"
+    return PostBarView()
+        .environment(vm)
+}
+
+#Preview("Character Ring") {
+    VStack(spacing: 20) {
+        CharacterCountRing(count: 0, limit: 300)
+        CharacterCountRing(count: 150, limit: 300)
+        CharacterCountRing(count: 285, limit: 300)
+        CharacterCountRing(count: 310, limit: 300)
+    }
+    .padding()
+}
+#endif

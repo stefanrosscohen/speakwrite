@@ -40,6 +40,7 @@ struct LoginView: View {
                     .autocorrectionDisabled()
                     .font(Theme.monoHeadline)
                     .padding(.horizontal)
+                    .accessibilityIdentifier("handle-field")
 
                 // Server toggle
                 VStack(spacing: Theme.sm) {
@@ -121,3 +122,10 @@ struct LoginView: View {
         isLoading = false
     }
 }
+
+#if DEBUG
+#Preview {
+    LoginView()
+        .environment(AppViewModel.previewLoggedOut)
+}
+#endif

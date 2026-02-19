@@ -39,6 +39,7 @@ struct EditorView: View {
                         placeholder: "What's on your mind?",
                         inputDelegate: viewModel
                     )
+                    .accessibilityIdentifier("compose-editor")
 
                     // Placeholder text (shown when empty)
                     if viewModel.postText.isEmpty {
@@ -318,5 +319,13 @@ struct ComposeToolbar: View {
         }
         .padding(.horizontal, Theme.lg)
         .padding(.vertical, 6)
+        .accessibilityIdentifier("media-toolbar")
     }
 }
+
+#if DEBUG
+#Preview {
+    EditorView()
+        .environment(AppViewModel.preview)
+}
+#endif

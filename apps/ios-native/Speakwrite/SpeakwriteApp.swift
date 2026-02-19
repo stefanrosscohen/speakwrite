@@ -66,3 +66,15 @@ struct ContentView: View {
         }
     }
 }
+
+#if DEBUG
+#Preview("Logged In") {
+    ContentView()
+        .environment(AppViewModel.preview)
+}
+
+#Preview("Logged Out") {
+    ContentView()
+        .environment(AppViewModel.previewLoggedOut)
+}
+#endif

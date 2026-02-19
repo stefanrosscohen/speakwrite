@@ -58,3 +58,16 @@ struct MediaPreviewStrip: View {
         }
     }
 }
+
+#if DEBUG
+#Preview {
+    // MediaPreviewStrip requires CapturedMedia with UIImage thumbnails — preview shows placeholder
+    MediaPreviewStrip(
+        photos: [],
+        video: nil,
+        onRemovePhoto: { _ in },
+        onRemoveVideo: {}
+    )
+    .padding()
+}
+#endif

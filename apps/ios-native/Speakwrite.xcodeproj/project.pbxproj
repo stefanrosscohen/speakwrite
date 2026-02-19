@@ -39,9 +39,13 @@
 		A10001010000000000000043 /* CameraCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000043 /* CameraCaptureView.swift */; };
 		A10001010000000000000044 /* PostImagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000044 /* PostImagesView.swift */; };
 		A10001010000000000000045 /* MediaPreviewStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000045 /* MediaPreviewStrip.swift */; };
+		A10001010000000000000046 /* PreviewHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000046 /* PreviewHelpers.swift */; };
 		A10003010000000000000001 /* CryptoKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A10004010000000000000001 /* CryptoKit.framework */; };
 		A10003010000000000000002 /* DeviceCheck.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A10004010000000000000002 /* DeviceCheck.framework */; };
 		A10003010000000000000004 /* AuthenticationServices.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A10004010000000000000004 /* AuthenticationServices.framework */; };
+		A10001010000000000000050 /* SpeakwriteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000050 /* SpeakwriteTests.swift */; };
+		A10001010000000000000051 /* SnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000051 /* SnapshotTests.swift */; };
+		A10001010000000000000052 /* SnapshotTesting in Frameworks */ = {isa = PBXBuildFile; productRef = A10011010000000000000001 /* SnapshotTesting */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -77,12 +81,16 @@
 		A10002010000000000000043 /* CameraCaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraCaptureView.swift; sourceTree = "<group>"; };
 		A10002010000000000000044 /* PostImagesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostImagesView.swift; sourceTree = "<group>"; };
 		A10002010000000000000045 /* MediaPreviewStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaPreviewStrip.swift; sourceTree = "<group>"; };
+		A10002010000000000000046 /* PreviewHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewHelpers.swift; sourceTree = "<group>"; };
 		A10004010000000000000001 /* CryptoKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CryptoKit.framework; path = System/Library/Frameworks/CryptoKit.framework; sourceTree = SDKROOT; };
 		A10004010000000000000002 /* DeviceCheck.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = DeviceCheck.framework; path = System/Library/Frameworks/DeviceCheck.framework; sourceTree = SDKROOT; };
 		A10004010000000000000004 /* AuthenticationServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AuthenticationServices.framework; path = System/Library/Frameworks/AuthenticationServices.framework; sourceTree = SDKROOT; };
 		A10005010000000000000001 /* Speakwrite.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Speakwrite.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10006010000000000000001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A10006010000000000000002 /* Speakwrite.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Speakwrite.entitlements; sourceTree = "<group>"; };
+		A10002010000000000000050 /* SpeakwriteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeakwriteTests.swift; sourceTree = "<group>"; };
+		A10002010000000000000051 /* SnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapshotTests.swift; sourceTree = "<group>"; };
+		A10005010000000000000002 /* SpeakwriteTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SpeakwriteTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -96,6 +104,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A10007010000000000000002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10001010000000000000052 /* SnapshotTesting in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -103,9 +119,19 @@
 			isa = PBXGroup;
 			children = (
 				A10008010000000000000002 /* Speakwrite */,
+				A10008010000000000000020 /* SpeakwriteTests */,
 				A10008010000000000000009 /* Frameworks */,
 				A10008010000000000000010 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		A10008010000000000000020 /* SpeakwriteTests */ = {
+			isa = PBXGroup;
+			children = (
+				A10002010000000000000050 /* SpeakwriteTests.swift */,
+				A10002010000000000000051 /* SnapshotTests.swift */,
+			);
+			path = SpeakwriteTests;
 			sourceTree = "<group>";
 		};
 		A10008010000000000000002 /* Speakwrite */ = {
@@ -113,6 +139,7 @@
 			children = (
 				A10002010000000000000001 /* SpeakwriteApp.swift */,
 				A10002010000000000000031 /* Theme.swift */,
+				A10002010000000000000046 /* PreviewHelpers.swift */,
 				A10002010000000000000025 /* Assets.xcassets */,
 				A10006010000000000000001 /* Info.plist */,
 				A10006010000000000000002 /* Speakwrite.entitlements */,
@@ -211,11 +238,30 @@
 			isa = PBXGroup;
 			children = (
 				A10005010000000000000001 /* Speakwrite.app */,
+				A10005010000000000000002 /* SpeakwriteTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
+
+/* Begin PBXContainerItemProxy section */
+		A1000E010000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A1000C010000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A10009010000000000000001;
+			remoteInfo = Speakwrite;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXTargetDependency section */
+		A1000F010000000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A10009010000000000000001 /* Speakwrite */;
+			targetProxy = A1000E010000000000000001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXNativeTarget section */
 		A10009010000000000000001 /* Speakwrite */ = {
@@ -235,6 +281,27 @@
 			productReference = A10005010000000000000001 /* Speakwrite.app */;
 			productType = "com.apple.product-type.application";
 		};
+		A10009010000000000000002 /* SpeakwriteTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A1000B010000000000000002 /* Build configuration list for PBXNativeTarget "SpeakwriteTests" */;
+			buildPhases = (
+				A1000A010000000000000003 /* Sources */,
+				A10007010000000000000002 /* Frameworks */,
+				A1000A010000000000000004 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A1000F010000000000000001 /* PBXTargetDependency */,
+			);
+			name = SpeakwriteTests;
+			packageProductDependencies = (
+				A10011010000000000000001 /* SnapshotTesting */,
+			);
+			productName = SpeakwriteTests;
+			productReference = A10005010000000000000002 /* SpeakwriteTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -248,6 +315,10 @@
 					A10009010000000000000001 = {
 						CreatedOnToolsVersion = 15.4;
 					};
+					A10009010000000000000002 = {
+						CreatedOnToolsVersion = 15.4;
+						TestTargetID = A10009010000000000000001;
+					};
 				};
 			};
 			buildConfigurationList = A1000B010000000000000003 /* Build configuration list for PBXProject "Speakwrite" */;
@@ -259,11 +330,15 @@
 				Base,
 			);
 			mainGroup = A10008010000000000000001;
+			packageReferences = (
+				A10010010000000000000001 /* XCRemoteSwiftPackageReference "swift-snapshot-testing" */,
+			);
 			productRefGroup = A10008010000000000000010 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
 				A10009010000000000000001 /* Speakwrite */,
+				A10009010000000000000002 /* SpeakwriteTests */,
 			);
 		};
 /* End PBXProject section */
@@ -275,6 +350,13 @@
 			files = (
 				A10001010000000000000025 /* Assets.xcassets in Resources */,
 				A10001010000000000000042 /* AppleAppAttestRootCA.cer in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A1000A010000000000000004 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -315,6 +397,16 @@
 				A10001010000000000000043 /* CameraCaptureView.swift in Sources */,
 				A10001010000000000000044 /* PostImagesView.swift in Sources */,
 				A10001010000000000000045 /* MediaPreviewStrip.swift in Sources */,
+				A10001010000000000000046 /* PreviewHelpers.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A1000A010000000000000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10001010000000000000050 /* SpeakwriteTests.swift in Sources */,
+				A10001010000000000000051 /* SnapshotTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -514,6 +606,48 @@
 			};
 			name = Release;
 		};
+		A1000D010000000000000005 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = J3Y68ZC9L2;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = io.speakwrite.app.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Speakwrite.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Speakwrite";
+			};
+			name = Debug;
+		};
+		A1000D010000000000000006 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = J3Y68ZC9L2;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = io.speakwrite.app.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Speakwrite.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Speakwrite";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -535,7 +669,35 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		A1000B010000000000000002 /* Build configuration list for PBXNativeTarget "SpeakwriteTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A1000D010000000000000005 /* Debug */,
+				A1000D010000000000000006 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		A10010010000000000000001 /* XCRemoteSwiftPackageReference "swift-snapshot-testing" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/pointfreeco/swift-snapshot-testing";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.17.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A10011010000000000000001 /* SnapshotTesting */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10010010000000000000001 /* XCRemoteSwiftPackageReference "swift-snapshot-testing" */;
+			productName = SnapshotTesting;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = A1000C010000000000000001 /* Project object */;
 }

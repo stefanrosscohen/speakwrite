@@ -128,3 +128,10 @@ private struct PublishStatBadge: View {
         }
     }
 }
+
+#if DEBUG
+#Preview {
+    PublishView()
+        .environment(AppViewModel.preview)
+}
+#endif

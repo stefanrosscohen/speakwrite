@@ -1,0 +1,28 @@
+appId: io.speakwrite.app
+tags:
+  - smoke
+  - compose
+name: Compose and Publish
+---
+- launchApp
+
+# Navigate to compose tab
+- tapOn: "Compose"
+
+# Editor should be visible
+- assertVisible: "What's on your mind?"
+
+# Type a post
+- tapOn:
+    id: "compose-editor"
+- inputText: "Testing the compose flow with Maestro automation"
+
+# Character count should update
+- assertVisible: "Publish"
+
+# Check media toolbar is present
+- assertVisible:
+    id: "media-toolbar"
+
+# Tap publish
+- tapOn: "Publish"

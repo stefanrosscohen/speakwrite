@@ -16,3 +16,10 @@ struct AvatarButton: View {
         }
     }
 }
+
+#if DEBUG
+#Preview {
+    AvatarButton(avatarURL: nil, handle: "alice.bsky.social") {}
+        .padding()
+}
+#endif

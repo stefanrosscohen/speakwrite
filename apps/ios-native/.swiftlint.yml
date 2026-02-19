@@ -1,0 +1,29 @@
+disabled_rules:
+  - line_length
+  - trailing_whitespace
+  - todo
+
+opt_in_rules:
+  - force_unwrapping
+  - empty_count
+  - closure_end_indentation
+
+excluded:
+  - build/
+  - DerivedData/
+  - .build/
+
+force_unwrapping:
+  severity: error
+
+file_length:
+  warning: 500
+  error: 1000
+
+type_body_length:
+  warning: 400
+  error: 800
+
+function_body_length:
+  warning: 60
+  error: 100

@@ -111,6 +111,7 @@ struct TimelineView: View {
                     .padding(.top, 10)
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier(feed == .following ? "following-tab" : "for-you-tab")
             }
         }
         .padding(.horizontal, Theme.lg)
@@ -214,3 +215,10 @@ struct TimelineView: View {
         }
     }
 }
+
+#if DEBUG
+#Preview {
+    TimelineView()
+        .environment(AppViewModel.preview)
+}
+#endif

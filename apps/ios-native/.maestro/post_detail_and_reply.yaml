@@ -1,0 +1,33 @@
+appId: io.speakwrite.app
+tags:
+  - smoke
+  - posts
+name: Post Detail and Reply
+---
+- launchApp
+
+# Tap on first post in feed to open detail
+- tapOn:
+    index: 0
+    id: "post-row"
+
+# Post detail should show engagement buttons
+- assertVisible:
+    id: "like-button"
+- assertVisible:
+    id: "repost-button"
+- assertVisible:
+    id: "reply-button"
+
+# Tap reply button
+- tapOn:
+    id: "reply-button"
+
+# Reply sheet should appear
+- assertVisible: "Reply"
+
+# Type reply text
+- inputText: "Testing reply flow"
+
+# Go back
+- back

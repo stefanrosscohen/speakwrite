@@ -144,6 +144,7 @@ struct ProfileView: View {
                 }
             }
         }
+        .accessibilityIdentifier("profile-view")
         .background(Theme.background(colorScheme))
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
@@ -207,3 +208,12 @@ struct ProfileView: View {
         } catch {}
     }
 }
+
+#if DEBUG
+#Preview {
+    NavigationStack {
+        ProfileView(actorDID: "did:plc:bob456")
+    }
+    .environment(AppViewModel.preview)
+}
+#endif

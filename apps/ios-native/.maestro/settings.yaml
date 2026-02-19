@@ -1,0 +1,20 @@
+appId: io.speakwrite.app
+tags:
+  - smoke
+  - settings
+name: Settings
+---
+- launchApp
+
+# Navigate to Settings tab
+- tapOn: "Settings"
+
+# Appearance section should be visible
+- assertVisible: "Appearance"
+
+# Account info should be visible
+- assertVisible:
+    id: "account-info"
+
+# Sign Out button should exist (but don't tap it)
+- assertVisible: "Sign Out"

@@ -1,0 +1,30 @@
+appId: io.speakwrite.app
+tags:
+  - regression
+name: "Regression: Cursor Jump Bug"
+---
+- launchApp
+
+# Navigate to compose
+- tapOn: "Compose"
+
+# Type text in segments to test cursor stability
+- tapOn:
+    id: "compose-editor"
+- inputText: "First segment "
+
+# Small pause then continue typing
+- inputText: "second segment "
+
+# Erase some characters
+- eraseText: 5
+
+# Type more
+- inputText: "part "
+
+# Erase and retype to test cursor doesn't jump
+- eraseText: 10
+- inputText: "replacement text here"
+
+# Verify final text integrity
+- assertVisible: "First segment replacement text here"

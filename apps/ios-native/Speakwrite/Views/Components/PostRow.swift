@@ -161,6 +161,7 @@ struct PostRow<Post: PostDisplayable>: View {
             }
         }
         .padding(.vertical, 10)
+        .accessibilityIdentifier("post-row")
         .onAppear { syncEngagementState() }
         .task {
             viewModel.verification.verify(postUri: post.uri, postText: post.text, authorDID: post.author.did)
@@ -405,3 +406,21 @@ private struct PostControlButton: View {
         return "\(n)"
     }
 }
+
+#if DEBUG
+#Preview("Verified Post") {
+    NavigationStack {
+        PostRow(post: VerifiedPost.preview)
+            .padding(.horizontal)
+    }
+    .environment(AppViewModel.preview)
+}
+
+#Preview("Timeline Post") {
+    NavigationStack {
+        PostRow(post: TimelinePost.previewReposted)
+            .padding(.horizontal)
+    }
+    .environment(AppViewModel.preview)
+}
+#endif

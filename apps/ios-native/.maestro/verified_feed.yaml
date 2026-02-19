@@ -1,0 +1,25 @@
+appId: io.speakwrite.app
+tags:
+  - smoke
+  - verified
+name: Verified Feed
+---
+- launchApp
+
+# Switch to Verified tab
+- tapOn: "Verified"
+
+# Verified feed should show
+- assertVisible:
+    id: "verified-feed"
+
+# Scroll through verified posts
+- scroll:
+    direction: DOWN
+
+- scroll:
+    direction: DOWN
+
+# Scroll back up
+- scroll:
+    direction: UP

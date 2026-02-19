@@ -18,3 +18,14 @@ struct StatView: View {
         }
     }
 }
+
+#if DEBUG
+#Preview {
+    HStack(spacing: 24) {
+        StatView(count: 89, label: "Posts")
+        StatView(count: 1234, label: "Followers")
+        StatView(count: 567, label: "Following")
+    }
+    .padding()
+}
+#endif

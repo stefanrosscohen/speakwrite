@@ -194,3 +194,17 @@ struct QuotePostView: View {
         isSending = false
     }
 }
+
+#if DEBUG
+#Preview {
+    QuotePostView(
+        quotedUri: "at://did:plc:alice123/app.bsky.feed.post/3abc123",
+        quotedCid: "bafyreiabc123",
+        quotedHandle: "alice.bsky.social",
+        quotedDisplayName: "Alice Johnson",
+        quotedAvatar: nil,
+        quotedText: "The AT Protocol is the future of social networking."
+    )
+    .environment(AppViewModel.preview)
+}
+#endif

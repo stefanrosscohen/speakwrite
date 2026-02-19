@@ -209,3 +209,20 @@ private struct FullScreenImageView: View {
         }
     }
 }
+
+#if DEBUG
+#Preview("Single Image") {
+    PostImagesView(images: [
+        EmbedImageView(thumb: "https://picsum.photos/400/300", fullsize: "https://picsum.photos/800/600", alt: "Sample image"),
+    ])
+    .padding()
+}
+
+#Preview("Two Images") {
+    PostImagesView(images: [
+        EmbedImageView(thumb: "https://picsum.photos/400/300", fullsize: "https://picsum.photos/800/600", alt: "Image 1"),
+        EmbedImageView(thumb: "https://picsum.photos/401/300", fullsize: "https://picsum.photos/801/600", alt: "Image 2"),
+    ])
+    .padding()
+}
+#endif

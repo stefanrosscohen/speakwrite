@@ -296,3 +296,17 @@ struct ReplyView: View {
         isSending = false
     }
 }
+
+#if DEBUG
+#Preview {
+    ReplyView(
+        replyToUri: "at://did:plc:alice123/app.bsky.feed.post/3abc123",
+        replyToCid: "bafyreiabc123",
+        replyToHandle: "alice.bsky.social",
+        replyToDisplayName: "Alice Johnson",
+        replyToAvatar: nil,
+        replyToText: "Just shipped a new feature! Human-verified posting is now live."
+    )
+    .environment(AppViewModel.preview)
+}
+#endif

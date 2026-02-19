@@ -55,3 +55,14 @@ struct AvatarView: View {
             }
     }
 }
+
+#if DEBUG
+#Preview("Avatar Sizes") {
+    HStack(spacing: 20) {
+        AvatarView(url: nil, handle: "alice.bsky.social", size: .small)
+        AvatarView(url: nil, handle: "bob.bsky.social", size: .medium)
+        AvatarView(url: nil, handle: nil, size: .large)
+    }
+    .padding()
+}
+#endif

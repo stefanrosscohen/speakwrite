@@ -1,0 +1,31 @@
+appId: io.speakwrite.app
+tags:
+  - smoke
+  - feed
+name: Browse Feed
+---
+- launchApp
+
+# Feed tab should be default
+- assertVisible: "Following"
+- assertVisible: "For You"
+
+# Scroll through feed
+- scroll:
+    direction: DOWN
+
+- scroll:
+    direction: DOWN
+
+# Switch to For You sub-tab
+- tapOn: "For You"
+
+- scroll:
+    direction: DOWN
+
+# Switch back to Following
+- tapOn: "Following"
+
+# Scroll back up
+- scroll:
+    direction: UP

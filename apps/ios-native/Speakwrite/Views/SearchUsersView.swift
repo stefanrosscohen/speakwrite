@@ -24,6 +24,7 @@ struct SearchUsersView: View {
                         .font(.system(size: 16, design: .monospaced))
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
+                        .accessibilityIdentifier("search-field")
 
                     if !query.isEmpty {
                         Button {
@@ -74,6 +75,7 @@ struct SearchUsersView: View {
                                     SearchResultRow(profile: profile)
                                 }
                                 .buttonStyle(.plain)
+                                .accessibilityIdentifier("search-result")
 
                                 Divider()
                                     .foregroundStyle(Theme.separator(colorScheme))
@@ -171,3 +173,10 @@ struct SearchResultRow: View {
         .padding(.vertical, Theme.sm)
     }
 }
+
+#if DEBUG
+#Preview {
+    SearchUsersView()
+        .environment(AppViewModel.preview)
+}
+#endif

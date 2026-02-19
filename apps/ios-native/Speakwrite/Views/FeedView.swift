@@ -69,6 +69,7 @@ struct VerifiedFeedView: View {
                                 }
                             }
                         }
+                        .accessibilityIdentifier("verified-feed")
                         .refreshable {
                             await viewModel.loadFeed()
                         }
@@ -101,3 +102,15 @@ struct VerifiedFeedView: View {
         }
     }
 }
+
+#if DEBUG
+#Preview("With Posts") {
+    VerifiedFeedView()
+        .environment(AppViewModel.preview)
+}
+
+#Preview("Empty") {
+    VerifiedFeedView()
+        .environment(AppViewModel.previewEmpty)
+}
+#endif

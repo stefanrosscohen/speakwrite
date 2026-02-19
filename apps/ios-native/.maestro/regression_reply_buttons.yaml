@@ -1,0 +1,40 @@
+appId: io.speakwrite.app
+tags:
+  - regression
+name: "Regression: Reply Button Functionality"
+---
+- launchApp
+
+# Open a post detail
+- tapOn:
+    index: 0
+    id: "post-row"
+
+# Test like button toggle
+- tapOn:
+    id: "like-button"
+# Like should register (button state changes)
+
+# Test repost button
+- tapOn:
+    id: "repost-button"
+
+# Test reply button opens reply sheet
+- tapOn:
+    id: "reply-button"
+- assertVisible: "Reply"
+
+# Type a reply
+- inputText: "Testing reply functionality"
+
+# Close reply sheet
+- back
+
+# Test share button
+- tapOn:
+    id: "share-button"
+# Share sheet should appear
+- back
+
+# Go back to feed
+- back

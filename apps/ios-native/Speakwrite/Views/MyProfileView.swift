@@ -132,6 +132,7 @@ struct MyProfileView: View {
                     }
                     .padding(.horizontal, Theme.lg)
                     .padding(.top, Theme.md)
+                    .accessibilityIdentifier("my-profile-header")
 
                     Divider()
                         .foregroundStyle(Theme.separator(colorScheme))
@@ -404,3 +405,10 @@ struct EditProfileSheet: View {
         isSaving = false
     }
 }
+
+#if DEBUG
+#Preview {
+    MyProfileView()
+        .environment(AppViewModel.preview)
+}
+#endif

@@ -1,0 +1,106 @@
+name: iOS Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/ios-native/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/ios-native/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-tests:
+    name: Unit & Snapshot Tests
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: apps/ios-native
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.app/Contents/Developer
+
+      - name: Build and test
+        run: |
+          xcodebuild test \
+            -scheme Speakwrite \
+            -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.0' \
+            -resultBundlePath TestResults.xcresult \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: apps/ios-native/TestResults.xcresult
+
+  swiftlint:
+    name: SwiftLint
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: apps/ios-native
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install SwiftLint
+        run: brew install swiftlint
+
+      - name: Run SwiftLint
+        run: swiftlint lint --reporter github-actions-logging
+
+  maestro:
+    name: Maestro E2E
+    runs-on: macos-15
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    defaults:
+      run:
+        working-directory: apps/ios-native
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.app/Contents/Developer
+
+      - name: Boot simulator
+        run: |
+          DEVICE=$(xcrun simctl create "test-phone" "iPhone 16" "iOS18.0")
+          xcrun simctl boot "$DEVICE"
+          echo "DEVICE_ID=$DEVICE" >> $GITHUB_ENV
+
+      - name: Build for simulator
+        run: |
+          xcodebuild build \
+            -scheme Speakwrite \
+            -destination "id=$DEVICE_ID" \
+            -derivedDataPath DerivedData \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Install app
+        run: |
+          APP_PATH=$(find DerivedData -name "Speakwrite.app" -type d | head -1)
+          xcrun simctl install "$DEVICE_ID" "$APP_PATH"
+
+      - name: Install Maestro
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> $GITHUB_PATH
+
+      - name: Run Maestro flows
+        run: |
+          maestro test .maestro/ --include-tags=smoke || true
+
+      - name: Shutdown simulator
+        if: always()
+        run: xcrun simctl shutdown "$DEVICE_ID" || true

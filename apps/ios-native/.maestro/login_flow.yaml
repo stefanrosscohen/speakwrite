@@ -1,0 +1,27 @@
+appId: io.speakwrite.app
+tags:
+  - smoke
+  - auth
+name: Login Flow
+---
+- launchApp:
+    clearState: true
+
+# Login screen should be visible
+- assertVisible: "Sign in with Bluesky"
+
+# Enter handle
+- tapOn:
+    id: "handle-field"
+- inputText: "testuser.bsky.social"
+
+# Toggle custom PDS
+- tapOn: "Use custom PDS"
+- assertVisible: "PDS URL"
+- tapOn: "Use custom PDS"
+
+# Tap sign in (will trigger OAuth - can't fully automate beyond this)
+- tapOn: "Sign In"
+
+# Note: OAuth web flow requires manual interaction
+# This test validates the login UI is functional up to the OAuth handoff
