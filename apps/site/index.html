@@ -9,34 +9,53 @@
   <meta property="og:description" content="An open protocol for proving the authenticity of writing, photos, and video. Hardware-signed by the Secure Enclave. Stored on the author's PDS. Verified on every reader's device. No server. No trust required.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://speakwrite.io">
+  <meta property="og:image" content="https://speakwrite.io/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://speakwrite.io/og-image.png">
   <meta name="theme-color" content="#0a0a0a">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✓</text></svg>">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Speakwrite",
+    "applicationCategory": "SocialNetworkingApplication",
+    "operatingSystem": "iOS",
+    "description": "An open protocol for proving the authenticity of writing, photos, and video. Hardware-signed by the Secure Enclave.",
+    "url": "https://speakwrite.io",
+    "offers": { "@type": "Offer", "price": "0" }
+  }
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <a href="#main" class="skip-link">Skip to main content</a>
 
   <header>
     <nav>
       <a href="/" class="wordmark">speakwrite</a>
       <div class="nav-links">
         <a href="#protocol" class="nav-link">Protocol</a>
-        <a href="#verification" class="nav-link">Verify</a>
-        <a href="https://github.com/stefanrosscohen/speakwrite" class="nav-link">GitHub</a>
-        <a href="https://testflight.apple.com/join/TtPndBU4" class="nav-link">TestFlight</a>
+        <a href="/verify" class="nav-link">Verify</a>
+        <a href="https://github.com/stefanrosscohen/speakwrite" class="nav-link" rel="noopener noreferrer">GitHub</a>
+        <a href="https://testflight.apple.com/join/TtPndBU4" class="nav-link" rel="noopener noreferrer">TestFlight</a>
       </div>
     </nav>
   </header>
 
-  <main>
+  <main id="main">
 
     <section class="hero">
       <h1>Authentic content, cryptographically proven.</h1>
       <p class="subtitle">Open protocol. Hardware-backed. No trust required.</p>
       <p class="lede">You can no longer look at a piece of writing, a photo, or a video and know whether it was made by a person. Generative AI produces content indistinguishable from human-created work. Every detection tool that analyzes the <em>output</em> is losing an arms race it can never win.</p>
-      <p class="lede">Speakwrite takes a different approach: instead of analyzing the content, it restricts <em>how</em> it can be created. Every word typed on the soft keyboard. Every photo and video captured live through the camera. A SHA-256 content hash signed by the Secure Enclave. The proof stored on the author&rsquo;s PDS. Verification on every reader&rsquo;s device. Pure cryptography.</p>
-      <p class="cta"><a href="https://testflight.apple.com/join/TtPndBU4">Join the TestFlight</a></p>
+      <p class="lede">Speakwrite takes a different approach: instead of analyzing the content, it restricts <em>how</em> it can be created. Every word typed on the <abbr title="The on-screen touch keyboard — no hardware keyboards, paste, or dictation allowed">soft keyboard</abbr>. Every photo and video captured live through the camera. A SHA-256 content hash signed by the <abbr title="A dedicated security chip in Apple devices that stores cryptographic keys — they never leave the hardware">Secure Enclave</abbr>. The proof stored on the author&rsquo;s <abbr title="Personal Data Server — where your AT Protocol data lives, controlled by you">PDS</abbr>. Verification on every reader&rsquo;s device. Pure cryptography.</p>
+      <p class="cta"><a href="https://testflight.apple.com/join/TtPndBU4" rel="noopener noreferrer">Join the TestFlight</a></p>
     </section>
 
     <section id="the-problem">
@@ -61,7 +80,7 @@
         </div>
       </div>
 
-      <p>When you publish, a SHA-256 content hash covering both text and media is signed by the iPhone&rsquo;s Secure Enclave via App Attest. The post is published on AT Protocol and a cryptographic proof record (<code>io.speakwrite.proof</code>) is stored in the author&rsquo;s repository.</p>
+      <p>When you publish, a SHA-256 content hash covering both text and media is signed by the iPhone&rsquo;s Secure Enclave via <abbr title="Apple's system for certifying that an app is genuine and running on real hardware">App Attest</abbr>. The post is published on <abbr title="AT Protocol — the open, decentralized social protocol that powers Bluesky">AT Protocol</abbr> and a cryptographic proof record (<code>io.speakwrite.proof</code>) is stored in the author&rsquo;s repository.</p>
       <p>Verification happens entirely on the reader&rsquo;s device. The content hash is recomputed, the certificate chain is validated against Apple&rsquo;s Root CA, and the ECDSA signature is verified. No server in the loop.</p>
     </section>
 
@@ -153,7 +172,7 @@
         <div class="tab-card accent-card">
           <div class="tab-icon">@_</div>
           <h3>Verification bot</h3>
-          <p>Mention <a href="https://bsky.app/profile/verify.speakwrite.io">@verify.speakwrite.io</a> under any Speakwrite post. The bot runs the full verification pipeline and replies with results.</p>
+          <p>Mention <a href="https://bsky.app/profile/verify.speakwrite.io" rel="noopener noreferrer">@verify.speakwrite.io</a> under any Speakwrite post. The bot runs the full verification pipeline and replies with results.</p>
         </div>
         <div class="tab-card">
           <div class="tab-icon">{&rarr;}</div>
@@ -299,7 +318,7 @@
         <li>Verification bot: TypeScript (Fly.io)</li>
         <li>Web verifier: Client-side Web Crypto</li>
       </ul>
-      <p class="cta"><a href="https://github.com/stefanrosscohen/speakwrite">View on GitHub</a></p>
+      <p class="cta"><a href="https://github.com/stefanrosscohen/speakwrite" rel="noopener noreferrer">View on GitHub</a></p>
     </section>
 
   </main>
@@ -307,9 +326,9 @@
   <footer>
     <p>Speakwrite doesn&rsquo;t solve the AI problem. It creates a new kind of evidence for authentic content &mdash; and a place to go where that evidence matters.</p>
     <p class="links">
-      <a href="https://github.com/stefanrosscohen/speakwrite">GitHub</a>
+      <a href="https://github.com/stefanrosscohen/speakwrite" rel="noopener noreferrer">GitHub</a>
       &middot;
-      <a href="https://testflight.apple.com/join/TtPndBU4">TestFlight</a>
+      <a href="https://testflight.apple.com/join/TtPndBU4" rel="noopener noreferrer">TestFlight</a>
     </p>
   </footer>
 

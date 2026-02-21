@@ -4,12 +4,36 @@ import { resolvePostTarget, fetchProofForPost, parseAtUri } from './atproto.js';
 import { verifyPost } from './verify.js';
 import { PostTarget } from './types.js';
 
+// LRU-style dedup: cap at 10,000 entries, evict oldest when full
+const MAX_PROCESSED = 10_000;
 const processedUris = new Set<string>();
+
+function trackProcessed(uri: string) {
+  processedUris.add(uri);
+  if (processedUris.size > MAX_PROCESSED) {
+    // Delete the oldest entry (Sets iterate in insertion order)
+    const oldest = processedUris.values().next().value;
+    if (oldest) processedUris.delete(oldest);
+  }
+}
 
 const anthropic = new Anthropic();
 
 function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
+}
+
+/** Truncate text to fit within Bluesky's 300-grapheme limit, accounting for byte length. */
+function truncateForBluesky(text: string, maxGraphemes = 300): string {
+  const segmenter = new Intl.Segmenter('en', { granularity: 'grapheme' });
+  const segments = [...segmenter.segment(text)];
+  if (segments.length <= maxGraphemes) return text;
+  return segments.slice(0, maxGraphemes - 1).map(s => s.segment).join('') + '…';
+}
+
+/** Small delay between replies to avoid rate limiting */
+function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 const REPLY_SYSTEM_PROMPT = `You are the Speakwrite verification bot on Bluesky. You just cryptographically verified that a post was genuinely typed by a human on a real Apple device using the Secure Enclave.
@@ -107,36 +131,37 @@ const VERIFIED_FALLBACK = [
   "Confirmed human. The Secure Enclave vouches for this one.",
 ];
 const NO_PROOF_FALLBACK = [
-  "No Speakwrite proof found. Could be human, could be a mass of LLM tokens in a trenchcoat.",
-  "No proof on file. This post showed up with no ID.",
-  "The Secure Enclave has no record of this post. Make of that what you will.",
+  "No Speakwrite proof found for this post. Most posts don't use Speakwrite — that's fine.",
+  "No proof on file. This post wasn't published through Speakwrite.",
+  "No Speakwrite proof. This just means the post wasn't made with the Speakwrite app.",
 ];
 const FAILED_FALLBACK = [
   "Verification failed. The math didn't math.",
-  "This proof didn't pass the vibe check (or the ECDSA check).",
+  "This proof didn't pass the vibe check. Something's off.",
 ];
 const CHAT_FALLBACK = [
-  "I'm a verification bot, not a conversationalist. Tag me on a Speakwrite post!",
-  "My therapist says I need to develop interests outside of cryptographic verification. I haven't listened.",
+  "I verify posts! Reply to any post with @speakwrite-bot and I'll check if it has a Speakwrite proof.",
+  "I'm a verification bot — reply to a post and mention me to check if it's human-verified via Speakwrite.",
 ];
 
 
-/** Check if we already replied to a post in its thread */
+/** Check if we already replied to a post in its thread.
+ *  Returns 'yes' | 'no' | 'unknown' (network error — caller decides). */
 async function alreadyReplied(
   agent: AtpAgent,
   targetUri: string,
   botDid: string
-): Promise<boolean> {
+): Promise<'yes' | 'no' | 'unknown'> {
   try {
     const thread = await agent.app.bsky.feed.getPostThread({
       uri: targetUri,
       depth: 1,
     });
     const replies = (thread.data.thread as { replies?: Array<{ post: { author: { did: string } } }> }).replies;
-    if (!replies) return false;
-    return replies.some((r) => r.post?.author?.did === botDid);
+    if (!replies) return 'no';
+    return replies.some((r) => r.post?.author?.did === botDid) ? 'yes' : 'no';
   } catch {
-    return false;
+    return 'unknown';
   }
 }
 
@@ -152,7 +177,7 @@ async function buildReplyText(
   reason?: string,
   mentionText?: string
 ): Promise<{ text: string; facets: Facet[] }> {
-  const linkUrl = `https://www.speakwrite.io/verify/${target.handle}/${target.rkey}`;
+  const linkUrl = `https://www.speakwrite.io/verify/${encodeURIComponent(target.handle)}/${encodeURIComponent(target.rkey)}`;
 
   let line1: string;
 
@@ -164,7 +189,8 @@ async function buildReplyText(
     );
     line1 = '✓ ' + (generated || pick(VERIFIED_FALLBACK));
     const linkLabel = 'Verify independently →';
-    const text = `${line1}\n\n${linkLabel}`;
+    const linkText = `www.speakwrite.io/verify/${encodeURIComponent(target.handle)}/${encodeURIComponent(target.rkey)}`;
+    const text = `${line1}\n\n${linkLabel}\n${linkText}`;
 
     const linkByteStart = Buffer.byteLength(`${line1}\n\n`, 'utf8');
     const linkByteEnd = linkByteStart + Buffer.byteLength(linkLabel, 'utf8');
@@ -197,7 +223,8 @@ async function buildReplyText(
   }
 
   const linkLabel = 'Check for yourself →';
-  const text = `${line1}\n\n${linkLabel}`;
+  const linkText = `www.speakwrite.io/verify/${encodeURIComponent(target.handle)}/${encodeURIComponent(target.rkey)}`;
+  const text = `${line1}\n\n${linkLabel}\n${linkText}`;
 
   const linkByteStart = Buffer.byteLength(`${line1}\n\n`, 'utf8');
   const linkByteEnd = linkByteStart + Buffer.byteLength(linkLabel, 'utf8');
@@ -258,7 +285,7 @@ export async function pollNotifications(agent: AtpAgent): Promise<void> {
 
       // Dedup within process
       if (processedUris.has(mentionUri)) continue;
-      processedUris.add(mentionUri);
+      trackProcessed(mentionUri);
 
       try {
         const record = mention.record as {
@@ -276,7 +303,8 @@ export async function pollNotifications(agent: AtpAgent): Promise<void> {
 
         // If not a reply to another post, it's casual interaction
         if (!isVerificationRequest(record)) {
-          if (await alreadyReplied(agent, mentionUri, botDid)) continue;
+          const chatDedup = await alreadyReplied(agent, mentionUri, botDid);
+          if (chatDedup !== 'no') continue; // skip if already replied or uncertain
 
           const chatReply = await generateReply(
             CHAT_SYSTEM_PROMPT,
@@ -284,10 +312,11 @@ export async function pollNotifications(agent: AtpAgent): Promise<void> {
             record.text
           );
           await agent.post({
-            text: chatReply || pick(CHAT_FALLBACK),
+            text: truncateForBluesky(chatReply || pick(CHAT_FALLBACK)),
             reply: replyRef,
           });
           console.log(`Chat reply to ${mentionUri}`);
+          await delay(1000);
           continue;
         }
 
@@ -302,13 +331,31 @@ export async function pollNotifications(agent: AtpAgent): Promise<void> {
         );
 
         // Check if we already replied (dedup across restarts)
-        if (await alreadyReplied(agent, target.uri, botDid)) {
-          console.log(`Already replied to ${target.uri}, skipping`);
+        const dedup = await alreadyReplied(agent, target.uri, botDid);
+        if (dedup !== 'no') {
+          console.log(`Already replied or uncertain for ${target.uri}, skipping`);
           continue;
         }
 
-        // Fetch proof
-        const proof = await fetchProofForPost(target.uri, target.authorDid);
+        // Fetch proof (throws on network errors, returns null if no proof exists)
+        let proof: Awaited<ReturnType<typeof fetchProofForPost>> = null;
+        let networkError = false;
+        try {
+          proof = await fetchProofForPost(target.uri, target.authorDid);
+        } catch (fetchErr) {
+          console.error(`Network error fetching proof for ${target.uri}:`, fetchErr);
+          networkError = true;
+        }
+
+        if (networkError) {
+          await agent.post({
+            text: truncateForBluesky("I tried to check this post but couldn't reach the author's server. Try again in a bit!"),
+            reply: replyRef,
+          });
+          console.log(`Network error reply for ${mentionUri}`);
+          await delay(1000);
+          continue;
+        }
 
         let verified = false;
         let reason: string | undefined;
@@ -323,7 +370,7 @@ export async function pollNotifications(agent: AtpAgent): Promise<void> {
         const reply = await buildReplyText(verified, target, proof ? reason : undefined, record.text);
 
         await agent.post({
-          text: reply.text,
+          text: truncateForBluesky(reply.text),
           facets: reply.facets,
           reply: replyRef,
         });
@@ -331,6 +378,7 @@ export async function pollNotifications(agent: AtpAgent): Promise<void> {
         console.log(
           `Replied to ${mentionUri}: ${verified ? 'verified' : proof ? `failed: ${reason}` : 'no proof'}`
         );
+        await delay(1000);
       } catch (err) {
         console.error(`Error processing mention ${mentionUri}:`, err);
       }

@@ -90,7 +90,7 @@ struct ReplyView: View {
                         .padding(.bottom, 12)
 
                         // Compose area — flows right after the thread connector
-                        InputRestrictedEditor(text: $replyText, placeholder: "Post your reply", inputDelegate: nil)
+                        InputRestrictedEditor(text: $replyText, placeholder: "Post your reply", inputDelegate: viewModel)
                             .frame(minHeight: 100)
                     }
                 }

@@ -8,6 +8,7 @@ struct PostDetailView: View {
 
     @State private var replies: [ThreadReply] = []
     @State private var isLoading = true
+    @State private var threadError: String?
     @State private var showReplySheet = false
 
     // Engagement state for the main post
@@ -32,16 +33,31 @@ struct PostDetailView: View {
 
                 // MARK: Replies
                 if isLoading {
-                    ProgressView()
+                    ProgressView("Loading replies…")
                         .tint(Theme.accent)
                         .frame(maxWidth: .infinity)
                         .padding(.top, Theme.xxxl)
+                } else if let error = threadError {
+                    VStack(spacing: Theme.sm) {
+                        Text(error)
+                            .font(.system(size: 14))
+                            .foregroundStyle(Theme.textSecondary(colorScheme))
+                        Button("Retry") {
+                            threadError = nil
+                            Task { await loadThread() }
+                        }
+                        .font(.system(size: 14, weight: .bold, design: .monospaced))
+                        .foregroundStyle(Theme.accent)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, Theme.xxxl)
                 } else if replies.isEmpty {
                     Text("No replies yet")
                         .font(.system(size: 14))
                         .foregroundStyle(Theme.textTertiary(colorScheme))
                         .frame(maxWidth: .infinity)
                         .padding(.top, Theme.xxxl)
+                        .accessibilityIdentifier("no-replies")
                 } else {
                     LazyVStack(spacing: 0) {
                         ForEach(replies) { reply in
@@ -341,7 +357,7 @@ struct PostDetailView: View {
                 }
             }
         } catch {
-            print("Failed to load thread: \(error)")
+            threadError = "Couldn't load replies. Check your connection."
         }
         isLoading = false
     }

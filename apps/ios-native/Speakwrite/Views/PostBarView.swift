@@ -4,6 +4,7 @@ import SwiftUI
 struct PostBarView: View {
     @Environment(AppViewModel.self) private var viewModel
     @Environment(\.colorScheme) private var colorScheme
+    @State private var showPublishConfirm = false
 
     private let charLimit = 300
 
@@ -35,8 +36,7 @@ struct PostBarView: View {
                     }
                 } else {
                     Button {
-                        viewModel.publishError = nil
-                        Task { await viewModel.publish() }
+                        showPublishConfirm = true
                     } label: {
                         Text("Publish")
                             .font(Theme.monoBold)
@@ -59,12 +59,30 @@ struct PostBarView: View {
             .padding(.vertical, 10)
 
             if let error = viewModel.publishError {
-                Text(error)
+                HStack {
+                    Text(error)
+                        .font(Theme.monoSmall)
+                        .foregroundStyle(Theme.error)
+                    Spacer()
+                    Button("Retry") {
+                        viewModel.publishError = nil
+                        Task { await viewModel.publish() }
+                    }
                     .font(Theme.monoSmall)
-                    .foregroundStyle(Theme.error)
-                    .padding(.horizontal, Theme.lg)
-                    .padding(.bottom, Theme.sm)
+                    .foregroundStyle(Theme.accent)
+                }
+                .padding(.horizontal, Theme.lg)
+                .padding(.bottom, Theme.sm)
             }
+        }
+        .alert("Publish verified post?", isPresented: $showPublishConfirm) {
+            Button("Publish", role: .none) {
+                viewModel.publishError = nil
+                Task { await viewModel.publish() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This post will be cryptographically signed and published to your AT Protocol feed with a Speakwrite proof.")
         }
     }
 

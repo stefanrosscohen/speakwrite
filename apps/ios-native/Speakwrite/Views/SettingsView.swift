@@ -5,6 +5,7 @@ struct SettingsView: View {
     @Environment(AppViewModel.self) private var viewModel
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("appearanceMode") private var appearanceMode: Int = AppearanceMode.system.rawValue
+    @State private var showLogoutConfirm = false
 
     var body: some View {
         NavigationStack {
@@ -77,14 +78,7 @@ struct SettingsView: View {
                         }
 
                         Button(role: .destructive) {
-                            viewModel.atproto.logout()
-                            viewModel.myProfile = nil
-                            viewModel.verifiedPosts = []
-                            viewModel.timelinePosts = []
-                            viewModel.followingPosts = []
-                            viewModel.feedCursor = nil
-                            viewModel.timelineCursor = nil
-                            viewModel.followingCursor = nil
+                            showLogoutConfirm = true
                         } label: {
                             HStack {
                                 Image(systemName: "rectangle.portrait.and.arrow.right")
@@ -94,6 +88,21 @@ struct SettingsView: View {
                             }
                         }
                         .listRowBackground(Theme.surfaceElevated(colorScheme))
+                        .alert("Sign out?", isPresented: $showLogoutConfirm) {
+                            Button("Sign Out", role: .destructive) {
+                                viewModel.atproto.logout()
+                                viewModel.myProfile = nil
+                                viewModel.verifiedPosts = []
+                                viewModel.timelinePosts = []
+                                viewModel.followingPosts = []
+                                viewModel.feedCursor = nil
+                                viewModel.timelineCursor = nil
+                                viewModel.followingCursor = nil
+                            }
+                            Button("Cancel", role: .cancel) {}
+                        } message: {
+                            Text("You'll need to sign in again to post or view your verified feed.")
+                        }
                     }
 
                     // About

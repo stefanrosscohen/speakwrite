@@ -2,8 +2,6 @@
 node_modules/
 
 # Build output
-apps/desktop/src-tauri/target/
-apps/desktop/dist/
 apps/web/dist/
 apps/verifier/dist/
 apps/reader/dist/
@@ -31,6 +29,3 @@ Thumbs.db
 
 # Rust
 *.pdb
-
-# Tauri
-apps/desktop/src-tauri/gen/

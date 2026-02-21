@@ -33,7 +33,7 @@ struct QuotePostView: View {
                         size: .medium
                     )
 
-                    InputRestrictedEditor(text: $postText, placeholder: "Add your thoughts", inputDelegate: nil)
+                    InputRestrictedEditor(text: $postText, placeholder: "Add your thoughts", inputDelegate: viewModel)
                         .frame(minHeight: 80)
                 }
                 .padding(.horizontal, Theme.lg)

@@ -10,6 +10,9 @@ struct EditorView: View {
     @State private var mentionResults: [ProfileViewBasic] = []
     @State private var showMentionSuggestions = false
     @State private var mentionSearchTask: Task<Void, Never>?
+    @State private var showViolationBanner = false
+    @State private var violationDismissTask: Task<Void, Never>?
+    @State private var cameraError: String?
 
     var body: some View {
         @Bindable var vm = viewModel
@@ -31,6 +34,22 @@ struct EditorView: View {
                 }
                 .padding(.horizontal, Theme.lg)
                 .padding(.vertical, Theme.sm)
+
+                // Violation banner
+                if showViolationBanner {
+                    HStack(spacing: Theme.sm) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 13))
+                        Text("Naughty naughty — use the iPhone keyboard to make a verified post")
+                            .font(.system(size: 13, weight: .medium, design: .monospaced))
+                    }
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, Theme.lg)
+                    .padding(.vertical, Theme.sm)
+                    .frame(maxWidth: .infinity)
+                    .background(Theme.accent.opacity(0.9))
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
 
                 // Editor area with mention overlay
                 ZStack(alignment: .topLeading) {
@@ -118,23 +137,41 @@ struct EditorView: View {
             } message: {
                 Text("This will delete your current draft.")
             }
+            .alert("Capture Error", isPresented: Binding(get: { cameraError != nil }, set: { if !$0 { cameraError = nil } })) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(cameraError ?? "")
+            }
             .fullScreenCover(isPresented: $vm.showCamera) {
-                CameraCaptureView(mode: viewModel.cameraMode) { media in
+                CameraCaptureView(mode: viewModel.cameraMode, onCapture: { media in
                     if media.mimeType.starts(with: "video/") {
-                        // Video replaces any photos (mutually exclusive per AT Protocol)
                         viewModel.capturedPhotos = []
                         viewModel.capturedVideo = media
                     } else {
-                        // Photo: clear any video, append (max 4)
                         viewModel.capturedVideo = nil
                         if viewModel.capturedPhotos.count < 4 {
                             viewModel.capturedPhotos.append(media)
                         }
                     }
-                }
+                }, onError: { error in
+                    cameraError = error
+                })
             }
             .onChange(of: viewModel.postText) { _, newText in
                 detectMentionQuery(in: newText)
+            }
+            .onChange(of: viewModel.violationCount) { _, _ in
+                violationDismissTask?.cancel()
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    showViolationBanner = true
+                }
+                violationDismissTask = Task {
+                    try? await Task.sleep(for: .seconds(3))
+                    guard !Task.isCancelled else { return }
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        showViolationBanner = false
+                    }
+                }
             }
         }
     }
@@ -284,7 +321,7 @@ struct ComposeToolbar: View {
                 Button {
                     onVideoTap()
                 } label: {
-                    Label("Record Video", systemImage: "video")
+                    Label("Record Video (60s max)", systemImage: "video")
                 }
                 .disabled(isVideoDisabled)
             } label: {

@@ -7,6 +7,7 @@ import UIKit
 struct CameraCaptureView: UIViewControllerRepresentable {
     let mode: CameraMode
     let onCapture: (CapturedMedia) -> Void
+    var onError: ((String) -> Void)?
     @Environment(\.dismiss) private var dismiss
 
     func makeUIViewController(context: Context) -> UIImagePickerController {
@@ -29,15 +30,17 @@ struct CameraCaptureView: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(onCapture: onCapture, dismiss: dismiss)
+        Coordinator(onCapture: onCapture, onError: onError, dismiss: dismiss)
     }
 
     final class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
         let onCapture: (CapturedMedia) -> Void
+        let onError: ((String) -> Void)?
         let dismiss: DismissAction
 
-        init(onCapture: @escaping (CapturedMedia) -> Void, dismiss: DismissAction) {
+        init(onCapture: @escaping (CapturedMedia) -> Void, onError: ((String) -> Void)?, dismiss: DismissAction) {
             self.onCapture = onCapture
+            self.onError = onError
             self.dismiss = dismiss
         }
 
@@ -46,6 +49,7 @@ struct CameraCaptureView: UIViewControllerRepresentable {
                 // Photo capture — resize + compress to fit Bluesky's 976KB blob limit
                 let resized = Self.resizeForUpload(image, maxDimension: 1500)
                 guard let jpegData = Self.compressToFit(resized, maxBytes: 950_000) else {
+                    onError?("Photo too large to process. Try again.")
                     dismiss()
                     return
                 }
@@ -61,6 +65,7 @@ struct CameraCaptureView: UIViewControllerRepresentable {
             } else if let videoURL = info[.mediaURL] as? URL {
                 // Video capture
                 guard let videoData = try? Data(contentsOf: videoURL) else {
+                    onError?("Couldn't read video file. Try again.")
                     dismiss()
                     return
                 }

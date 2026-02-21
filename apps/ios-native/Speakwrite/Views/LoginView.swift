@@ -116,8 +116,26 @@ struct LoginView: View {
             )
         } catch let err as ASWebAuthenticationSessionError where err.code == .canceledLogin {
             self.error = nil
+        } catch let err as ATProtoError {
+            switch err {
+            case .notLoggedIn:
+                self.error = "Not logged in. Please try again."
+            case .authCancelled:
+                self.error = nil
+            default:
+                self.error = err.localizedDescription
+            }
+        } catch let err as URLError {
+            switch err.code {
+            case .notConnectedToInternet, .networkConnectionLost:
+                self.error = "No internet connection. Check your network and try again."
+            case .timedOut:
+                self.error = "Connection timed out. Try again."
+            default:
+                self.error = "Network error. Check your connection and try again."
+            }
         } catch {
-            self.error = "\(error)"
+            self.error = "Sign in failed. Check your handle and try again."
         }
         isLoading = false
     }

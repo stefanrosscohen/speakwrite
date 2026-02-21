@@ -252,9 +252,10 @@ struct PostRow<Post: PostDisplayable>: View {
                     Text("Follow")
                         .font(.system(size: 12, weight: .bold))
                         .foregroundColor(.white)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
                         .background(Capsule().fill(Theme.accent))
+                        .frame(minHeight: 44)
                 }
                 .buttonStyle(.plain)
                 .fixedSize()
@@ -300,24 +301,27 @@ struct PostRow<Post: PostDisplayable>: View {
 
     // MARK: - Actions
 
+    private func notifyFailure() {
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(.error)
+    }
+
     private func toggleLike() async {
         if isLiked, let uri = likeUri {
             isLiked = false; localLikeCount -= 1; likeUri = nil
             do {
                 try await viewModel.atproto.unlikePost(likeUri: uri)
             } catch {
-                // Rollback on failure
                 isLiked = true; localLikeCount += 1; likeUri = uri
-                print("[Speakwrite] Unlike failed: \(error)")
+                notifyFailure()
             }
         } else {
             isLiked = true; localLikeCount += 1
             do {
                 likeUri = try await viewModel.atproto.likePost(uri: post.uri, cid: post.cid)
             } catch {
-                // Rollback on failure
                 isLiked = false; localLikeCount -= 1
-                print("[Speakwrite] Like failed: \(error)")
+                notifyFailure()
             }
         }
     }
@@ -328,18 +332,16 @@ struct PostRow<Post: PostDisplayable>: View {
             do {
                 try await viewModel.atproto.unrepost(repostUri: uri)
             } catch {
-                // Rollback on failure
                 isReposted = true; localRepostCount += 1; repostUri = uri
-                print("[Speakwrite] Unrepost failed: \(error)")
+                notifyFailure()
             }
         } else {
             isReposted = true; localRepostCount += 1
             do {
                 repostUri = try await viewModel.atproto.repost(uri: post.uri, cid: post.cid)
             } catch {
-                // Rollback on failure
                 isReposted = false; localRepostCount -= 1
-                print("[Speakwrite] Repost failed: \(error)")
+                notifyFailure()
             }
         }
     }
@@ -350,7 +352,7 @@ struct PostRow<Post: PostDisplayable>: View {
             try await viewModel.atproto.follow(did: post.author.did)
         } catch {
             isFollowingAuthor = false
-            print("[Speakwrite] Follow failed: \(error)")
+            notifyFailure()
         }
     }
 

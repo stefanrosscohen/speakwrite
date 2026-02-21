@@ -8,7 +8,13 @@
   <meta property="og:title" content="Speakwrite — Verify Post">
   <meta property="og:description" content="Client-side verification of App Attest proofs. No server. No trust required.">
   <meta property="og:type" content="website">
+  <meta property="og:image" content="https://speakwrite.io/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://speakwrite.io/og-image.png">
   <meta name="theme-color" content="#0a0a0a">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✓</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -207,7 +213,8 @@
       background: var(--accent);
       border: 1px solid var(--accent);
     }
-    .btn-primary:hover {
+    .btn-primary:hover,
+    .btn-primary:focus-visible {
       background: transparent;
       color: var(--accent);
     }
@@ -217,7 +224,8 @@
       background: transparent;
       border: 1px solid var(--border);
     }
-    .btn-secondary:hover {
+    .btn-secondary:hover,
+    .btn-secondary:focus-visible {
       color: var(--accent);
       border-color: var(--accent);
     }
@@ -281,7 +289,8 @@
       cursor: pointer;
     }
 
-    .verify-btn:hover {
+    .verify-btn:hover,
+    .verify-btn:focus-visible {
       background: transparent;
       color: var(--accent);
     }
@@ -298,18 +307,19 @@
   </style>
 </head>
 <body>
+  <a href="#verify-content" class="skip-link">Skip to main content</a>
 
   <header>
     <nav>
       <a href="/" class="wordmark">speakwrite</a>
       <div class="nav-links">
         <a href="/#protocol" class="nav-link">Protocol</a>
-        <a href="https://github.com/stefanrosscohen/speakwrite" class="nav-link">GitHub</a>
+        <a href="https://github.com/stefanrosscohen/speakwrite" class="nav-link" rel="noopener noreferrer">GitHub</a>
       </div>
     </nav>
   </header>
 
-  <div class="verify-container">
+  <div class="verify-container" id="verify-content">
     <div class="verify-header">
       <h1>Verify Post</h1>
       <p>Client-side cryptographic verification. No server. No trust required.</p>
@@ -436,6 +446,20 @@ oyFraWVIyd/dganmrduC1bmTBGwD
           map[key] = this.read();
         }
         return map;
+      }
+    }
+
+    // ── Fetch with timeout ──
+    async function fetchWithTimeout(url, timeoutMs = 15000) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        return await fetch(url, { signal: controller.signal });
+      } catch (err) {
+        if (err.name === 'AbortError') throw new Error('Request timed out. Check your internet connection.');
+        throw err;
+      } finally {
+        clearTimeout(timer);
       }
     }
 
@@ -815,7 +839,7 @@ oyFraWVIyd/dganmrduC1bmTBGwD
         let step = addStep(`Resolving @${handle}...`);
         updateContent();
 
-        const resolveResp = await fetch(`https://api.bsky.app/xrpc/com.atproto.identity.resolveHandle?handle=${encodeURIComponent(handle)}`);
+        const resolveResp = await fetchWithTimeout(`https://api.bsky.app/xrpc/com.atproto.identity.resolveHandle?handle=${encodeURIComponent(handle)}`);
         if (!resolveResp.ok) throw new Error(`Could not resolve handle @${handle}`);
         const { did } = await resolveResp.json();
 
@@ -829,7 +853,7 @@ oyFraWVIyd/dganmrduC1bmTBGwD
         updateContent();
 
         const postUri = `at://${did}/app.bsky.feed.post/${rkey}`;
-        const postResp = await fetch(`https://api.bsky.app/xrpc/app.bsky.feed.getPosts?uris=${encodeURIComponent(postUri)}`);
+        const postResp = await fetchWithTimeout(`https://api.bsky.app/xrpc/app.bsky.feed.getPosts?uris=${encodeURIComponent(postUri)}`);
         if (!postResp.ok) throw new Error('Could not fetch post');
         const postData = await postResp.json();
         const post = postData.posts?.[0];
@@ -863,7 +887,7 @@ oyFraWVIyd/dganmrduC1bmTBGwD
         step = addStep('Resolving author\'s PDS...');
         updateContent(postCardHtml);
 
-        const plcResp = await fetch(`https://plc.directory/${encodeURIComponent(did)}`);
+        const plcResp = await fetchWithTimeout(`https://plc.directory/${encodeURIComponent(did)}`);
         if (!plcResp.ok) throw new Error('Could not resolve DID document');
         const didDoc = await plcResp.json();
         const pds = didDoc.service?.find(s => s.id === '#atproto_pds')?.serviceEndpoint;
@@ -888,7 +912,7 @@ oyFraWVIyd/dganmrduC1bmTBGwD
           proofUrl.searchParams.set('reverse', 'true');
           if (proofCursor) proofUrl.searchParams.set('cursor', proofCursor);
 
-          const proofsResp = await fetch(proofUrl.toString());
+          const proofsResp = await fetchWithTimeout(proofUrl.toString());
           if (!proofsResp.ok) throw new Error('Could not fetch proof records');
           const proofsData = await proofsResp.json();
 
@@ -1067,10 +1091,11 @@ oyFraWVIyd/dganmrduC1bmTBGwD
         // ── All checks passed ──
         const successHtml = `
           <div class="result-banner verified">
-            <h2>✓ Verified</h2>
+            <h2>✓ Verified Human-Created</h2>
             <p>This post was typed by a human on a genuine Apple device using Speakwrite.<br>
-            Input was restricted to soft keyboard only &mdash; no paste, no dictation, no autocorrect.<br>
-            The content hash was signed by the device's Secure Enclave via App Attest.</p>
+            Input was restricted to the on-screen keyboard only &mdash; no paste, no dictation, no autocorrect.<br>
+            The content hash was signed by the device's Secure Enclave via App Attest.<br>
+            <em>This confirms human authorship, not originality of ideas.</em></p>
           </div>
           <div class="verify-cta">
             <h3>What is Speakwrite?</h3>
@@ -1084,7 +1109,19 @@ oyFraWVIyd/dganmrduC1bmTBGwD
         updateContent(postCardHtml + successHtml);
 
       } catch (err) {
-        const msg = err.message || `${err.name || 'Error'}: cryptographic verification failed`;
+        const rawMsg = err.message || `${err.name || 'Error'}: cryptographic verification failed`;
+        const friendlyErrors = {
+          'Intermediate certificate signature invalid': 'The certificate chain could not be verified against Apple\'s root certificate.',
+          'Leaf certificate signature invalid': 'The device certificate could not be verified.',
+          'Nonce extension not found in leaf certificate': 'The attestation proof is missing required data.',
+          'Attestation nonce length mismatch': 'The attestation proof data is corrupted.',
+          'Attestation nonce mismatch': 'The attestation proof does not match the expected value.',
+          'Invalid AAGUID — not an Apple App Attest device': 'This proof did not come from a genuine Apple device.',
+          'Credential ID does not match key ID': 'The signing key does not match the attestation.',
+          'RP ID hash mismatch between attestation and assertion': 'The attestation and signature were made by different apps.',
+          'Unsupported curve in certificate SPKI': 'The certificate uses an unsupported cryptographic curve.',
+        };
+        const msg = friendlyErrors[rawMsg] || rawMsg;
         const lastStep = steps[steps.length - 1];
         if (lastStep) {
           lastStep.status = 'fail';
@@ -1102,6 +1139,9 @@ oyFraWVIyd/dganmrduC1bmTBGwD
           <h2>✗ Verification Failed</h2>
           <p>${message}</p>
         </div>
+        <div class="btn-row" style="margin: 1rem 0;">
+          <button onclick="tryAnother()" class="btn btn-primary">Try Another Post</button>
+        </div>
         <div class="verify-cta">
           <h3>What is Speakwrite?</h3>
           <p>Speakwrite is an AT Protocol client that creates cryptographic proof a post was typed by a human. Open protocol. Hardware-backed. No trust required.</p>
@@ -1110,6 +1150,14 @@ oyFraWVIyd/dganmrduC1bmTBGwD
             <a href="/" class="btn btn-secondary">Learn More</a>
           </div>
         </div>`;
+    }
+
+    function tryAnother() {
+      document.getElementById('input-section').style.display = 'block';
+      document.getElementById('content').innerHTML = '';
+      const input = document.getElementById('post-url');
+      input.value = '';
+      input.focus();
     }
 
     // ── Extract public key from X.509 DER certificate (auto-detects P-256/P-384) ──

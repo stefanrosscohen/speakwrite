@@ -157,9 +157,18 @@ export async function verifyPost(
     return { verified: true };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
+    const friendlyReasons: Record<string, string> = {
+      'No certificates in attestation': 'The proof data was incomplete',
+      'Leaf cert not issued by intermediate': 'The proof certificate chain is invalid',
+      'Intermediate cert not signed by Apple App Attestation Root CA': 'The proof did not come from a genuine Apple device',
+      'Leaf cert not signed by Apple App Attestation Root CA': 'The proof did not come from a genuine Apple device',
+      'Invalid assertion — missing signature or authenticator data': 'The proof is missing required data',
+      'ECDSA signature verification failed': 'The cryptographic signature is invalid',
+    };
+    const friendly = friendlyReasons[message] || `Verification error: ${message}`;
     return {
       verified: false,
-      reason: `Verification error: ${message}`,
+      reason: friendly,
     };
   }
 }

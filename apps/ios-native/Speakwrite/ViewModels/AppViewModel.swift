@@ -188,9 +188,8 @@ final class AppViewModel: InputRestrictedDelegate {
                     blob = try await atproto.pollVideoJob(jobId: jobStatus.jobId) { [weak self] state in
                         Task { @MainActor in
                             switch state {
-                            case "JOB_STATE_CREATED": self?.videoProcessingStatus = "Processing video..."
                             case "JOB_STATE_COMPLETED": self?.videoProcessingStatus = "Video ready!"
-                            default: self?.videoProcessingStatus = "Processing video..."
+                            default: self?.videoProcessingStatus = "Processing video…"
                             }
                         }
                     }
@@ -347,9 +346,8 @@ final class AppViewModel: InputRestrictedDelegate {
                 blob = try await atproto.pollVideoJob(jobId: jobStatus.jobId) { state in
                     Task { @MainActor in
                         switch state {
-                        case "JOB_STATE_CREATED": onVideoStatus?("Processing video...")
                         case "JOB_STATE_COMPLETED": onVideoStatus?("Video ready!")
-                        default: onVideoStatus?("Processing video...")
+                        default: onVideoStatus?("Processing video…")
                         }
                     }
                 }
@@ -450,7 +448,7 @@ final class AppViewModel: InputRestrictedDelegate {
             verifiedPosts.append(contentsOf: result.posts)
             feedCursor = result.cursor
         } catch {
-            // Silently fail
+            print("[Feed] Error loading more: \(error)")
         }
     }
 
@@ -478,7 +476,7 @@ final class AppViewModel: InputRestrictedDelegate {
             timelinePosts.append(contentsOf: result.posts)
             timelineCursor = result.cursor
         } catch {
-            // Silently fail
+            print("[Timeline] Error loading more: \(error)")
         }
     }
 
@@ -506,7 +504,7 @@ final class AppViewModel: InputRestrictedDelegate {
             followingPosts.append(contentsOf: result.posts)
             followingCursor = result.cursor
         } catch {
-            // Silently fail
+            print("[Following] Error loading more: \(error)")
         }
     }
 }

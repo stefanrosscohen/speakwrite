@@ -11,6 +11,7 @@ struct ProfileView: View {
     @State private var isLoading = true
     @State private var isFollowing = false
     @State private var followUri: String?
+    @State private var loadError: String?
 
     var body: some View {
         ScrollView {
@@ -45,12 +46,19 @@ struct ProfileView: View {
                         Button {
                             Task {
                                 if isFollowing, let uri = followUri {
-                                    try? await viewModel.atproto.unfollow(followUri: uri)
-                                    isFollowing = false
-                                    followUri = nil
+                                    isFollowing = false; followUri = nil
+                                    do {
+                                        try await viewModel.atproto.unfollow(followUri: uri)
+                                    } catch {
+                                        isFollowing = true; followUri = uri
+                                    }
                                 } else {
-                                    try? await viewModel.atproto.follow(did: actorDID)
                                     isFollowing = true
+                                    do {
+                                        try await viewModel.atproto.follow(did: actorDID)
+                                    } catch {
+                                        isFollowing = false
+                                    }
                                 }
                             }
                         } label: {
@@ -113,10 +121,27 @@ struct ProfileView: View {
 
                 // Author's posts
                 if isLoading {
-                    ProgressView()
+                    ProgressView("Loading posts…")
                         .tint(Theme.accent)
                         .frame(maxWidth: .infinity)
                         .padding(.top, Theme.xxxl)
+                } else if let error = loadError {
+                    VStack(spacing: Theme.sm) {
+                        Text(error)
+                            .font(.system(size: 14))
+                            .foregroundStyle(Theme.textSecondary(colorScheme))
+                        Button("Retry") {
+                            Task {
+                                loadError = nil
+                                await loadProfile()
+                                await loadPosts()
+                            }
+                        }
+                        .font(Theme.monoBold)
+                        .foregroundStyle(Theme.accent)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, Theme.xxxl)
                 } else if posts.isEmpty {
                     Text("No posts yet")
                         .font(.system(size: 14))
@@ -134,7 +159,7 @@ struct ProfileView: View {
                         }
 
                         if postsCursor != nil {
-                            ProgressView()
+                            ProgressView("Loading more…")
                                 .tint(Theme.accent)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, Theme.xl)
@@ -155,6 +180,11 @@ struct ProfileView: View {
             PostDetailView(nav: nav)
         }
         .task {
+            await loadProfile()
+            await loadPosts()
+        }
+        .refreshable {
+            loadError = nil
             await loadProfile()
             await loadPosts()
         }
@@ -186,7 +216,9 @@ struct ProfileView: View {
             profile = try await viewModel.atproto.getProfile(actor: actorDID)
             isFollowing = profile?.viewer?.following != nil
             followUri = profile?.viewer?.following
-        } catch {}
+        } catch {
+            loadError = "Couldn't load profile. Check your connection and try again."
+        }
     }
 
     private func loadPosts() async {
@@ -195,7 +227,11 @@ struct ProfileView: View {
             let result = try await viewModel.atproto.getAuthorFeed(actor: actorDID)
             posts = result.posts
             postsCursor = result.cursor
-        } catch {}
+        } catch {
+            if posts.isEmpty {
+                loadError = "Couldn't load posts. Pull to refresh."
+            }
+        }
         isLoading = false
     }
 
@@ -205,7 +241,9 @@ struct ProfileView: View {
             let result = try await viewModel.atproto.getAuthorFeed(actor: actorDID, cursor: cursor)
             posts.append(contentsOf: result.posts)
             postsCursor = result.cursor
-        } catch {}
+        } catch {
+            // Pagination failure is non-critical — user can scroll again
+        }
     }
 }
 

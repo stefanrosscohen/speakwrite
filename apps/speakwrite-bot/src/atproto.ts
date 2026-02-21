@@ -52,9 +52,20 @@ export async function resolvePostTarget(
   };
 }
 
+/** Fetch with timeout */
+async function fetchWithTimeout(url: string, timeoutMs = 10000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** Resolve a DID to its PDS endpoint via plc.directory */
 async function resolvePds(did: string): Promise<string> {
-  const resp = await fetch(`https://plc.directory/${encodeURIComponent(did)}`);
+  const resp = await fetchWithTimeout(`https://plc.directory/${encodeURIComponent(did)}`);
   if (!resp.ok) throw new Error(`Could not resolve DID: ${did}`);
   const didDoc = await resp.json();
   const pds = didDoc.service?.find(
@@ -64,7 +75,9 @@ async function resolvePds(did: string): Promise<string> {
   return pds;
 }
 
-/** Fetch the Speakwrite proof record for a given post */
+/** Fetch the Speakwrite proof record for a given post.
+ *  Returns the proof record if found, null if no proof exists.
+ *  Throws on network/server errors so callers can distinguish "no proof" from "couldn't check". */
 export async function fetchProofForPost(
   postUri: string,
   authorDid: string
@@ -80,8 +93,10 @@ export async function fetchProofForPost(
     url.searchParams.set('reverse', 'true');
     if (cursor) url.searchParams.set('cursor', cursor);
 
-    const resp = await fetch(url.toString());
-    if (!resp.ok) return null;
+    const resp = await fetchWithTimeout(url.toString());
+    if (!resp.ok) {
+      throw new Error(`PDS returned ${resp.status} when fetching proof records`);
+    }
 
     const data = await resp.json();
     const record = data.records?.find(

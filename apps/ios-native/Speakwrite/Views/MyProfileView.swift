@@ -140,7 +140,7 @@ struct MyProfileView: View {
 
                     // Posts list
                     if isLoading {
-                        ProgressView()
+                        ProgressView("Loading posts…")
                             .tint(Theme.accent)
                             .frame(maxWidth: .infinity)
                             .padding(.top, Theme.xxxl)
@@ -169,7 +169,7 @@ struct MyProfileView: View {
                             }
 
                             if postsCursor != nil {
-                                ProgressView()
+                                ProgressView("Loading more…")
                                     .tint(Theme.accent)
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, Theme.xl)
@@ -259,7 +259,9 @@ struct MyProfileView: View {
             let result = try await viewModel.atproto.getAuthorFeed(actor: did)
             posts = result.posts
             postsCursor = result.cursor
-        } catch {}
+        } catch {
+            print("[MyProfile] Failed to load posts: \(error)")
+        }
         isLoading = false
     }
 
@@ -269,7 +271,9 @@ struct MyProfileView: View {
             let result = try await viewModel.atproto.getAuthorFeed(actor: did, cursor: cursor)
             posts.append(contentsOf: result.posts)
             postsCursor = result.cursor
-        } catch {}
+        } catch {
+            // Pagination failure is non-critical
+        }
     }
 
     // MARK: - Actions
@@ -333,19 +337,40 @@ struct EditProfileSheet: View {
     @State private var isSaving = false
     @State private var errorMessage: String?
 
+    private let displayNameLimit = 64
+    private let bioLimit = 256
+
     var body: some View {
         NavigationStack {
             Form {
-                Section("Display Name") {
+                Section {
                     TextField("Display name", text: $displayName)
                         .font(Theme.body)
+                        .onChange(of: displayName) { _, newVal in
+                            if newVal.count > displayNameLimit { displayName = String(newVal.prefix(displayNameLimit)) }
+                        }
+                } header: {
+                    Text("Display Name")
+                } footer: {
+                    Text("\(displayName.count)/\(displayNameLimit)")
+                        .font(Theme.monoSmall)
+                        .foregroundStyle(displayName.count >= displayNameLimit ? Theme.error : Theme.textTertiary(colorScheme))
                 }
                 .listRowBackground(Theme.surfaceElevated(colorScheme))
 
-                Section("Bio") {
+                Section {
                     TextEditor(text: $bio)
                         .font(Theme.body)
                         .frame(minHeight: 100)
+                        .onChange(of: bio) { _, newVal in
+                            if newVal.count > bioLimit { bio = String(newVal.prefix(bioLimit)) }
+                        }
+                } header: {
+                    Text("Bio")
+                } footer: {
+                    Text("\(bio.count)/\(bioLimit)")
+                        .font(Theme.monoSmall)
+                        .foregroundStyle(bio.count >= bioLimit ? Theme.error : Theme.textTertiary(colorScheme))
                 }
                 .listRowBackground(Theme.surfaceElevated(colorScheme))
 

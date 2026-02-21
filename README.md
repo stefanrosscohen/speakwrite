@@ -105,7 +105,6 @@ speakwrite/
 │   ├── site/                Landing page + web verifier (GitHub Pages)
 │   │   ├── index.html       speakwrite.io
 │   │   └── verify/          Client-side web verification page
-│   └── desktop/             Tauri + React desktop app (WIP)
 ```
 
 ## What It Proves (and Doesn't)
