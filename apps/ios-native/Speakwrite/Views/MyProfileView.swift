@@ -153,19 +153,31 @@ struct MyProfileView: View {
                     } else {
                         LazyVStack(spacing: 0) {
                             ForEach(posts) { post in
-                                PostRow(post: post)
-                                    .padding(.horizontal, Theme.lg)
-                                    .contextMenu {
-                                        Button(role: .destructive) {
-                                            postToDelete = post
-                                            showDeleteConfirm = true
-                                        } label: {
-                                            Label("Delete Post", systemImage: "trash")
+                                VStack(spacing: 0) {
+                                    PostRow(post: post, hideFollowButton: true)
+                                        .padding(.horizontal, Theme.lg)
+                                        .overlay(alignment: .topTrailing) {
+                                            Menu {
+                                                Button(role: .destructive) {
+                                                    postToDelete = post
+                                                    showDeleteConfirm = true
+                                                } label: {
+                                                    Label("Delete Post", systemImage: "trash")
+                                                }
+                                            } label: {
+                                                Image(systemName: "ellipsis")
+                                                    .font(.system(size: 14))
+                                                    .foregroundStyle(Theme.textTertiary(colorScheme))
+                                                    .frame(width: 32, height: 32)
+                                                    .contentShape(Rectangle())
+                                            }
+                                            .padding(.trailing, Theme.lg)
+                                            .padding(.top, 10)
                                         }
-                                    }
 
-                                Divider()
-                                    .foregroundStyle(Theme.separator(colorScheme))
+                                    Divider()
+                                        .foregroundStyle(Theme.separator(colorScheme))
+                                }
                             }
 
                             if postsCursor != nil {
@@ -216,6 +228,7 @@ struct MyProfileView: View {
                 Task { await uploadBanner(item: newItem) }
             }
             .task {
+                await viewModel.loadMyProfile()
                 await loadPosts()
             }
             .refreshable {

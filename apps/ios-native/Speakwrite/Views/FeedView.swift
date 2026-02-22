@@ -88,8 +88,9 @@ struct VerifiedFeedView: View {
                 PostDetailView(nav: nav)
             }
             .task {
-                // Always refresh; cached posts show instantly while search completes
-                await viewModel.loadFeed()
+                if viewModel.verifiedPosts.isEmpty {
+                    await viewModel.loadFeed()
+                }
             }
             .environment(\.openURL, OpenURLAction { url in
                 if url.scheme == "speakwrite", url.host == "profile",

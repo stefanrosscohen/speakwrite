@@ -55,7 +55,7 @@ struct ProfileView: View {
                                 } else {
                                     isFollowing = true
                                     do {
-                                        try await viewModel.atproto.follow(did: actorDID)
+                                        followUri = try await viewModel.atproto.follow(did: actorDID)
                                     } catch {
                                         isFollowing = false
                                     }

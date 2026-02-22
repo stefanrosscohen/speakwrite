@@ -70,6 +70,10 @@ final class AppViewModel: InputRestrictedDelegate {
 
     init() {
         self.atproto = ATProtoService()
+        // Restore cached feeds instantly
+        verifiedPosts = FeedCache.load("verified") ?? []
+        followingPosts = FeedCache.load("following") ?? []
+        timelinePosts = FeedCache.load("timeline") ?? []
     }
 
     // MARK: - InputRestrictedDelegate
@@ -256,8 +260,8 @@ final class AppViewModel: InputRestrictedDelegate {
             videoProcessingStatus = nil
             isPublishing = false
 
-            // Navigate to main feed
-            selectedTab = .timeline
+            // Navigate to verified feed where the new post appears
+            selectedTab = .verified
             lastPublishedURI = nil
             return
         } catch {
@@ -417,6 +421,15 @@ final class AppViewModel: InputRestrictedDelegate {
         )
     }
 
+    // MARK: - Preload All Feeds
+
+    func loadAllFeeds() async {
+        async let feed: () = loadFeed()
+        async let following: () = loadFollowing()
+        async let timeline: () = loadTimeline()
+        _ = await (feed, following, timeline)
+    }
+
     // MARK: - Verified Feed
 
     func loadFeed() async {
@@ -427,11 +440,11 @@ final class AppViewModel: InputRestrictedDelegate {
         do {
             let result = try await atproto.fetchVerifiedFeed(cursor: nil)
             if !result.posts.isEmpty || verifiedPosts.isEmpty {
-                // Merge: keep optimistic posts that haven't been indexed yet
                 let fetchedURIs = Set(result.posts.map(\.uri))
                 let optimistic = verifiedPosts.filter { !fetchedURIs.contains($0.uri) }
                 verifiedPosts = optimistic + result.posts
                 feedCursor = result.cursor
+                FeedCache.save(verifiedPosts, key: "verified")
             }
         } catch {
             print("[Feed] Error loading verified feed: \(error)")
@@ -461,6 +474,7 @@ final class AppViewModel: InputRestrictedDelegate {
             let result = try await atproto.fetchTimeline(cursor: nil)
             timelinePosts = result.posts
             timelineCursor = result.cursor
+            FeedCache.save(timelinePosts, key: "timeline")
         } catch {
             print("[Timeline] Error loading discover feed: \(error)")
         }
@@ -489,6 +503,7 @@ final class AppViewModel: InputRestrictedDelegate {
             let result = try await atproto.fetchFollowingTimeline(cursor: nil)
             followingPosts = result.posts
             followingCursor = result.cursor
+            FeedCache.save(followingPosts, key: "following")
         } catch {
             print("[Timeline] Error loading following feed: \(error)")
         }
@@ -505,6 +520,40 @@ final class AppViewModel: InputRestrictedDelegate {
             followingCursor = result.cursor
         } catch {
             print("[Following] Error loading more: \(error)")
+        }
+    }
+}
+
+// MARK: - Feed Cache
+
+enum FeedCache {
+    private static let encoder = JSONEncoder()
+    private static let decoder = JSONDecoder()
+
+    private static func url(for key: String) -> URL {
+        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("feed-\(key).json")
+    }
+
+    static func save<T: Encodable>(_ items: [T], key: String) {
+        do {
+            let data = try encoder.encode(items)
+            try data.write(to: url(for: key), options: .atomic)
+        } catch {
+            print("[FeedCache] Save failed for \(key): \(error)")
+        }
+    }
+
+    static func load<T: Decodable>(_ key: String) -> [T]? {
+        let file = url(for: key)
+        guard FileManager.default.fileExists(atPath: file.path) else { return nil }
+        do {
+            let data = try Data(contentsOf: file)
+            return try decoder.decode([T].self, from: data)
+        } catch {
+            print("[FeedCache] Load failed for \(key): \(error)")
+            try? FileManager.default.removeItem(at: file)
+            return nil
         }
     }
 }

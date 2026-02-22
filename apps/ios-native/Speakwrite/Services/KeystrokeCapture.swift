@@ -24,7 +24,9 @@ class InputRestrictedTextView: UITextView {
     // MARK: - Block paste, cut, and other non-typing actions
 
     override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
-        // Block paste, cut, and other clipboard-related actions
+        // Block paste, cut, and other clipboard-related actions.
+        // Don't count violations here — iOS queries available actions proactively
+        // (e.g. when building the editing menu), which would cause false positives.
         let blockedActions: [Selector] = [
             #selector(UIResponderStandardEditActions.paste(_:)),
             #selector(UIResponderStandardEditActions.cut(_:)),
@@ -34,11 +36,20 @@ class InputRestrictedTextView: UITextView {
             NSSelectorFromString("_promptForReplace:"), // Replace...
         ]
         if blockedActions.contains(action) {
-            violationCount += 1
-            restrictionDelegate?.violationCountDidChange(violationCount)
             return false
         }
         return super.canPerformAction(action, withSender: sender)
+    }
+
+    // Count violations only when the user explicitly triggers a blocked action.
+    override func paste(_ sender: Any?) {
+        violationCount += 1
+        restrictionDelegate?.violationCountDidChange(violationCount)
+    }
+
+    override func cut(_ sender: Any?) {
+        violationCount += 1
+        restrictionDelegate?.violationCountDidChange(violationCount)
     }
 
     // MARK: - Software keyboard input (with dictation blocking)
@@ -70,8 +81,11 @@ class InputRestrictedTextView: UITextView {
     // MARK: - Block hardware keyboard
 
     override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
-        // Consume hardware keyboard events without calling super
-        violationCount += presses.count
+        // Only count presses that have a key (actual hardware keyboard)
+        // Software keyboard generates UIPress events without a key property
+        let hardwareKeys = presses.filter { $0.key != nil }
+        guard !hardwareKeys.isEmpty else { return }
+        violationCount += hardwareKeys.count
         restrictionDelegate?.violationCountDidChange(violationCount)
     }
 

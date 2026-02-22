@@ -349,7 +349,7 @@ struct PostRow<Post: PostDisplayable>: View {
     private func followAuthor() async {
         isFollowingAuthor = true
         do {
-            try await viewModel.atproto.follow(did: post.author.did)
+            _ = try await viewModel.atproto.follow(did: post.author.did)
         } catch {
             isFollowingAuthor = false
             notifyFailure()

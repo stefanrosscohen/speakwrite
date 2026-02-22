@@ -61,7 +61,11 @@ struct ContentView: View {
         }
         .onAppear {
             if viewModel.atproto.restoreSession() {
-                Task { await viewModel.loadMyProfile() }
+                Task {
+                    async let profile: () = viewModel.loadMyProfile()
+                    async let feeds: () = viewModel.loadAllFeeds()
+                    _ = await (profile, feeds)
+                }
             }
         }
     }

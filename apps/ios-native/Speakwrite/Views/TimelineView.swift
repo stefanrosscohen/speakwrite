@@ -70,8 +70,12 @@ struct TimelineView: View {
                 PostDetailView(nav: nav)
             }
             .task {
-                await viewModel.loadFollowing()
-                await viewModel.loadTimeline()
+                if viewModel.followingPosts.isEmpty {
+                    await viewModel.loadFollowing()
+                }
+                if viewModel.timelinePosts.isEmpty {
+                    await viewModel.loadTimeline()
+                }
             }
             .environment(\.openURL, OpenURLAction { url in
                 if url.scheme == "speakwrite", url.host == "profile",

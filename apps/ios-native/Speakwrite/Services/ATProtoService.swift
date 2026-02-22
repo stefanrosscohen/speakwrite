@@ -74,9 +74,17 @@ final class ATProtoService {
     // MARK: - OAuth Flow
 
     func resolveHandle(_ handle: String, serviceHost: String = "https://bsky.social") async throws -> (did: String, pds: String) {
-        let url = URL(string: "\(serviceHost)/xrpc/com.atproto.identity.resolveHandle?handle=\(handle)")!
-        let (data, _) = try await URLSession.shared.data(from: url)
-        let result = try JSONDecoder().decode(ResolveHandleResponse.self, from: data)
+        let encoded = handle.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? handle
+        let url = URL(string: "\(serviceHost)/xrpc/com.atproto.identity.resolveHandle?handle=\(encoded)")!
+        let (data, response) = try await URLSession.shared.data(from: url)
+
+        if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode != 200 {
+            throw ATProtoError.handleNotFound
+        }
+
+        guard let result = try? JSONDecoder().decode(ResolveHandleResponse.self, from: data) else {
+            throw ATProtoError.handleNotFound
+        }
 
         let didDocURL = URL(string: "https://plc.directory/\(result.did)")!
         let (didData, _) = try await URLSession.shared.data(from: didDocURL)
@@ -469,13 +477,17 @@ final class ATProtoService {
             // Skip replies — they belong in their thread, not the top-level feed
             if post.record.reply != nil { return nil }
             let embed = post.embed
+            // Images/video can be top-level (images embed) or nested under media (recordWithMedia)
+            let images = embed?.images ?? embed?.media?.images
+            let videoURL = embed?.playlist ?? embed?.media?.playlist
+            let videoThumb = embed?.thumbnail ?? embed?.media?.thumbnail
             return VerifiedPost(
                 uri: post.uri, cid: post.cid, author: post.author,
                 text: post.record.displayText, createdAt: post.record.safeCreatedAt,
                 likeCount: post.likeCount ?? 0, repostCount: post.repostCount ?? 0,
                 replyCount: post.replyCount ?? 0, viewer: post.viewer,
-                images: embed?.images,
-                videoURL: embed?.playlist, videoThumbnail: embed?.thumbnail
+                images: images,
+                videoURL: videoURL, videoThumbnail: videoThumb
             )
         }
 
@@ -555,14 +567,18 @@ final class ATProtoService {
                 repostedBy = nil
             }
 
+            let embed = post.embed
+            let images = embed?.images ?? embed?.media?.images
+            let videoURL = embed?.playlist ?? embed?.media?.playlist
+            let videoThumb = embed?.thumbnail ?? embed?.media?.thumbnail
             return TimelinePost(
                 uri: post.uri, cid: post.cid, author: post.author,
                 text: displayText, createdAt: post.record?.createdAt ?? "",
                 likeCount: post.likeCount ?? 0, repostCount: post.repostCount ?? 0,
                 replyCount: post.replyCount ?? 0, isVerified: false,
                 viewer: post.viewer, repostedBy: repostedBy,
-                images: post.embed?.images,
-                videoURL: post.embed?.playlist, videoThumbnail: post.embed?.thumbnail
+                images: images,
+                videoURL: videoURL, videoThumbnail: videoThumb
             )
         }
     }
@@ -606,14 +622,18 @@ final class ATProtoService {
             let post = item.post
             guard let text = post.record?.text else { return nil }
 
+            let embed = post.embed
+            let images = embed?.images ?? embed?.media?.images
+            let videoURL = embed?.playlist ?? embed?.media?.playlist
+            let videoThumb = embed?.thumbnail ?? embed?.media?.thumbnail
             return TimelinePost(
                 uri: post.uri, cid: post.cid, author: post.author,
                 text: Self.stripSpeakwriteFooter(text), createdAt: post.record?.createdAt ?? "",
                 likeCount: post.likeCount ?? 0, repostCount: post.repostCount ?? 0,
                 replyCount: post.replyCount ?? 0, isVerified: false,
                 viewer: post.viewer, repostedBy: nil,
-                images: post.embed?.images,
-                videoURL: post.embed?.playlist, videoThumbnail: post.embed?.thumbnail
+                images: images,
+                videoURL: videoURL, videoThumbnail: videoThumb
             )
         }
 
@@ -705,16 +725,17 @@ final class ATProtoService {
 
     // MARK: - Follow / Unfollow
 
-    func follow(did: String) async throws {
+    func follow(did: String) async throws -> String {
         guard let pds = pdsURL, let myDID = self.did else { throw ATProtoError.notLoggedIn }
         let record: [String: Any] = [
             "$type": "app.bsky.graph.follow",
             "subject": did,
             "createdAt": ISO8601DateFormatter().string(from: Date()),
         ]
-        let _: CreateRecordResponse = try await createRecord(
+        let result: CreateRecordResponse = try await createRecord(
             pds: pds, did: myDID, collection: "app.bsky.graph.follow", record: record
         )
+        return result.uri
     }
 
     func unfollow(followUri: String) async throws {
@@ -1465,7 +1486,7 @@ struct FeedPost: Decodable {
 }
 struct FeedPostRecord: Decodable { let text: String?; let createdAt: String?; let tags: [String]? }
 
-struct VerifiedPost: Identifiable {
+struct VerifiedPost: Identifiable, Codable {
     let uri: String; let cid: String; let author: PostAuthor
     let text: String; let createdAt: String
     let likeCount: Int; let repostCount: Int; let replyCount: Int
@@ -1476,7 +1497,7 @@ struct VerifiedPost: Identifiable {
     var id: String { uri }
 }
 
-struct TimelinePost: Identifiable {
+struct TimelinePost: Identifiable, Codable {
     let uri: String; let cid: String; let author: PostAuthor
     let text: String; let createdAt: String
     let likeCount: Int; let repostCount: Int; let replyCount: Int
@@ -1490,7 +1511,7 @@ struct TimelinePost: Identifiable {
 
 // MARK: - Embed Types
 
-struct EmbedImageView: Decodable, Hashable, Identifiable {
+struct EmbedImageView: Codable, Hashable, Identifiable {
     let thumb: String
     let fullsize: String
     let alt: String?
@@ -1504,9 +1525,17 @@ struct PostEmbedView: Decodable {
     let playlist: String?      // HLS playlist URL
     let thumbnail: String?     // Thumbnail image URL
     let aspectRatio: EmbedAspectRatio?
+    // recordWithMedia nests images/video under "media"
+    let media: PostEmbedMedia?
     enum CodingKeys: String, CodingKey {
-        case type = "$type"; case images; case playlist; case thumbnail; case aspectRatio
+        case type = "$type"; case images; case playlist; case thumbnail; case aspectRatio; case media
     }
+}
+
+struct PostEmbedMedia: Decodable {
+    let images: [EmbedImageView]?
+    let playlist: String?
+    let thumbnail: String?
 }
 
 struct EmbedAspectRatio: Decodable, Hashable {
@@ -1586,7 +1615,7 @@ private class PresentationContextProvider: NSObject, ASWebAuthenticationPresenta
 // MARK: - Errors
 
 enum ATProtoError: Error, LocalizedError {
-    case noPDS, authCancelled, noAuthCode, notLoggedIn, sessionExpired
+    case noPDS, authCancelled, noAuthCode, notLoggedIn, sessionExpired, handleNotFound
     case oauthError(String, String?) // error code, description
     var errorDescription: String? {
         switch self {
@@ -1595,6 +1624,7 @@ enum ATProtoError: Error, LocalizedError {
         case .noAuthCode: return "No authorization code received"
         case .notLoggedIn: return "Not logged in"
         case .sessionExpired: return "Your session has expired. Please sign in again."
+        case .handleNotFound: return "Handle not found. Check spelling and try again."
         case .oauthError(let code, let desc): return "OAuth error (\(code)): \(desc ?? "unknown")"
         }
     }

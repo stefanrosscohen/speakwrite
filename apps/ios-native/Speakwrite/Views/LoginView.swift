@@ -122,6 +122,8 @@ struct LoginView: View {
                 self.error = "Not logged in. Please try again."
             case .authCancelled:
                 self.error = nil
+            case .handleNotFound:
+                self.error = "Handle not found. Check spelling — use your handle (e.g. alice.bsky.social), not email."
             default:
                 self.error = err.localizedDescription
             }
@@ -134,6 +136,8 @@ struct LoginView: View {
             default:
                 self.error = "Network error. Check your connection and try again."
             }
+        } catch is DecodingError {
+            self.error = "Sign in failed. Check your handle and try again."
         } catch {
             self.error = "Sign in failed. Check your handle and try again."
         }

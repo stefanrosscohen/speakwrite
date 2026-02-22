@@ -6,12 +6,19 @@ struct SettingsView: View {
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("appearanceMode") private var appearanceMode: Int = AppearanceMode.system.rawValue
     @State private var showLogoutConfirm = false
+    @State private var showMyProfile = false
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
                 // App header
                 HStack(spacing: Theme.sm) {
+                    AvatarButton(
+                        avatarURL: viewModel.myProfile?.avatar,
+                        handle: viewModel.atproto.handle
+                    ) {
+                        showMyProfile = true
+                    }
                     Text("speakwrite")
                         .font(Theme.monoTitle)
                         .foregroundStyle(Theme.accent)
@@ -130,6 +137,9 @@ struct SettingsView: View {
             }
             .background(Theme.background(colorScheme))
             .navigationBarHidden(true)
+            .sheet(isPresented: $showMyProfile) {
+                MyProfileView()
+            }
         }
     }
 }
