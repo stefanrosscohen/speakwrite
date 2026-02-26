@@ -145,6 +145,7 @@ extension TimelinePost {
         author: .alice,
         text: "Working on something exciting today. Can't wait to share it with everyone!",
         createdAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(-1800)),
+        indexedAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(-1800)),
         likeCount: 15,
         repostCount: 3,
         replyCount: 7,
@@ -162,6 +163,7 @@ extension TimelinePost {
         author: .bob,
         text: "Great discussion happening about open protocols and the future of the social web.",
         createdAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(-5400)),
+        indexedAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(-5400)),
         likeCount: 89,
         repostCount: 22,
         replyCount: 14,
@@ -214,7 +216,9 @@ extension ThreadReply {
         createdAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(-1200)),
         likeCount: 5,
         repostCount: 1,
-        replyCount: 0
+        replyCount: 0,
+        viewer: nil,
+        isSpeakwrite: true
     )
 
     static let previewList: [ThreadReply] = [
@@ -230,7 +234,9 @@ extension ThreadReply {
             createdAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(-600)),
             likeCount: 2,
             repostCount: 0,
-            replyCount: 1
+            replyCount: 1,
+            viewer: nil,
+            isSpeakwrite: false
         ),
     ]
 }

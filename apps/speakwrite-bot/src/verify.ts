@@ -10,11 +10,11 @@ Fw00NTAzMTUwMDAwMDBaMFIxJjAkBgNVBAMMHUFwcGxlIEFwcCBBdHRlc3RhdGlv
 biBSb290IENBMRMwEQYDVQQKDApBcHBsZSBJbmMuMRMwEQYDVQQIDApDYWxpZm9y
 bmlhMHYwEAYHKoZIzj0CAQYFK4EEACIDYgAERTHhmLW07ATaFQIEVwTtT4dyctdh
 NbJhFs/Ii2FdCgAHGbpphY3+d8qjuDngIN3WVhQUBHAoMeQ/cLiP1sOUtgjqK9au
-Ywn2LZyOD0nnNlQY6q5CmiWRb0wqsy7FNRaWo0IwQDAPBgNVHRMBAf8EBTADAQH/
-MB0GA1UdDgQWBBQ+410cBBmpybQx+xe1w3OAeyMuYjAOBgNVHQ8BAf8EBAMCAQYw
+Yen1mMEvRq9Sk3Jm5X8U62H+xTD3FE9TgS41o0IwQDAPBgNVHRMBAf8EBTADAQH/
+MB0GA1UdDgQWBBSskRBTM72+aEH/pwyp5frq5eWKoTAOBgNVHQ8BAf8EBAMCAQYw
 CgYIKoZIzj0EAwMDaAAwZQIwQgFGnByvsiVbpTKwSga0kP0e8EeDS4+sQmTvb7vn
-53O5+FRXgeLhd7ng7oRdu5WhAjEAiR+hZp/jnRoYcJR4wFAtcHlBpOAnoc3Pmdbi
-M/pWNqumUnq5fy5Ai8y/MJDOV7hd
+53O5+FRXgeLhpJ06ysC5PrOyAjEAp5U4xDgEgllF7En3VcE3iexZZtKeYnpqtijV
+oyFraWVIyd/dganmrduC1bmTBGwD
 -----END CERTIFICATE-----`;
 
 const FOOTER_MARKERS = [
@@ -84,6 +84,13 @@ export async function verifyPost(
     // Step 3: Validate certificate chain cryptographically against Apple root
     const rootCert = new crypto.X509Certificate(APPLE_APP_ATTEST_ROOT_CA_PEM);
     const leafCert = new crypto.X509Certificate(x5c[0]);
+
+    // Note: App Attest leaf certs are short-lived (~72 hours) and issued at
+    // KEY REGISTRATION time, not at posting time. The attestation object is
+    // created once and reused for all subsequent assertions. We verify the
+    // cert chain cryptographically (signatures) which proves the key came
+    // from a genuine Apple device — the cert's validity period is irrelevant
+    // since the key persists in the Secure Enclave indefinitely.
 
     if (x5c.length >= 2) {
       const intermediateCert = new crypto.X509Certificate(x5c[1]);

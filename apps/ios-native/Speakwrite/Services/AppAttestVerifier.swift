@@ -104,6 +104,14 @@ actor AppAttestVerifier {
         SecTrustSetAnchorCertificates(trust, [rootCert] as CFArray)
         SecTrustSetAnchorCertificatesOnly(trust, true)
 
+        // App Attest leaf certs are short-lived (~72 hours). Evaluate the chain
+        // at the time the leaf cert was issued, not the current time. This lets us
+        // verify proofs long after the cert expires while still confirming Apple
+        // signed the key on a genuine device.
+        if let notBefore = Self.extractNotBefore(from: certDatas[0]) {
+            SecTrustSetVerifyDate(trust, notBefore as CFDate)
+        }
+
         var error: CFError?
         let trusted = SecTrustEvaluateWithError(trust, &error)
         guard trusted else {
@@ -156,6 +164,72 @@ actor AppAttestVerifier {
         }
 
         return .verified
+    }
+
+    // MARK: - X.509 notBefore Extraction
+
+    /// Extract the notBefore date from a DER-encoded X.509 certificate by walking
+    /// the ASN.1 structure: Certificate → TBSCertificate → Validity → notBefore.
+    private static func extractNotBefore(from certData: Data) -> Date? {
+        var offset = 0
+        let bytes = [UInt8](certData)
+
+        func readTagAndLength() -> (tag: UInt8, length: Int)? {
+            guard offset < bytes.count else { return nil }
+            let tag = bytes[offset]; offset += 1
+            guard offset < bytes.count else { return nil }
+            var length = Int(bytes[offset]); offset += 1
+            if length & 0x80 != 0 {
+                let numBytes = length & 0x7F
+                guard offset + numBytes <= bytes.count else { return nil }
+                length = 0
+                for _ in 0..<numBytes {
+                    length = (length << 8) | Int(bytes[offset]); offset += 1
+                }
+            }
+            return (tag, length)
+        }
+
+        func skipElement() -> Bool {
+            guard let (_, length) = readTagAndLength() else { return false }
+            offset += length
+            return offset <= bytes.count
+        }
+
+        func parseTime() -> Date? {
+            guard let (tag, length) = readTagAndLength() else { return nil }
+            guard tag == 0x17 || tag == 0x18 else { return nil } // UTCTime or GeneralizedTime
+            guard offset + length <= bytes.count else { return nil }
+            let timeBytes = bytes[offset..<(offset + length)]
+            offset += length
+            guard let timeStr = String(bytes: timeBytes, encoding: .ascii) else { return nil }
+            let fmt = DateFormatter()
+            fmt.locale = Locale(identifier: "en_US_POSIX")
+            fmt.timeZone = TimeZone(identifier: "UTC")
+            if tag == 0x17 { // UTCTime: YYMMDDHHMMSSZ
+                fmt.dateFormat = "yyMMddHHmmss'Z'"
+            } else { // GeneralizedTime: YYYYMMDDHHMMSSZ
+                fmt.dateFormat = "yyyyMMddHHmmss'Z'"
+            }
+            return fmt.date(from: timeStr)
+        }
+
+        // Certificate SEQUENCE
+        guard let (t0, _) = readTagAndLength(), t0 == 0x30 else { return nil }
+        // TBSCertificate SEQUENCE
+        guard let (t1, _) = readTagAndLength(), t1 == 0x30 else { return nil }
+        // Skip version [0] EXPLICIT (context tag 0xA0) if present
+        if offset < bytes.count && bytes[offset] == 0xA0 { guard skipElement() else { return nil } }
+        // Skip serialNumber INTEGER
+        guard skipElement() else { return nil }
+        // Skip signature AlgorithmIdentifier SEQUENCE
+        guard skipElement() else { return nil }
+        // Skip issuer Name SEQUENCE
+        guard skipElement() else { return nil }
+        // Validity SEQUENCE
+        guard let (tv, _) = readTagAndLength(), tv == 0x30 else { return nil }
+        // notBefore
+        return parseTime()
     }
 }
 

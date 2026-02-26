@@ -72,6 +72,16 @@ async function resolvePds(did: string): Promise<string> {
     (s: { id: string; serviceEndpoint: string }) => s.id === '#atproto_pds'
   )?.serviceEndpoint;
   if (!pds) throw new Error(`No PDS found for DID: ${did}`);
+
+  // Validate PDS URL to prevent SSRF
+  if (!pds.startsWith('https://')) {
+    throw new Error('PDS endpoint must use HTTPS');
+  }
+  const parsedUrl = new URL(pds);
+  if (parsedUrl.hostname === 'localhost' || parsedUrl.hostname.startsWith('127.') || parsedUrl.hostname === '0.0.0.0') {
+    throw new Error('PDS endpoint cannot be a local address');
+  }
+
   return pds;
 }
 
@@ -84,6 +94,9 @@ export async function fetchProofForPost(
 ): Promise<ProofRecord | null> {
   const pds = await resolvePds(authorDid);
   let cursor: string | undefined;
+
+  const MAX_PAGES = 50;
+  let pages = 0;
 
   do {
     const url = new URL(`${pds}/xrpc/com.atproto.repo.listRecords`);
@@ -105,7 +118,8 @@ export async function fetchProofForPost(
     if (record) return record.value;
 
     cursor = data.cursor;
-  } while (cursor);
+    pages++;
+  } while (cursor && pages < MAX_PAGES);
 
   return null;
 }

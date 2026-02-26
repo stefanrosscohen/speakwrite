@@ -1,6 +1,51 @@
 import AVKit
 import SwiftUI
 
+// MARK: - URLSession Image Loader
+
+/// Manual image loader using URLSession for reliable loading in LazyVStack.
+private struct RemoteImage: View {
+    let url: URL?
+    @State private var uiImage: UIImage?
+    @State private var failed = false
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        Group {
+            if let uiImage {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+            } else if failed {
+                Rectangle()
+                    .fill(Theme.surface(colorScheme))
+                    .overlay {
+                        Image(systemName: "photo")
+                            .font(.system(size: 24))
+                            .foregroundStyle(Theme.textTertiary(colorScheme))
+                    }
+            } else {
+                Rectangle()
+                    .fill(Theme.surface(colorScheme))
+                    .overlay { ProgressView().tint(Theme.textTertiary(colorScheme)) }
+            }
+        }
+        .task(id: url) {
+            guard let url, uiImage == nil else { return }
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                if let img = UIImage(data: data) {
+                    uiImage = img
+                } else {
+                    failed = true
+                }
+            } catch {
+                failed = true
+            }
+        }
+    }
+}
+
 /// Grid layout for displaying 1-4 post images with full-screen tap-to-view.
 struct PostImagesView: View {
     let images: [EmbedImageView]
@@ -50,46 +95,19 @@ struct PostImagesView: View {
     }
 
     private func singleImage(_ image: EmbedImageView) -> some View {
-        AsyncImage(url: URL(string: image.thumb)) { phase in
-            switch phase {
-            case .success(let img):
-                img.resizable().scaledToFill()
-            case .failure:
-                imagePlaceholder
-            default:
-                imagePlaceholder
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: 300)
-        .clipped()
-        .contentShape(Rectangle())
-        .onTapGesture { selectedImage = image }
+        RemoteImage(url: URL(string: image.thumb))
+            .frame(maxWidth: .infinity, minHeight: 200, maxHeight: 300)
+            .clipped()
+            .contentShape(Rectangle())
+            .onTapGesture { selectedImage = image }
     }
 
     private func imageCell(_ image: EmbedImageView, aspectRatio: CGFloat) -> some View {
-        AsyncImage(url: URL(string: image.thumb)) { phase in
-            switch phase {
-            case .success(let img):
-                img.resizable().scaledToFill()
-            case .failure:
-                imagePlaceholder
-            default:
-                imagePlaceholder
-            }
-        }
-        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
-        .clipped()
-        .contentShape(Rectangle())
-        .onTapGesture { selectedImage = image }
-    }
-
-    private var imagePlaceholder: some View {
-        Rectangle()
-            .fill(Theme.surface(colorScheme))
-            .overlay {
-                Image(systemName: "photo")
-                    .foregroundStyle(Theme.textTertiary(colorScheme))
-            }
+        RemoteImage(url: URL(string: image.thumb))
+            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+            .clipped()
+            .contentShape(Rectangle())
+            .onTapGesture { selectedImage = image }
     }
 }
 
@@ -104,18 +122,9 @@ struct PostVideoView: View {
 
     var body: some View {
         ZStack {
-            AsyncImage(url: URL(string: thumbnailURL)) { phase in
-                switch phase {
-                case .success(let img):
-                    img.resizable().scaledToFill()
-                case .failure:
-                    Rectangle().fill(Theme.surface(colorScheme))
-                default:
-                    Rectangle().fill(Theme.surface(colorScheme))
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: 300)
-            .clipped()
+            RemoteImage(url: URL(string: thumbnailURL))
+                .frame(maxWidth: .infinity, maxHeight: 300)
+                .clipped()
 
             // Play button overlay
             Image(systemName: "play.circle.fill")
@@ -178,25 +187,9 @@ private struct FullScreenImageView: View {
         ZStack(alignment: .topTrailing) {
             Color.black.ignoresSafeArea()
 
-            AsyncImage(url: URL(string: image.fullsize)) { phase in
-                switch phase {
-                case .success(let img):
-                    img.resizable()
-                        .scaledToFit()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                case .failure:
-                    VStack(spacing: 8) {
-                        Image(systemName: "exclamationmark.triangle")
-                            .font(.system(size: 32))
-                        Text("Failed to load image")
-                            .font(.system(size: 14))
-                    }
-                    .foregroundStyle(.white.opacity(0.6))
-                default:
-                    ProgressView()
-                        .tint(.white)
-                }
-            }
+            RemoteImage(url: URL(string: image.fullsize))
+                .scaledToFit()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             Button {
                 dismiss()

@@ -70,6 +70,7 @@ final class AppViewModel: InputRestrictedDelegate {
 
     init() {
         self.atproto = ATProtoService()
+        FeedCache.migrateIfNeeded()
         // Restore cached feeds instantly
         verifiedPosts = FeedCache.load("verified") ?? []
         followingPosts = FeedCache.load("following") ?? []
@@ -522,6 +523,7 @@ final class AppViewModel: InputRestrictedDelegate {
             print("[Following] Error loading more: \(error)")
         }
     }
+
 }
 
 // MARK: - Feed Cache
@@ -530,9 +532,24 @@ enum FeedCache {
     private static let encoder = JSONEncoder()
     private static let decoder = JSONDecoder()
 
+    /// Bump this when the cache format changes to invalidate old caches.
+    private static let cacheVersion = 3
+    private static let versionKey = "feedCacheVersion"
+
     private static func url(for key: String) -> URL {
         FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("feed-\(key).json")
+    }
+
+    /// Clear all feed caches if the version has changed.
+    static func migrateIfNeeded() {
+        let current = UserDefaults.standard.integer(forKey: versionKey)
+        if current < cacheVersion {
+            for key in ["verified", "following", "timeline"] {
+                try? FileManager.default.removeItem(at: url(for: key))
+            }
+            UserDefaults.standard.set(cacheVersion, forKey: versionKey)
+        }
     }
 
     static func save<T: Encodable>(_ items: [T], key: String) {
@@ -556,4 +573,5 @@ enum FeedCache {
             return nil
         }
     }
+
 }

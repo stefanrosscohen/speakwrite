@@ -61,7 +61,9 @@ struct PostDetailView: View {
                 } else {
                     LazyVStack(spacing: 0) {
                         ForEach(replies) { reply in
-                            replyRow(reply)
+                            ReplyRowView(reply: reply, onReplyDismiss: {
+                                Task { await loadThread() }
+                            })
                                 .padding(.horizontal, Theme.lg)
                                 .padding(.vertical, 10)
 
@@ -89,7 +91,9 @@ struct PostDetailView: View {
             viewModel.verification.verify(postUri: nav.uri, postText: nav.text, authorDID: nav.authorDID)
             await loadThread()
         }
-        .sheet(isPresented: $showReplySheet) {
+        .sheet(isPresented: $showReplySheet, onDismiss: {
+            Task { await loadThread() }
+        }) {
             ReplyView(
                 replyToUri: nav.uri,
                 replyToCid: nav.cid,
@@ -234,84 +238,7 @@ struct PostDetailView: View {
         }
     }
 
-    // MARK: - Reply Row
-
-    private func replyRow(_ reply: ThreadReply) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            NavigationLink(value: reply.authorDID) {
-                AvatarView(url: reply.authorAvatar, handle: reply.authorHandle, size: .medium)
-            }
-            .buttonStyle(.plain)
-
-            VStack(alignment: .leading, spacing: 4) {
-                // Header — single line: Name @handle · time
-                HStack(spacing: 0) {
-                    if let name = reply.authorDisplayName, !name.isEmpty {
-                        Text(name)
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(Theme.textPrimary(colorScheme))
-                            .lineLimit(1)
-                            .layoutPriority(1)
-                    }
-
-                    Text(" @\(reply.authorHandle)")
-                        .font(.system(size: 14))
-                        .foregroundStyle(Theme.textSecondary(colorScheme))
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-
-                    Text(" · \(relativeTimeString(from: reply.createdAt))")
-                        .font(.system(size: 14))
-                        .foregroundStyle(Theme.textTertiary(colorScheme))
-                        .lineLimit(1)
-                        .fixedSize(horizontal: true, vertical: false)
-                }
-
-                // Reply text
-                if !reply.text.isEmpty {
-                    Text(mentionHighlightedText(reply.text))
-                        .font(.system(size: 15))
-                        .foregroundStyle(Theme.textPrimary(colorScheme))
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                // Engagement row — compact, matching feed PostRow style
-                HStack(spacing: 0) {
-                    replyControlButton(icon: "bubble.left", count: reply.replyCount)
-                    Spacer(minLength: 0)
-                    replyControlButton(icon: "arrow.2.squarepath", count: reply.repostCount)
-                    Spacer(minLength: 0)
-                    replyControlButton(icon: "heart", count: reply.likeCount)
-                    Spacer(minLength: 0)
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: 15))
-                        .foregroundStyle(Theme.textTertiary(colorScheme))
-                        .padding(5)
-                }
-                .frame(maxWidth: 280, alignment: .leading)
-                .padding(.top, 2)
-            }
-        }
-    }
-
-    private func replyControlButton(icon: String, count: Int) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: icon)
-                .font(.system(size: 15))
-            if count > 0 {
-                Text(formatCount(count))
-                    .font(.system(size: 13))
-            }
-        }
-        .foregroundStyle(Theme.textTertiary(colorScheme))
-        .padding(5)
-    }
-
-    private func formatCount(_ n: Int) -> String {
-        if n >= 1_000_000 { return String(format: "%.1fM", Double(n) / 1_000_000) }
-        if n >= 1_000 { return String(format: "%.1fK", Double(n) / 1_000) }
-        return "\(n)"
-    }
+    // MARK: - Reply Row (delegated to ReplyRowView for per-row state)
 
     // MARK: - Helpers
 
@@ -346,13 +273,20 @@ struct PostDetailView: View {
             if let threadReplies = result.thread.replies {
                 replies = threadReplies.compactMap { node -> ThreadReply? in
                     guard let post = node.post, let record = post.record else { return nil }
+                    let rawText = record.text ?? ""
+                    let tags = record.tags ?? []
+                    let isSW = tags.contains("speakwrite") ||
+                        rawText.contains("#speakwrite") ||
+                        (rawText.contains("human verified") && rawText.contains("speakwrite"))
                     return ThreadReply(
                         uri: post.uri, cid: post.cid,
                         authorDID: post.author.did, authorHandle: post.author.handle,
                         authorDisplayName: post.author.displayName, authorAvatar: post.author.avatar,
-                        text: record.text ?? "", createdAt: record.createdAt ?? "",
+                        text: ATProtoService.stripSpeakwriteFooter(rawText),
+                        createdAt: record.createdAt ?? "",
                         likeCount: post.likeCount ?? 0, repostCount: post.repostCount ?? 0,
-                        replyCount: post.replyCount ?? 0
+                        replyCount: post.replyCount ?? 0, viewer: post.viewer,
+                        isSpeakwrite: isSW
                     )
                 }
             }
@@ -431,7 +365,241 @@ struct ThreadReply: Identifiable {
     let likeCount: Int
     let repostCount: Int
     let replyCount: Int
+    let viewer: PostViewer?
+    let isSpeakwrite: Bool
     var id: String { uri }
+}
+
+// MARK: - Reply Row View (interactive)
+
+private struct ReplyRowView: View {
+    let reply: ThreadReply
+    var onReplyDismiss: (() -> Void)?
+    @Environment(AppViewModel.self) private var viewModel
+    @Environment(\.colorScheme) private var colorScheme
+
+    @State private var isLiked = false
+    @State private var likeUri: String?
+    @State private var localLikeCount: Int = 0
+    @State private var isReposted = false
+    @State private var repostUri: String?
+    @State private var localRepostCount: Int = 0
+    @State private var showReplySheet = false
+    @State private var showRepostMenu = false
+    @State private var showQuotePost = false
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            NavigationLink(value: reply.authorDID) {
+                AvatarView(url: reply.authorAvatar, handle: reply.authorHandle, size: .medium)
+            }
+            .buttonStyle(.plain)
+
+            VStack(alignment: .leading, spacing: 4) {
+                // Header
+                NavigationLink(value: reply.authorDID) {
+                    HStack(spacing: 0) {
+                        if let name = reply.authorDisplayName, !name.isEmpty {
+                            Text(name)
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(Theme.textPrimary(colorScheme))
+                                .lineLimit(1)
+                                .layoutPriority(1)
+                        }
+                        if reply.isSpeakwrite {
+                            Image(systemName: "checkmark.seal.fill")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Theme.accent)
+                                .padding(.leading, 2)
+                        }
+                        Text(" @\(reply.authorHandle)")
+                            .font(.system(size: 14))
+                            .foregroundStyle(Theme.textSecondary(colorScheme))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                        Text(" · \(relativeTimeString(from: reply.createdAt))")
+                            .font(.system(size: 14))
+                            .foregroundStyle(Theme.textTertiary(colorScheme))
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
+                    }
+                }
+                .buttonStyle(.plain)
+
+                // Reply text
+                if !reply.text.isEmpty {
+                    Text(mentionHighlightedText(reply.text))
+                        .font(.system(size: 15))
+                        .foregroundStyle(Theme.textPrimary(colorScheme))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                // Engagement row
+                HStack(spacing: 0) {
+                    replyButton
+                    Spacer(minLength: 0)
+                    repostButton
+                    Spacer(minLength: 0)
+                    likeButton
+                    Spacer(minLength: 0)
+                    shareButton
+                }
+                .frame(maxWidth: 280, alignment: .leading)
+                .padding(.top, 2)
+            }
+        }
+        .onAppear {
+            isLiked = reply.viewer?.like != nil
+            likeUri = reply.viewer?.like
+            localLikeCount = reply.likeCount
+            isReposted = reply.viewer?.repost != nil
+            repostUri = reply.viewer?.repost
+            localRepostCount = reply.repostCount
+        }
+        .sheet(isPresented: $showReplySheet, onDismiss: {
+            onReplyDismiss?()
+        }) {
+            ReplyView(
+                replyToUri: reply.uri,
+                replyToCid: reply.cid,
+                replyToHandle: reply.authorHandle,
+                replyToDisplayName: reply.authorDisplayName,
+                replyToAvatar: reply.authorAvatar,
+                replyToText: reply.text
+            )
+        }
+        .confirmationDialog("", isPresented: $showRepostMenu, titleVisibility: .hidden) {
+            Button(isReposted ? "Undo repost" : "Repost") {
+                Task { await toggleRepost() }
+            }
+            Button("Quote Post") {
+                showQuotePost = true
+            }
+            Button("Cancel", role: .cancel) {}
+        }
+        .sheet(isPresented: $showQuotePost) {
+            QuotePostView(
+                quotedUri: reply.uri,
+                quotedCid: reply.cid,
+                quotedHandle: reply.authorHandle,
+                quotedDisplayName: reply.authorDisplayName,
+                quotedAvatar: reply.authorAvatar,
+                quotedText: reply.text
+            )
+        }
+    }
+
+    private var replyButton: some View {
+        Button { showReplySheet = true } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "bubble.left").font(.system(size: 15))
+                if reply.replyCount > 0 {
+                    Text(formatCount(reply.replyCount)).font(.system(size: 13))
+                }
+            }
+            .foregroundStyle(Theme.textTertiary(colorScheme))
+            .padding(5)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var repostButton: some View {
+        Button { showRepostMenu = true } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "arrow.2.squarepath").font(.system(size: 15))
+                if localRepostCount > 0 {
+                    Text(formatCount(localRepostCount))
+                        .font(.system(size: 13, weight: isReposted ? .semibold : .regular))
+                }
+            }
+            .foregroundStyle(isReposted ? Theme.accent : Theme.textTertiary(colorScheme))
+            .padding(5)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var likeButton: some View {
+        Button { Task { await toggleLike() } } label: {
+            HStack(spacing: 4) {
+                Image(systemName: isLiked ? "heart.fill" : "heart").font(.system(size: 15))
+                if localLikeCount > 0 {
+                    Text(formatCount(localLikeCount))
+                        .font(.system(size: 13, weight: isLiked ? .semibold : .regular))
+                }
+            }
+            .foregroundStyle(isLiked ? Theme.liked : Theme.textTertiary(colorScheme))
+            .padding(5)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var shareButton: some View {
+        Button { shareReply() } label: {
+            Image(systemName: "square.and.arrow.up")
+                .font(.system(size: 15))
+                .foregroundStyle(Theme.textTertiary(colorScheme))
+                .padding(5)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func toggleLike() async {
+        if isLiked, let uri = likeUri {
+            isLiked = false; localLikeCount -= 1; likeUri = nil
+            do {
+                try await viewModel.atproto.unlikePost(likeUri: uri)
+            } catch {
+                isLiked = true; localLikeCount += 1; likeUri = uri
+            }
+        } else {
+            isLiked = true; localLikeCount += 1
+            do {
+                likeUri = try await viewModel.atproto.likePost(uri: reply.uri, cid: reply.cid)
+            } catch {
+                isLiked = false; localLikeCount -= 1
+            }
+        }
+    }
+
+    private func toggleRepost() async {
+        if isReposted, let uri = repostUri {
+            isReposted = false; localRepostCount -= 1; repostUri = nil
+            do {
+                try await viewModel.atproto.unrepost(repostUri: uri)
+            } catch {
+                isReposted = true; localRepostCount += 1; repostUri = uri
+            }
+        } else {
+            isReposted = true; localRepostCount += 1
+            do {
+                repostUri = try await viewModel.atproto.repost(uri: reply.uri, cid: reply.cid)
+            } catch {
+                isReposted = false; localRepostCount -= 1
+            }
+        }
+    }
+
+    private func shareReply() {
+        let parts = reply.uri.components(separatedBy: "/")
+        if let rkey = parts.last {
+            let bskyURL = "https://bsky.app/profile/\(reply.authorHandle)/post/\(rkey)"
+            let activityVC = UIActivityViewController(activityItems: [bskyURL], applicationActivities: nil)
+            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+               let rootVC = windowScene.windows.first?.rootViewController {
+                rootVC.present(activityVC, animated: true)
+            }
+        }
+    }
+
+    private func formatCount(_ n: Int) -> String {
+        if n >= 1_000_000 { return String(format: "%.1fM", Double(n) / 1_000_000) }
+        if n >= 1_000 { return String(format: "%.1fK", Double(n) / 1_000) }
+        return "\(n)"
+    }
 }
 
 // MARK: - Detail Engagement Button

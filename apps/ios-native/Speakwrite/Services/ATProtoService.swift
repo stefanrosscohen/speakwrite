@@ -1,6 +1,9 @@
 import AuthenticationServices
 import CryptoKit
 import Foundation
+import os.log
+
+private let authLog = Logger(subsystem: "io.speakwrite.app", category: "auth")
 
 // MARK: - AT Protocol Service
 
@@ -297,7 +300,7 @@ final class ATProtoService {
 
     // MARK: - Publishing
 
-    private static let testFlightURL = "https://testflight.apple.com/join/TtPndBU4"
+    private static let speakwriteURL = "https://www.speakwrite.io"
 
     func publishAttestedPost(text: String, attestation: AttestationRecord, embed: [String: Any]? = nil, reply: (parentUri: String, parentCid: String)? = nil) async throws -> (uri: String, cid: String) {
         guard let pds = pdsURL, let did = did, let handle = handle else { throw ATProtoError.notLoggedIn }
@@ -324,14 +327,14 @@ final class ATProtoService {
             "index": ["byteStart": verifyByteStart, "byteEnd": verifyByteEnd],
             "features": [["$type": "app.bsky.richtext.facet#link", "uri": verifyURL]]
         ])
-        // "Try Speakwrite" → TestFlight download
+        // "Try Speakwrite" → speakwrite.io website
         let separatorBytes = Array(" · ".utf8).count
         let tryText = "Try Speakwrite"
         let tryByteStart = verifyByteEnd + separatorBytes
         let tryByteEnd = tryByteStart + Array(tryText.utf8).count
         facets.append([
             "index": ["byteStart": tryByteStart, "byteEnd": tryByteEnd],
-            "features": [["$type": "app.bsky.richtext.facet#link", "uri": Self.testFlightURL]]
+            "features": [["$type": "app.bsky.richtext.facet#link", "uri": Self.speakwriteURL]]
         ])
 
         var postRecord: [String: Any] = [
@@ -549,9 +552,9 @@ final class ATProtoService {
         return (posts: filtered, cursor: result.cursor)
     }
 
-    /// Parse feed items into TimelinePost array.
+    /// Parse feed items into TimelinePost array, sorted newest-first by indexedAt.
     private func parseFeedPosts(_ feedItems: [FeedItem]) -> [TimelinePost] {
-        return feedItems.compactMap { item -> TimelinePost? in
+        let posts = feedItems.compactMap { item -> TimelinePost? in
             let post = item.post
             guard let text = post.record?.text else { return nil }
 
@@ -567,6 +570,9 @@ final class ATProtoService {
                 repostedBy = nil
             }
 
+            // For reposts, use the repost timestamp; otherwise use the post's indexed time
+            let effectiveIndexedAt = item.reason?.indexedAt ?? post.indexedAt
+
             let embed = post.embed
             let images = embed?.images ?? embed?.media?.images
             let videoURL = embed?.playlist ?? embed?.media?.playlist
@@ -574,12 +580,21 @@ final class ATProtoService {
             return TimelinePost(
                 uri: post.uri, cid: post.cid, author: post.author,
                 text: displayText, createdAt: post.record?.createdAt ?? "",
+                indexedAt: effectiveIndexedAt,
                 likeCount: post.likeCount ?? 0, repostCount: post.repostCount ?? 0,
-                replyCount: post.replyCount ?? 0, isVerified: false,
+                replyCount: post.replyCount ?? 0,
+                isVerified: post.record?.isSpeakwrite == true,
                 viewer: post.viewer, repostedBy: repostedBy,
                 images: images,
                 videoURL: videoURL, videoThumbnail: videoThumb
             )
+        }
+
+        // Sort by indexedAt descending (newest first), falling back to createdAt
+        return posts.sorted { a, b in
+            let dateA = a.indexedAt ?? a.createdAt
+            let dateB = b.indexedAt ?? b.createdAt
+            return dateA > dateB
         }
     }
 
@@ -629,8 +644,10 @@ final class ATProtoService {
             return TimelinePost(
                 uri: post.uri, cid: post.cid, author: post.author,
                 text: Self.stripSpeakwriteFooter(text), createdAt: post.record?.createdAt ?? "",
+                indexedAt: post.indexedAt,
                 likeCount: post.likeCount ?? 0, repostCount: post.repostCount ?? 0,
-                replyCount: post.replyCount ?? 0, isVerified: false,
+                replyCount: post.replyCount ?? 0,
+                isVerified: post.record?.isSpeakwrite == true,
                 viewer: post.viewer, repostedBy: nil,
                 images: images,
                 videoURL: videoURL, videoThumbnail: videoThumb
@@ -714,11 +731,17 @@ final class ATProtoService {
     // MARK: - Post Thread
 
     func getPostThread(uri: String) async throws -> PostThreadResponse {
-        let publicAPI = "https://api.bsky.app"
         let encoded = uri.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? uri
-        let urlString = "\(publicAPI)/xrpc/app.bsky.feed.getPostThread?uri=\(encoded)&depth=10"
 
-        let (data, _) = try await URLSession.shared.data(from: URL(string: urlString)!)
+        let data: Data
+        if let pds = pdsURL, accessToken != nil {
+            let urlString = "\(pds)/xrpc/app.bsky.feed.getPostThread?uri=\(encoded)&depth=10"
+            (data, _) = try await authenticatedRequest(url: urlString, method: "GET")
+        } else {
+            let publicAPI = "https://api.bsky.app"
+            let urlString = "\(publicAPI)/xrpc/app.bsky.feed.getPostThread?uri=\(encoded)&depth=10"
+            (data, _) = try await URLSession.shared.data(from: URL(string: urlString)!)
+        }
 
         return try JSONDecoder().decode(PostThreadResponse.self, from: data)
     }
@@ -930,11 +953,11 @@ final class ATProtoService {
     /// The refresh request is DPoP-bound with the same key pair used during initial token exchange.
     private func refreshAccessToken() async throws {
         guard let rt = refreshToken, let tokenEndpoint = tokenEndpointURL ?? resolveTokenEndpoint() else {
-            print("[Auth] Refresh failed: no refresh token or token endpoint")
+            authLog.error("Refresh failed: no refresh token or token endpoint")
             throw ATProtoError.notLoggedIn
         }
 
-        print("[Auth] Attempting token refresh at \(tokenEndpoint)")
+        authLog.debug("Attempting token refresh")
 
         let clientId = "https://www.speakwrite.io/app/client-metadata.json"
         let bodyDict: [String: String] = [
@@ -963,7 +986,7 @@ final class ATProtoService {
                 dpopNonce = nonce
             }
 
-            print("[Auth] Refresh response: \(httpResponse.statusCode)")
+            authLog.debug("Refresh response: \(httpResponse.statusCode)")
 
             // Retry with nonce if 400 or 401 (DPoP nonce challenge)
             if httpResponse.statusCode == 400 || httpResponse.statusCode == 401 {
@@ -973,19 +996,19 @@ final class ATProtoService {
                     if let retryNonce = retryHttp.value(forHTTPHeaderField: "DPoP-Nonce") {
                         dpopNonce = retryNonce
                     }
-                    print("[Auth] Refresh retry response: \(retryHttp.statusCode)")
+                    authLog.debug("Refresh retry response: \(retryHttp.statusCode)")
                     if retryHttp.statusCode >= 200 && retryHttp.statusCode < 300 {
                         let tokens = try JSONDecoder().decode(TokenResponse.self, from: retryData)
                         accessToken = tokens.accessToken
                         if let newRT = tokens.refreshToken { refreshToken = newRT }
                         persistSession()
-                        print("[Auth] Token refreshed successfully (after nonce retry)")
+                        authLog.debug("Token refreshed successfully (after nonce retry)")
                         return
                     }
                     let errorBody = String(data: retryData, encoding: .utf8) ?? ""
-                    print("[Auth] Refresh retry failed: \(errorBody)")
+                    authLog.error("Refresh retry failed with status \(retryHttp.statusCode)")
                     if errorBody.contains("invalid_grant") {
-                        print("[Auth] Session expired (invalid_grant) — logging out")
+                        authLog.warning("Session expired (invalid_grant) — logging out")
                         logout()
                         throw ATProtoError.sessionExpired
                     }
@@ -1004,14 +1027,14 @@ final class ATProtoService {
                 accessToken = tokens.accessToken
                 if let newRT = tokens.refreshToken { refreshToken = newRT }
                 persistSession()
-                print("[Auth] Token refreshed successfully")
+                authLog.debug("Token refreshed successfully")
                 return
             }
 
             let errorBody = String(data: data, encoding: .utf8) ?? "HTTP \(httpResponse.statusCode)"
-            print("[Auth] Refresh failed: \(errorBody)")
+            authLog.error("Refresh failed with status \(httpResponse.statusCode)")
             if errorBody.contains("invalid_grant") {
-                print("[Auth] Session expired (invalid_grant) — logging out")
+                authLog.warning("Session expired (invalid_grant) — logging out")
                 logout()
                 throw ATProtoError.sessionExpired
             }
@@ -1088,28 +1111,28 @@ final class ATProtoService {
             let isTokenExpired = errorMessage.contains("exp") || errorMessage.contains("invalid_token") || errorMessage.contains("expired")
 
             if !isTokenExpired {
-                print("[Auth] Got 401 for \(url), attempting nonce retry")
+                authLog.debug("Got 401, attempting nonce retry")
                 // First retry: might just need the fresh DPoP nonce
                 let retryRequest = try buildRequest()
                 let (retryData, retryResponse) = try await URLSession.shared.data(for: retryRequest)
                 if let retryHttp = retryResponse as? HTTPURLResponse {
                     captureNonce(from: retryHttp)
                     if retryHttp.statusCode >= 200 && retryHttp.statusCode < 300 {
-                        print("[Auth] Nonce retry succeeded")
+                        authLog.debug("Nonce retry succeeded")
                         return (retryData, retryResponse)
                     }
                 }
             } else {
-                print("[Auth] Got 401 for \(url) — token expired, skipping nonce retry")
+                authLog.debug("Got 401 — token expired, skipping nonce retry")
             }
 
             // Token expired or nonce retry failed — try refreshing the access token
             if refreshToken != nil {
                 // Discover token endpoint if we don't have it (migration for existing sessions)
                 if tokenEndpointURL == nil {
-                    print("[Auth] No token endpoint cached, discovering...")
+                    authLog.debug("No token endpoint cached, discovering...")
                     tokenEndpointURL = try? await discoverTokenEndpoint()
-                    print("[Auth] Discovered token endpoint: \(tokenEndpointURL ?? "nil")")
+                    authLog.debug("Token endpoint discovery complete")
                 }
 
                 do {
@@ -1120,40 +1143,40 @@ final class ATProtoService {
                     if let freshHttp = freshResponse as? HTTPURLResponse {
                         captureNonce(from: freshHttp)
                         if freshHttp.statusCode >= 200 && freshHttp.statusCode < 300 {
-                            print("[Auth] Request succeeded after token refresh")
+                            authLog.debug("Request succeeded after token refresh")
                             return (freshData, freshResponse)
                         }
                         // If we get another nonce challenge after refresh, retry once more
                         if freshHttp.statusCode == 401 {
-                            print("[Auth] Got 401 after refresh, trying one more time with fresh nonce")
+                            authLog.debug("Got 401 after refresh, trying one more time with fresh nonce")
                             let finalRequest = try buildRequest()
                             let (finalData, finalResponse) = try await URLSession.shared.data(for: finalRequest)
                             if let finalHttp = finalResponse as? HTTPURLResponse {
                                 captureNonce(from: finalHttp)
                                 if finalHttp.statusCode >= 200 && finalHttp.statusCode < 300 {
-                                    print("[Auth] Final retry after refresh succeeded")
+                                    authLog.debug("Final retry after refresh succeeded")
                                     return (finalData, finalResponse)
                                 }
                                 let errorBody = String(data: finalData, encoding: .utf8) ?? "HTTP \(finalHttp.statusCode)"
-                                print("[Auth] Final retry failed: \(finalHttp.statusCode) \(errorBody)")
+                                authLog.error("Final retry failed with status \(finalHttp.statusCode)")
                                 throw ATProtoError.oauthError("http_\(finalHttp.statusCode)", errorBody)
                             }
                             return (finalData, finalResponse)
                         }
                         let errorBody = String(data: freshData, encoding: .utf8) ?? "HTTP \(freshHttp.statusCode)"
-                        print("[Auth] Request failed even after refresh: \(freshHttp.statusCode) \(errorBody)")
+                        authLog.error("Request failed even after refresh with status \(freshHttp.statusCode)")
                         throw ATProtoError.oauthError("http_\(freshHttp.statusCode)", errorBody)
                     }
                     return (freshData, freshResponse)
                 } catch {
-                    print("[Auth] Token refresh error: \(error)")
+                    authLog.error("Token refresh error")
                     throw error
                 }
             }
 
             // No refresh token — throw the error
             let errorBody = String(data: data, encoding: .utf8) ?? "HTTP \(httpResponse.statusCode)"
-            print("[Auth] No refresh token available, failing with 401")
+            authLog.warning("No refresh token available, failing with 401")
             throw ATProtoError.oauthError("http_\(httpResponse.statusCode)", errorBody)
         }
 
@@ -1472,9 +1495,11 @@ struct FeedItem: Decodable {
 struct FeedReason: Decodable {
     let type: String?
     let by: PostAuthor?
+    let indexedAt: String?
     enum CodingKeys: String, CodingKey {
         case type = "$type"
         case by
+        case indexedAt
     }
 }
 struct FeedPost: Decodable {
@@ -1482,9 +1507,18 @@ struct FeedPost: Decodable {
     let record: FeedPostRecord?
     let embed: PostEmbedView?
     let likeCount: Int?; let repostCount: Int?; let replyCount: Int?
+    let indexedAt: String?
     let viewer: PostViewer?
 }
-struct FeedPostRecord: Decodable { let text: String?; let createdAt: String?; let tags: [String]? }
+struct FeedPostRecord: Decodable {
+    let text: String?; let createdAt: String?; let tags: [String]?
+
+    var isSpeakwrite: Bool {
+        tags?.contains("speakwrite") == true ||
+        (text?.contains("#speakwrite") == true) ||
+        (text?.contains("human verified") == true && text?.contains("speakwrite") == true)
+    }
+}
 
 struct VerifiedPost: Identifiable, Codable {
     let uri: String; let cid: String; let author: PostAuthor
@@ -1500,6 +1534,7 @@ struct VerifiedPost: Identifiable, Codable {
 struct TimelinePost: Identifiable, Codable {
     let uri: String; let cid: String; let author: PostAuthor
     let text: String; let createdAt: String
+    let indexedAt: String?
     let likeCount: Int; let repostCount: Int; let replyCount: Int
     let isVerified: Bool; let viewer: PostViewer?
     let repostedBy: String? // Display name or handle of the reposter

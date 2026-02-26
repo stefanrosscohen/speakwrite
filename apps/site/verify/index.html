@@ -14,6 +14,7 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="https://speakwrite.io/og-image.png">
   <meta name="theme-color" content="#0a0a0a">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' https: data:; connect-src 'self' https://api.bsky.app https://plc.directory https://*.host.bsky.network; frame-ancestors 'none'; base-uri 'self'; form-action 'self'">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✓</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -363,6 +364,16 @@ oyFraWVIyd/dganmrduC1bmTBGwD
 
     const TEST_FLIGHT_URL = 'https://testflight.apple.com/join/TtPndBU4';
 
+    // ── HTML escaping helpers ──
+    function escapeHtml(text) {
+      if (!text) return '';
+      return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    }
+    function escapeAttr(text) {
+      if (!text) return '';
+      return text.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#039;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
     // ── CBOR Decoder (minimal) ──
     class CBORDecoder {
       constructor(data) {
@@ -632,7 +643,24 @@ oyFraWVIyd/dganmrduC1bmTBGwD
         }
       }
 
-      return { tbsBytes, signatureAlgorithm, signatureValue, spki, extensions, rawBytes: bytes };
+      // Parse validity period (notBefore, notAfter)
+      const validityElem = tbsChildren[fieldIdx + 3];
+      const validityChildren = parseDERChildren(bytes, validityElem.contentStart,
+                                                 validityElem.contentStart + validityElem.contentLen);
+      function parseDERTime(elem) {
+        const raw = new TextDecoder().decode(bytes.slice(elem.contentStart, elem.contentStart + elem.contentLen));
+        if (elem.tag === 0x17) { // UTCTime: YYMMDDHHMMSSZ
+          const yy = parseInt(raw.slice(0, 2));
+          const year = yy >= 50 ? 1900 + yy : 2000 + yy;
+          return new Date(`${year}-${raw.slice(2,4)}-${raw.slice(4,6)}T${raw.slice(6,8)}:${raw.slice(8,10)}:${raw.slice(10,12)}Z`);
+        } else { // GeneralizedTime: YYYYMMDDHHMMSSZ
+          return new Date(`${raw.slice(0,4)}-${raw.slice(4,6)}-${raw.slice(6,8)}T${raw.slice(8,10)}:${raw.slice(10,12)}:${raw.slice(12,14)}Z`);
+        }
+      }
+      const notBefore = parseDERTime(validityChildren[0]);
+      const notAfter = parseDERTime(validityChildren[1]);
+
+      return { tbsBytes, signatureAlgorithm, signatureValue, spki, extensions, rawBytes: bytes, notBefore, notAfter };
     }
 
     // ── Certificate chain verification ──
@@ -814,10 +842,10 @@ oyFraWVIyd/dganmrduC1bmTBGwD
           const labelClass = s.status === 'pending' ? ' pending' : '';
           html += `<div class="verify-step">
             <span class="step-icon ${iconClass}${spinClass}">${icon}</span>
-            <span class="step-label${labelClass}">${s.label}</span>
+            <span class="step-label${labelClass}">${escapeHtml(s.label)}</span>
           </div>`;
           if (s.detail) {
-            html += `<div class="step-detail">${s.detail}</div>`;
+            html += `<div class="step-detail">${escapeHtml(s.detail)}</div>`;
           }
         }
         return html;
@@ -868,16 +896,17 @@ oyFraWVIyd/dganmrduC1bmTBGwD
         updateContent();
 
         // Show post card
+        const safeAvatar = author.avatar && author.avatar.startsWith('https://') ? author.avatar : '';
         const postCardHtml = `
           <div class="post-card">
             <div class="post-author">
-              ${author.avatar ? `<img class="post-avatar" src="${author.avatar}" alt="">` : '<div class="post-avatar"></div>'}
+              ${safeAvatar ? `<img class="post-avatar" src="${escapeAttr(safeAvatar)}" alt="">` : '<div class="post-avatar"></div>'}
               <div class="post-author-info">
-                <span class="post-display-name">${author.displayName || author.handle}</span>
-                <span class="post-handle">@${author.handle}</span>
+                <span class="post-display-name">${escapeHtml(author.displayName || author.handle)}</span>
+                <span class="post-handle">@${escapeHtml(author.handle)}</span>
               </div>
             </div>
-            <div class="post-text">${displayText.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+            <div class="post-text">${escapeHtml(displayText)}</div>
             <div class="post-date">${formatDate(post.record?.createdAt)}</div>
           </div>`;
 
@@ -997,6 +1026,11 @@ oyFraWVIyd/dganmrduC1bmTBGwD
         }
 
         const leafCert = await verifyCertificateChain(x5c, APPLE_APP_ATTEST_ROOT_CA_PEM);
+
+        // Note: App Attest leaf certs are short-lived (~72h) and issued at
+        // KEY REGISTRATION time, not posting time. The attestation is created
+        // once and reused. Chain verification (signatures) proves the key came
+        // from a genuine Apple device — cert validity period is irrelevant.
 
         step.status = 'pass';
         step.label = 'Apple certificate chain verified';
@@ -1137,7 +1171,7 @@ oyFraWVIyd/dganmrduC1bmTBGwD
       return `
         <div class="result-banner failed">
           <h2>✗ Verification Failed</h2>
-          <p>${message}</p>
+          <p>${escapeHtml(message)}</p>
         </div>
         <div class="btn-row" style="margin: 1rem 0;">
           <button onclick="tryAnother()" class="btn btn-primary">Try Another Post</button>

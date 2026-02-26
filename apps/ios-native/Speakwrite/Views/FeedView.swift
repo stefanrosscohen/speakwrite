@@ -88,9 +88,7 @@ struct VerifiedFeedView: View {
                 PostDetailView(nav: nav)
             }
             .task {
-                if viewModel.verifiedPosts.isEmpty {
-                    await viewModel.loadFeed()
-                }
+                await viewModel.loadFeed()
             }
             .environment(\.openURL, OpenURLAction { url in
                 if url.scheme == "speakwrite", url.host == "profile",
