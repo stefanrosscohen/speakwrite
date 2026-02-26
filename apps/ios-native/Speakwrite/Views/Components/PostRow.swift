@@ -30,26 +30,50 @@ extension TimelinePost: PostDisplayable {
     var repostAttribution: String? { repostedBy }
 }
 
-// MARK: - Mention-Highlighted Text
+// MARK: - Rich Text (Mentions + URLs)
 
-/// Build an AttributedString with @mentions as tappable blue links.
+/// Build an AttributedString with @mentions and URLs as tappable links.
 func mentionHighlightedText(_ text: String) -> AttributedString {
     var result = AttributedString(text)
-    let pattern = try? NSRegularExpression(
+
+    // Highlight @mentions → in-app profile navigation
+    if let mentionPattern = try? NSRegularExpression(
         pattern: "@([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\.)+[a-zA-Z]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?"
-    )
-    guard let pattern else { return result }
-    let matches = pattern.matches(in: text, range: NSRange(text.startIndex..., in: text))
-    for match in matches {
-        guard let range = Range(match.range, in: text),
-              let attrRange = Range(range, in: result) else { continue }
-        // Strip leading @ to get the bare handle for the URL
-        let handle = String(text[range]).dropFirst()
-        result[attrRange].foregroundColor = Theme.accent
-        if let url = URL(string: "speakwrite://profile/\(handle)") {
-            result[attrRange].link = url
+    ) {
+        let matches = mentionPattern.matches(in: text, range: NSRange(text.startIndex..., in: text))
+        for match in matches {
+            guard let range = Range(match.range, in: text),
+                  let attrRange = Range(range, in: result) else { continue }
+            let handle = String(text[range]).dropFirst()
+            result[attrRange].foregroundColor = Theme.accent
+            if let url = URL(string: "speakwrite://profile/\(handle)") {
+                result[attrRange].link = url
+            }
         }
     }
+
+    // Highlight URLs → open in Safari
+    if let urlPattern = try? NSRegularExpression(
+        pattern: "https?://[^\\s<>\"')\\]]+|www\\.[^\\s<>\"')\\]]+",
+        options: .caseInsensitive
+    ) {
+        let matches = urlPattern.matches(in: text, range: NSRange(text.startIndex..., in: text))
+        for match in matches {
+            guard let range = Range(match.range, in: text),
+                  let attrRange = Range(range, in: result) else { continue }
+            var urlString = String(text[range])
+            if urlString.hasPrefix("www.") { urlString = "https://\(urlString)" }
+            // Trim trailing punctuation that's likely not part of the URL
+            while urlString.hasSuffix(".") || urlString.hasSuffix(",") || urlString.hasSuffix(";") {
+                urlString = String(urlString.dropLast())
+            }
+            result[attrRange].foregroundColor = Theme.accent
+            if let url = URL(string: urlString) {
+                result[attrRange].link = url
+            }
+        }
+    }
+
     return result
 }
 
@@ -146,9 +170,10 @@ struct PostRow<Post: PostDisplayable>: View {
                             }
 
                             if let images = post.images, !images.isEmpty {
-                                PostImagesView(images: images)
+                                PostImagesView(images: images, interactive: false)
                             } else if let videoURL = post.videoURL, let thumb = post.videoThumbnail {
                                 PostVideoView(thumbnailURL: thumb, playlistURL: videoURL)
+                                    .allowsHitTesting(false)
                             }
                         }
                     }

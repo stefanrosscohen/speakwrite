@@ -46,9 +46,12 @@ private struct RemoteImage: View {
     }
 }
 
-/// Grid layout for displaying 1-4 post images with full-screen tap-to-view.
+/// Grid layout for displaying 1-4 post images with optional full-screen tap-to-view.
+/// Set `interactive` to false when embedded inside a NavigationLink (e.g. feed rows)
+/// so taps navigate to the post detail instead of opening the image fullscreen.
 struct PostImagesView: View {
     let images: [EmbedImageView]
+    var interactive: Bool = true
     @State private var selectedImage: EmbedImageView?
     @Environment(\.colorScheme) private var colorScheme
 
@@ -99,7 +102,7 @@ struct PostImagesView: View {
             .frame(maxWidth: .infinity, minHeight: 200, maxHeight: 300)
             .clipped()
             .contentShape(Rectangle())
-            .onTapGesture { selectedImage = image }
+            .onTapGesture { if interactive { selectedImage = image } }
     }
 
     private func imageCell(_ image: EmbedImageView, aspectRatio: CGFloat) -> some View {
@@ -107,7 +110,7 @@ struct PostImagesView: View {
             .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
             .clipped()
             .contentShape(Rectangle())
-            .onTapGesture { selectedImage = image }
+            .onTapGesture { if interactive { selectedImage = image } }
     }
 }
 

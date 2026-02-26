@@ -2,11 +2,11 @@
 
 **Prove a human wrote it.**
 
-Speakwrite is a native iOS app for creating cryptographically verifiable proof that a post was typed by a human on a genuine Apple device. It enforces input restrictions (soft keyboard only, no paste, no dictation, no autocorrect, no hardware keyboard), computes a SHA-256 content hash, and signs it with the iPhone's Secure Enclave via App Attest (P-256 ECDSA). Photos and videos are captured live through the device camera — no gallery picker — and their hashes are bound to the same attestation.
+Speakwrite is a native iOS app and open protocol for creating cryptographically verifiable proof that a post was typed by a human on a genuine Apple device. It enforces input restrictions (soft keyboard only, no paste, no dictation, no autocorrect, no hardware keyboard), computes a SHA-256 content hash, and signs it with the iPhone's Secure Enclave via App Attest (P-256 ECDSA). Photos and videos are captured live through the device camera — no gallery picker — and their hashes are bound to the same attestation.
 
 The proof goes with the post. Any reader's device can verify it. No server in the loop, no API key, no trust required.
 
-**[speakwrite.io](https://www.speakwrite.io)**
+**[speakwrite.io](https://www.speakwrite.io)** · **[Try the App](https://testflight.apple.com/join/TtPndBU4)** · **[@verify.speakwrite.io](https://bsky.app/profile/verify.speakwrite.io)** · **[Verify a Post](https://www.speakwrite.io/verify)**
 
 ---
 
@@ -78,12 +78,13 @@ Native SwiftUI. Full AT Protocol client — timeline, verified feed, compose wit
 
 ## Verification Bot
 
-[`@verify.speakwrite.io`](https://bsky.app/profile/verify.speakwrite.io) — a TypeScript service deployed on Fly.io that provides automated verification on Bluesky:
+[`@verify.speakwrite.io`](https://bsky.app/profile/verify.speakwrite.io) — mention it under any post on Bluesky and it runs the full cryptographic verification pipeline:
 
-- Mention it under any Speakwrite post and it replies with verification results
-- Runs the full verification pipeline: content hash, certificate chain, ECDSA signature
-- Supports composite hashing for media posts
-- Source: `apps/speakwrite-bot/`
+- **Content hash** — Recomputes SHA-256 from post text and media
+- **Certificate chain** — Validates x5c against Apple's App Attest Root CA
+- **ECDSA signature** — Verifies the Secure Enclave assertion
+- Replies with results and a link to independent web verification
+- TypeScript service on Fly.io · Source: `apps/speakwrite-bot/`
 
 ## Web Verification
 

@@ -118,6 +118,22 @@ async function main() {
   await agent.login({ identifier, password });
   console.log(`Logged in as ${agent.session?.handle} (${agent.session?.did})`);
 
+  // Ensure bot profile is set
+  try {
+    await agent.upsertProfile((existing) => {
+      const description = 'Cryptographic proof-of-humanity verification bot. Tag me on any post to check if it was typed by a real human on a real device.\n\nhttps://www.speakwrite.io';
+      const displayName = 'Speakwrite Verify';
+      const current = existing ?? {};
+      if (current.description === description && current.displayName === displayName) {
+        return current;
+      }
+      return { ...current, description, displayName };
+    });
+    console.log('Bot profile updated');
+  } catch (err) {
+    console.error('Failed to update bot profile:', err);
+  }
+
   // Start polling
   console.log(`Polling every ${POLL_INTERVAL / 1000}s...`);
   await pollNotifications(agent);

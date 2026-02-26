@@ -188,25 +188,7 @@ async function buildReplyText(
       mentionText || ''
     );
     line1 = '✓ ' + (generated || pick(VERIFIED_FALLBACK));
-    const linkLabel = 'Verify independently →';
-    const linkText = `www.speakwrite.io/verify/${encodeURIComponent(target.handle)}/${encodeURIComponent(target.rkey)}`;
-    const text = `${line1}\n\n${linkLabel}\n${linkText}`;
-
-    const linkByteStart = Buffer.byteLength(`${line1}\n\n`, 'utf8');
-    const linkByteEnd = linkByteStart + Buffer.byteLength(linkLabel, 'utf8');
-
-    return {
-      text,
-      facets: [
-        {
-          index: { byteStart: linkByteStart, byteEnd: linkByteEnd },
-          features: [{ $type: 'app.bsky.richtext.facet#link', uri: linkUrl }],
-        },
-      ],
-    };
-  }
-
-  if (reason) {
+  } else if (reason) {
     const generated = await generateReply(
       FAILED_SYSTEM_PROMPT,
       target.text,
@@ -222,10 +204,17 @@ async function buildReplyText(
     line1 = generated || pick(NO_PROOF_FALLBACK);
   }
 
-  const linkLabel = 'Check for yourself →';
+  const linkLabel = verified ? 'Verify independently →' : 'Check for yourself →';
   const linkText = `www.speakwrite.io/verify/${encodeURIComponent(target.handle)}/${encodeURIComponent(target.rkey)}`;
-  const text = `${line1}\n\n${linkLabel}\n${linkText}`;
+  const suffix = `\n\n${linkLabel}\n${linkText}`;
 
+  // Truncate line1 to fit within 300 graphemes (reserving space for the link)
+  const suffixGraphemes = [...new Intl.Segmenter('en', { granularity: 'grapheme' }).segment(suffix)].length;
+  line1 = truncateForBluesky(line1, 300 - suffixGraphemes);
+
+  const text = `${line1}${suffix}`;
+
+  // Compute byte offsets AFTER final text is assembled
   const linkByteStart = Buffer.byteLength(`${line1}\n\n`, 'utf8');
   const linkByteEnd = linkByteStart + Buffer.byteLength(linkLabel, 'utf8');
 
@@ -369,8 +358,10 @@ export async function pollNotifications(agent: AtpAgent): Promise<void> {
         // Build reply
         const reply = await buildReplyText(verified, target, proof ? reason : undefined, record.text);
 
+        // Text is already truncated in buildReplyText — don't re-truncate
+        // (which would invalidate facet byte offsets)
         await agent.post({
-          text: truncateForBluesky(reply.text),
+          text: reply.text,
           facets: reply.facets,
           reply: replyRef,
         });
