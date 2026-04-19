@@ -3,6 +3,7 @@ import express from 'express';
 import { AtpAgent } from '@atproto/api';
 import { pollNotifications } from './bot.js';
 import { handleFeedQuery } from './feed-query.js';
+import { handleWorldIDVerify, handleWorldIDStatus } from './worldid.js';
 
 const POLL_INTERVAL = 30_000; // 30 seconds
 
@@ -108,6 +109,10 @@ async function main() {
   });
 
   app.post('/api/feed-query', rateLimit, feedQueryAuth, handleFeedQuery);
+
+  // World ID verification (public — proof is verified server-side against World ID API)
+  app.post('/api/worldid/verify', rateLimit, handleWorldIDVerify);
+  app.get('/api/worldid/status/:did', handleWorldIDStatus);
 
   app.listen(port, '0.0.0.0', () => {
     console.log(`Health server listening on :${port}`);

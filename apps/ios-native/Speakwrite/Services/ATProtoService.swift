@@ -1410,6 +1410,19 @@ private struct AnyCodable: Decodable {
 private struct SearchPostsResponse: Decodable {
     let posts: [SearchPost]
     let cursor: String?
+
+    private struct SafeItem: Decodable {
+        let value: SearchPost?
+        init(from decoder: Decoder) throws { value = try? SearchPost(from: decoder) }
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        cursor = try? c.decode(String.self, forKey: .cursor)
+        posts = (try c.decode([SafeItem].self, forKey: .posts)).compactMap(\.value)
+    }
+
+    enum CodingKeys: String, CodingKey { case posts, cursor }
 }
 
 private struct PostReplyRef: Decodable {
@@ -1487,7 +1500,26 @@ struct PostViewer: Codable {
     let like: String?; let repost: String?
 }
 
-struct FeedResponse: Decodable { let feed: [FeedItem]; let cursor: String? }
+struct FeedResponse: Decodable {
+    let feed: [FeedItem]
+    let cursor: String?
+
+    // Robustly decode feed arrays — Bluesky can return skippedItem / notFoundPost
+    // entries that don't have a `post` field and would crash a plain [FeedItem] decode.
+    private struct SafeItem: Decodable {
+        let value: FeedItem?
+        init(from decoder: Decoder) throws { value = try? FeedItem(from: decoder) }
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        cursor = try? c.decode(String.self, forKey: .cursor)
+        feed = (try c.decode([SafeItem].self, forKey: .feed)).compactMap(\.value)
+    }
+
+    enum CodingKeys: String, CodingKey { case feed, cursor }
+}
+
 struct FeedItem: Decodable {
     let post: FeedPost
     let reason: FeedReason?

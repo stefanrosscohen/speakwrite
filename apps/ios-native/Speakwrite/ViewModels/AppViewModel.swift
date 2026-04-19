@@ -23,6 +23,7 @@ enum CameraMode {
 final class AppViewModel: InputRestrictedDelegate {
     let attestation = DeviceAttestationService()
     let verification = VerificationService()
+    let worldID = WorldIDService()
     var atproto: ATProtoService
 
     // Navigation — default to feed for preview

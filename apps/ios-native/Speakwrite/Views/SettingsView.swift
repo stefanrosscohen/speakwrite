@@ -112,6 +112,12 @@ struct SettingsView: View {
                         }
                     }
 
+                    // World ID Verification
+                    Section("Identity") {
+                        WorldIDVerifyRow()
+                            .listRowBackground(Theme.surfaceElevated(colorScheme))
+                    }
+
                     // About
                     Section("About") {
                         LabeledContent("Version") {

@@ -66,6 +66,15 @@ struct ContentView: View {
                     async let feeds: () = viewModel.loadAllFeeds()
                     _ = await (profile, feeds)
                 }
+                if let did = viewModel.atproto.did {
+                    viewModel.worldID.restoreIfVerified(did: did)
+                    Task { await viewModel.worldID.checkStatus(did: did) }
+                }
+            }
+        }
+        .onOpenURL { url in
+            Task { @MainActor in
+                viewModel.worldID.handleCallback(url: url)
             }
         }
     }
