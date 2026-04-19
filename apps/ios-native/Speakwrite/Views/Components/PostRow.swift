@@ -105,6 +105,10 @@ struct PostRow<Post: PostDisplayable>: View {
         viewModel.verification.status(for: post.uri)
     }
 
+    private var worldIDStatus: WorldIDStatus {
+        viewModel.worldID.authorStatus(for: post.author.did)
+    }
+
     /// Build a PostNavigation value for detail view navigation.
     private var postNavigation: PostNavigation {
         PostNavigation(
@@ -190,6 +194,7 @@ struct PostRow<Post: PostDisplayable>: View {
         .onAppear { syncEngagementState() }
         .task {
             viewModel.verification.verify(postUri: post.uri, postText: post.text, authorDID: post.author.did)
+            viewModel.worldID.checkAuthorStatus(did: post.author.did)
         }
         .sheet(isPresented: $showReplySheet) {
             ReplyView(
@@ -254,6 +259,15 @@ struct PostRow<Post: PostDisplayable>: View {
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.textTertiary(colorScheme))
                     .padding(.leading, 2)
+            }
+
+            // WorldID badge — only shown when the author is verified; no loading state in rows
+            if case .verified = worldIDStatus {
+                Image(systemName: "person.circle.fill")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.worldIDBlue)
+                    .padding(.leading, 2)
+                    .accessibilityLabel("World ID verified")
             }
 
             Text(" @\(post.author.handle)")
@@ -441,6 +455,14 @@ private struct PostControlButton: View {
             .padding(.horizontal)
     }
     .environment(AppViewModel.preview)
+}
+
+#Preview("WorldID Verified") {
+    NavigationStack {
+        PostRow(post: VerifiedPost.preview)
+            .padding(.horizontal)
+    }
+    .environment(AppViewModel.previewWorldIDVerified)
 }
 
 #Preview("Timeline Post") {

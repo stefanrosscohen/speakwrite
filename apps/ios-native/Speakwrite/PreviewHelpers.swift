@@ -27,6 +27,13 @@ extension AppViewModel {
     static var previewLoggedOut: AppViewModel {
         AppViewModel()
     }
+
+    /// Preview with a WorldID-verified author so the blue badge renders.
+    static var previewWorldIDVerified: AppViewModel {
+        let vm = AppViewModel.preview
+        vm.worldID.seedAuthorCache(did: PostAuthor.alice.did, status: .verified(at: "2025-01-01T00:00:00Z"))
+        return vm
+    }
 }
 
 // MARK: - Mock Authors

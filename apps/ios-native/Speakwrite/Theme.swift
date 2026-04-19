@@ -100,6 +100,9 @@ extension Theme {
     // Accent
     static let accent = Color(red: 0.0, green: 0.85, blue: 0.30)
 
+    // WorldID brand blue — matches the World App's human verification badge (~#0D80FF)
+    static let worldIDBlue = Color(red: 0.05, green: 0.50, blue: 1.0)
+
     static var accentSubtle: Color {
         accent.opacity(0.15)
     }

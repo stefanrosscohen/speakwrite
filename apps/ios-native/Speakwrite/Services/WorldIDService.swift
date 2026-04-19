@@ -42,8 +42,54 @@ final class WorldIDService {
             ?? "https://speakwrite-bot.fly.dev"
     }()
 
+    // Current user's own verification status
     var status: WorldIDStatus = .notVerified
     var pendingDID: String?
+
+    // MARK: - Per-Author Cache (for displaying badges on other users' posts/profiles)
+
+    private var authorCache: [String: WorldIDStatus] = [:]
+    private var authorInFlight: [String: Task<Void, Never>] = [:]
+
+    /// Synchronous read — safe to call from SwiftUI body; @Observable tracks the access.
+    func authorStatus(for did: String) -> WorldIDStatus {
+        authorCache[did] ?? .notVerified
+    }
+
+    /// Fire-and-forget: fetches WorldID status for `did` from the bot backend and caches it.
+    /// Guards against duplicate in-flight requests and re-fetching already-verified DIDs.
+    func checkAuthorStatus(did: String) {
+        if case .verified = authorCache[did] { return }
+        if authorInFlight[did] != nil { return }
+
+        let task = Task { [weak self] in
+            guard let self else { return }
+            let encoded = did.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? did
+            let urlString = "\(Self.botBaseURL)/api/worldid/status/\(encoded)"
+            guard let url = URL(string: urlString) else {
+                self.authorCache[did] = .notVerified; return
+            }
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                struct StatusResponse: Decodable { let verified: Bool; let verifiedAt: String? }
+                if let r = try? JSONDecoder().decode(StatusResponse.self, from: data), r.verified {
+                    self.authorCache[did] = .verified(at: r.verifiedAt ?? "")
+                } else {
+                    self.authorCache[did] = .notVerified
+                }
+            } catch {
+                self.authorCache[did] = .notVerified
+            }
+            self.authorInFlight.removeValue(forKey: did)
+        }
+        authorInFlight[did] = task
+    }
+
+#if DEBUG
+    func seedAuthorCache(did: String, status: WorldIDStatus) {
+        authorCache[did] = status
+    }
+#endif
 
     // MARK: - Start Verification
 

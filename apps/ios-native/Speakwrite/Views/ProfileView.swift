@@ -13,6 +13,10 @@ struct ProfileView: View {
     @State private var followUri: String?
     @State private var loadError: String?
 
+    private var worldIDStatus: WorldIDStatus {
+        viewModel.worldID.authorStatus(for: actorDID)
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
@@ -85,9 +89,17 @@ struct ProfileView: View {
                 // Name + handle
                 VStack(alignment: .leading, spacing: 2) {
                     if let name = profile?.displayName, !name.isEmpty {
-                        Text(name)
-                            .font(.system(size: 22, weight: .bold))
-                            .foregroundStyle(Theme.textPrimary(colorScheme))
+                        HStack(spacing: 6) {
+                            Text(name)
+                                .font(.system(size: 22, weight: .bold))
+                                .foregroundStyle(Theme.textPrimary(colorScheme))
+                            if case .verified = worldIDStatus {
+                                Image(systemName: "person.circle.fill")
+                                    .font(.system(size: 18))
+                                    .foregroundStyle(Theme.worldIDBlue)
+                                    .accessibilityLabel("World ID verified")
+                            }
+                        }
                     }
                     Text("@\(profile?.handle ?? "")")
                         .font(.system(size: 15))
@@ -182,11 +194,13 @@ struct ProfileView: View {
         .task {
             await loadProfile()
             await loadPosts()
+            viewModel.worldID.checkAuthorStatus(did: actorDID)
         }
         .refreshable {
             loadError = nil
             await loadProfile()
             await loadPosts()
+            viewModel.worldID.checkAuthorStatus(did: actorDID)
         }
     }
 
