@@ -479,12 +479,11 @@ final class AppViewModel: InputRestrictedDelegate {
 
     func loadTimeline() async {
         isTimelineLoading = true
+        defer { isTimelineLoading = false }
         debugLoadingNote = "timeline: pds=\(atproto.pdsURLDebug ?? "nil") tok=\(atproto.hasAccessTokenDebug)"
 
         do {
-            let result = try await withTimeout(seconds: 12) {
-                try await self.atproto.fetchTimeline(cursor: nil)
-            }
+            let result = try await atproto.fetchTimeline(cursor: nil)
             timelinePosts = result.posts
             timelineCursor = result.cursor
             FeedCache.save(timelinePosts, key: "timeline")
@@ -493,8 +492,6 @@ final class AppViewModel: InputRestrictedDelegate {
             lastTimelineError = String(describing: error)
             print("[Timeline] Error loading discover feed: \(error)")
         }
-
-        isTimelineLoading = false
     }
 
     func loadMoreTimeline() async {
@@ -513,12 +510,11 @@ final class AppViewModel: InputRestrictedDelegate {
 
     func loadFollowing() async {
         isFollowingLoading = true
+        defer { isFollowingLoading = false }
         debugLoadingNote = "following: pds=\(atproto.pdsURLDebug ?? "nil") tok=\(atproto.hasAccessTokenDebug) did=\(atproto.did ?? "nil")"
 
         do {
-            let result = try await withTimeout(seconds: 12) {
-                try await self.atproto.fetchFollowingTimeline(cursor: nil)
-            }
+            let result = try await atproto.fetchFollowingTimeline(cursor: nil)
             followingPosts = result.posts
             followingCursor = result.cursor
             FeedCache.save(followingPosts, key: "following")
@@ -527,8 +523,6 @@ final class AppViewModel: InputRestrictedDelegate {
             lastFollowingError = String(describing: error)
             print("[Timeline] Error loading following feed: \(error)")
         }
-
-        isFollowingLoading = false
     }
 
     func loadMoreFollowing() async {
@@ -595,17 +589,3 @@ enum FeedCache {
 
 }
 
-// MARK: - Timeout Helper
-
-/// Runs `operation` with a deadline; throws `URLError(.timedOut)` if it doesn't finish in time.
-func withTimeout<T: Sendable>(seconds: Double, operation: @escaping @Sendable () async throws -> T) async throws -> T {
-    try await withThrowingTaskGroup(of: T.self) { group in
-        group.addTask { try await operation() }
-        group.addTask {
-            try await Task.sleep(for: .seconds(seconds))
-            throw URLError(.timedOut)
-        }
-        defer { group.cancelAll() }
-        return try await group.next()!
-    }
-}

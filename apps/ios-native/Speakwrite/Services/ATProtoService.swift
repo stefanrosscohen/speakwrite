@@ -503,18 +503,24 @@ final class ATProtoService {
         let feedURI = "at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.generator/whats-hot"
         let encodedFeed = feedURI.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? feedURI
 
+        let publicAPI = "https://api.bsky.app"
+        var publicURL = "\(publicAPI)/xrpc/app.bsky.feed.getFeed?feed=\(encodedFeed)&limit=30"
+        if let cursor { publicURL += "&cursor=\(cursor)" }
+
         let data: Data
         if let pds = pdsURL, accessToken != nil {
-            // Authenticated — viewer state (following, etc.) will be included
             var urlString = "\(pds)/xrpc/app.bsky.feed.getFeed?feed=\(encodedFeed)&limit=30"
             if let cursor { urlString += "&cursor=\(cursor)" }
-            (data, _) = try await authenticatedRequest(url: urlString, method: "GET")
+            do {
+                (data, _) = try await authenticatedRequest(url: urlString, method: "GET")
+            } catch {
+                // Fall back to public API if PDS request fails (token expired, network, etc.)
+                var request = URLRequest(url: URL(string: publicURL)!, timeoutInterval: 15)
+                request.cachePolicy = .reloadIgnoringLocalCacheData
+                (data, _) = try await URLSession.shared.data(for: request)
+            }
         } else {
-            // Fallback to public API (no viewer state)
-            let publicAPI = "https://api.bsky.app"
-            var urlString = "\(publicAPI)/xrpc/app.bsky.feed.getFeed?feed=\(encodedFeed)&limit=30"
-            if let cursor { urlString += "&cursor=\(cursor)" }
-            var request = URLRequest(url: URL(string: urlString)!)
+            var request = URLRequest(url: URL(string: publicURL)!, timeoutInterval: 15)
             request.cachePolicy = .reloadIgnoringLocalCacheData
             (data, _) = try await URLSession.shared.data(for: request)
         }
@@ -1075,7 +1081,7 @@ final class ATProtoService {
 
         func buildRequest() throws -> URLRequest {
             guard let token = accessToken else { throw ATProtoError.notLoggedIn }
-            var request = URLRequest(url: URL(string: url)!)
+            var request = URLRequest(url: URL(string: url)!, timeoutInterval: 15)
             request.httpMethod = method
             request.setValue("DPoP \(token)", forHTTPHeaderField: "Authorization")
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
