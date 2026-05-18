@@ -130,8 +130,18 @@ struct TimelineView: View {
                 ContentUnavailableView {
                     Label("No posts", systemImage: "person.2")
                 } description: {
-                    Text("Follow people to see their posts here.")
-                        .font(Theme.mono)
+                    VStack(spacing: 8) {
+                        Text("Follow people to see their posts here.")
+                            .font(Theme.mono)
+                        if let err = viewModel.lastFollowingError {
+                            Text("debug: \(err)")
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundStyle(.red)
+                                .multilineTextAlignment(.center)
+                                .textSelection(.enabled)
+                                .padding(.horizontal)
+                        }
+                    }
                 }
             } else {
                 ScrollView {
@@ -179,8 +189,18 @@ struct TimelineView: View {
                 ContentUnavailableView {
                     Label("No posts", systemImage: "house")
                 } description: {
-                    Text("Your feed is empty.")
-                        .font(Theme.mono)
+                    VStack(spacing: 8) {
+                        Text("Your feed is empty.")
+                            .font(Theme.mono)
+                        if let err = viewModel.lastTimelineError {
+                            Text("debug: \(err)")
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundStyle(.red)
+                                .multilineTextAlignment(.center)
+                                .textSelection(.enabled)
+                                .padding(.horizontal)
+                        }
+                    }
                 }
             } else {
                 ScrollView {

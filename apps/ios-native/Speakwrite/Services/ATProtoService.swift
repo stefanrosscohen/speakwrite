@@ -1267,6 +1267,11 @@ final class ATProtoService {
         return "\(headerB64).\(payloadB64).\(signature.rawRepresentation.base64URLEncoded)"
     }
 
+    // MARK: - Debug Accessors
+
+    var pdsURLDebug: String? { pdsURL }
+    var hasAccessTokenDebug: Bool { accessToken != nil }
+
     // MARK: - Logout
 
     func logout() {
