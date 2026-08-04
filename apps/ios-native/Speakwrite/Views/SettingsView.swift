@@ -5,6 +5,7 @@ struct SettingsView: View {
     @Environment(AppViewModel.self) private var viewModel
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("appearanceMode") private var appearanceMode: Int = AppearanceMode.system.rawValue
+    @AppStorage("typewriterHaptics") private var typewriterHaptics = true
     @State private var showLogoutConfirm = false
     @State private var showMyProfile = false
 
@@ -51,6 +52,36 @@ struct SettingsView: View {
                         .padding(.vertical, Theme.xs)
                         .accessibilityIdentifier("account-info")
                         .listRowBackground(Theme.surfaceElevated(colorScheme))
+                    }
+
+                    // Writing
+                    Section("Writing") {
+                        Toggle(isOn: $typewriterHaptics) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Typewriter haptics")
+                                    .font(Theme.body)
+                                Text("A soft tap on every keystroke")
+                                    .font(Theme.caption)
+                                    .foregroundStyle(Theme.textSecondary(colorScheme))
+                            }
+                        }
+                        .tint(Theme.accent)
+                        .listRowBackground(Theme.surfaceElevated(colorScheme))
+
+                        if viewModel.writingStreak > 0 {
+                            LabeledContent("Writing streak") {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "pencil.line")
+                                        .font(.system(size: 12))
+                                    Text(viewModel.writingStreak == 1
+                                         ? "1 day"
+                                         : "\(viewModel.writingStreak) days")
+                                        .font(Theme.mono)
+                                }
+                                .foregroundStyle(Theme.accent)
+                            }
+                            .listRowBackground(Theme.surfaceElevated(colorScheme))
+                        }
                     }
 
                     // Appearance

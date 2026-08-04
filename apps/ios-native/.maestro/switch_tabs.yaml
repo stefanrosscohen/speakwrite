@@ -6,7 +6,10 @@ name: Switch Tabs
 ---
 - launchApp
 
-# Start on Feed tab
+# Start on Write tab (default), then go to Feed
+- assertVisible:
+    id: "compose-editor"
+- tapOn: "Feed"
 - assertVisible: "Following"
 
 # Switch to Verified tab
@@ -15,7 +18,7 @@ name: Switch Tabs
     id: "verified-feed"
 
 # Switch to Compose tab
-- tapOn: "Compose"
+- tapOn: "Write"
 - assertVisible: "What's on your mind?"
 
 # Switch to Settings tab
@@ -28,7 +31,7 @@ name: Switch Tabs
 
 # Rapid tab switching stress test
 - tapOn: "Settings"
-- tapOn: "Compose"
+- tapOn: "Write"
 - tapOn: "Verified"
 - tapOn: "Feed"
 - tapOn: "Settings"

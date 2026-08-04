@@ -7,7 +7,7 @@ name: Compose and Publish
 - launchApp
 
 # Navigate to compose tab
-- tapOn: "Compose"
+- tapOn: "Write"
 
 # Editor should be visible
 - assertVisible: "What's on your mind?"

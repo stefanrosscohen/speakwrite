@@ -4,6 +4,7 @@ import SwiftUI
 struct EditorView: View {
     @Environment(AppViewModel.self) private var viewModel
     @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("typewriterHaptics") private var typewriterHaptics = true
     @State private var showClearConfirm = false
     @State private var showMyProfile = false
     @State private var mentionQuery: String = ""
@@ -31,6 +32,20 @@ struct EditorView: View {
                         .font(Theme.monoTitle)
                         .foregroundStyle(Theme.accent)
                     Spacer()
+
+                    // Writing streak chip
+                    if viewModel.writingStreak > 0 {
+                        HStack(spacing: 4) {
+                            Image(systemName: "pencil.line")
+                                .font(.system(size: 11))
+                            Text("day \(viewModel.writingStreak)")
+                                .font(Theme.monoCaption)
+                        }
+                        .foregroundStyle(Theme.accent)
+                        .padding(.horizontal, Theme.sm)
+                        .padding(.vertical, 4)
+                        .background(Capsule().fill(Theme.accentSubtle))
+                    }
                 }
                 .padding(.horizontal, Theme.lg)
                 .padding(.vertical, Theme.sm)
@@ -56,7 +71,8 @@ struct EditorView: View {
                     InputRestrictedEditor(
                         text: $vm.postText,
                         placeholder: "What's on your mind?",
-                        inputDelegate: viewModel
+                        inputDelegate: viewModel,
+                        typewriterHaptics: typewriterHaptics
                     )
                     .accessibilityIdentifier("compose-editor")
 
@@ -97,10 +113,12 @@ struct EditorView: View {
                     )
                 }
 
-                // Live proof-ritual stats — make the guarantees visible
+                // Live proof-ritual stats — the typing odometer
                 IntegrityHUD(
                     keystrokeCount: viewModel.keystrokeCount,
-                    violationCount: viewModel.violationCount
+                    violationCount: viewModel.violationCount,
+                    wordCount: wordCount,
+                    deletionCount: viewModel.deletionCount
                 )
 
                 // Compose toolbar
@@ -130,6 +148,26 @@ struct EditorView: View {
             }
             .background(Theme.background(colorScheme))
             .navigationBarHidden(true)
+            // The publish ceremony — replaces the anonymous spinner and the
+            // silent tab teleport with a visible seal ritual.
+            .overlay {
+                if let stage = viewModel.publishStage {
+                    PublishCeremonyView(
+                        stage: stage,
+                        hasMedia: !viewModel.capturedPhotos.isEmpty || viewModel.capturedVideo != nil,
+                        streak: viewModel.writingStreak,
+                        videoStatus: viewModel.videoProcessingStatus,
+                        onViewPost: {
+                            viewModel.publishStage = nil
+                            viewModel.selectedTab = .verified
+                        },
+                        onKeepWriting: {
+                            viewModel.publishStage = nil
+                        }
+                    )
+                }
+            }
+            .animation(.easeInOut(duration: 0.2), value: viewModel.publishStage)
             .sheet(isPresented: $showMyProfile) {
                 MyProfileView()
             }
@@ -185,6 +223,14 @@ struct EditorView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Odometer
+
+    private var wordCount: Int {
+        viewModel.postText
+            .split(whereSeparator: { $0.isWhitespace || $0.isNewline })
+            .count
     }
 
     // MARK: - @Mention Detection

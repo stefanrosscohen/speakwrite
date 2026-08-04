@@ -195,6 +195,39 @@ failure.
 - **Verified-only mode** — a reader toggle that filters every feed to
   proof-carrying posts.
 
+## 3b. Direction chosen: the writing ritual (compose is the product)
+
+After reviewing alternative design theses (calm authenticity, slow feed,
+provenance receipts, verified-identity layer), the chosen direction inverts the
+app's hierarchy: **Speakwrite is a writing instrument that happens to publish.**
+The editor is the differentiated 20%; the feeds are commodity client features.
+
+Shipped:
+
+- **Write is the home tab** — the app opens into the editor; Feed, Verified,
+  and Settings sit behind it. Tab renamed Compose → Write (`pencil.line`).
+- **Typewriter haptics** — a soft tap on every keystroke (lighter on deletes),
+  toggleable in Settings → Writing. The physicality is the point: every
+  character costs a keypress, and now you feel it.
+- **Typing odometer** — the integrity HUD grew into a live session meter:
+  keystrokes, words, deletions, restrictions, violations blocked.
+- **The publish ceremony** — publishing now runs a full-screen seal ritual that
+  mirrors the real pipeline stage by stage (hashing → Secure Enclave signature
+  → media upload → post + proof), ending on a "Sealed" state with the writing
+  streak and explicit next steps ("See it in the Verified feed" / "Keep
+  writing"). No more anonymous spinner and silent tab teleport. The publish
+  pipeline was reordered (hash before attest) so the stages shown are true.
+- **Draft persistence** — the draft survives app kills and restarts
+  (UserDefaults-backed; cleared on publish and sign-out). Typing 300
+  characters by hand is an investment the app no longer gambles with.
+- **Writing streaks** — consecutive days with a verified post, shown as a
+  "day N" chip in the editor header, in the seal ceremony, and in Settings.
+  Yesterday's streak survives until midnight; missing a full day resets it.
+
+Deliberately not done (yet): keystroke *sound* (needs audio-session care),
+full-screen zen mode hiding the toolbar, and a swipe-pager instead of the tab
+bar — each needs on-device iteration.
+
 ## 4. Feature / protocol roadmap ideas
 
 - **Proof caching by post** (rather than per-author `listRecords`) once volume

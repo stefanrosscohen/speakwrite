@@ -25,19 +25,43 @@ final class AppViewModel: InputRestrictedDelegate {
     let verification = VerificationService()
     var atproto: ATProtoService
 
-    // Navigation — default to feed for preview
-    var selectedTab: AppTab = .timeline
+    // Navigation — the app opens into the editor: writing is the product,
+    // the feeds are a swipe away.
+    var selectedTab: AppTab = .compose
 
     // Own profile (loaded after login / session restore)
     var myProfile: ProfileViewDetailed?
 
-    // Compose state
-    var postText: String = ""
+    // Compose state — the draft survives app kills; typing 300 characters by
+    // hand is an investment.
+    var postText: String = "" {
+        didSet {
+            guard postText != oldValue else { return }
+            UserDefaults.standard.set(postText, forKey: Self.draftKey)
+        }
+    }
     var isPublishing: Bool = false
     var publishError: String?
     var lastPublishedURI: String?
     var keystrokeCount: Int = 0
     var violationCount: Int = 0
+    var deletionCount: Int = 0
+
+    /// The publish ceremony — each stage the proof pipeline moves through,
+    /// rendered as a full-screen ritual instead of an anonymous spinner.
+    enum PublishStage: Equatable {
+        case hashing
+        case signing
+        case uploadingMedia
+        case publishing
+        case sealed(uri: String)
+    }
+    var publishStage: PublishStage?
+
+    /// Consecutive days with at least one verified post.
+    var writingStreak: Int = WritingStreak.current()
+
+    private static let draftKey = "sw_draft"
 
     // Media capture state
     var capturedPhotos: [CapturedMedia] = []
@@ -78,6 +102,8 @@ final class AppViewModel: InputRestrictedDelegate {
         verifiedPosts = FeedCache.load("verified") ?? []
         followingPosts = FeedCache.load("following") ?? []
         timelinePosts = FeedCache.load("timeline") ?? []
+        // Restore the in-progress draft
+        postText = UserDefaults.standard.string(forKey: Self.draftKey) ?? ""
     }
 
     // MARK: - InputRestrictedDelegate
@@ -97,6 +123,12 @@ final class AppViewModel: InputRestrictedDelegate {
     nonisolated func violationCountDidChange(_ count: Int) {
         Task { @MainActor in
             self.violationCount = count
+        }
+    }
+
+    nonisolated func deletionCountDidChange(_ count: Int) {
+        Task { @MainActor in
+            self.deletionCount = count
         }
     }
 
@@ -120,6 +152,11 @@ final class AppViewModel: InputRestrictedDelegate {
         capturedPhotos = []
         capturedVideo = nil
         lastPublishedURI = nil
+        publishStage = nil
+        keystrokeCount = 0
+        violationCount = 0
+        deletionCount = 0
+        UserDefaults.standard.removeObject(forKey: Self.draftKey)
         FeedCache.clearAll()
     }
 
@@ -148,8 +185,8 @@ final class AppViewModel: InputRestrictedDelegate {
         publishError = nil
 
         do {
-            // Initialize attestation (generates + attests App Attest key if needed)
-            let keyId = try await attestation.initialize()
+            // Stage 1: hash the content
+            publishStage = .hashing
 
             // Collect media hashes (hex) for the proof record
             var mediaHashesHex: [String] = []
@@ -179,6 +216,11 @@ final class AppViewModel: InputRestrictedDelegate {
             }
             let contentHashHex = contentHashData.map { String(format: "%02x", $0) }.joined()
 
+            // Stage 2: sign in the Secure Enclave.
+            // Initialize attestation (generates + attests App Attest key if needed)
+            publishStage = .signing
+            let keyId = try await attestation.initialize()
+
             // Generate App Attest assertion over the content hash
             let assertionData = try await attestation.generateAssertion(contentHash: contentHashData)
 
@@ -197,9 +239,12 @@ final class AppViewModel: InputRestrictedDelegate {
                 mediaHashes: mediaHashesHex.isEmpty ? nil : mediaHashesHex
             )
 
-            // Upload media blobs
+            // Stage 3: upload media blobs (if any)
             var embed: [String: Any]? = nil
             var uploadedImageURLs: [EmbedImageView] = []
+            if capturedVideo != nil || !capturedPhotos.isEmpty {
+                publishStage = .uploadingMedia
+            }
 
             if let video = capturedVideo {
                 guard let did = atproto.did else { throw ATProtoError.notLoggedIn }
@@ -252,7 +297,8 @@ final class AppViewModel: InputRestrictedDelegate {
                 ]
             }
 
-            // Publish to AT Protocol
+            // Stage 4: publish post + proof to AT Protocol
+            publishStage = .publishing
             let result = try await atproto.publishAttestedPost(
                 text: text, attestation: record, embed: embed
             )
@@ -282,19 +328,21 @@ final class AppViewModel: InputRestrictedDelegate {
             postText = ""
             keystrokeCount = 0
             violationCount = 0
+            deletionCount = 0
             capturedPhotos = []
             capturedVideo = nil
             videoProcessingStatus = nil
             isPublishing = false
 
-            // Navigate to verified feed where the new post appears.
-            // lastPublishedURI stays set so the compose bar shows "Published ✓"
-            // when the user returns — it clears when they start a new draft.
-            selectedTab = .verified
+            // Stage 5: sealed. The ceremony overlay shows the result and the
+            // streak; the user chooses where to go next — no tab teleporting.
+            writingStreak = WritingStreak.recordPublish()
+            publishStage = .sealed(uri: result.uri)
             return
         } catch {
             publishError = error.localizedDescription
             videoProcessingStatus = nil
+            publishStage = nil
         }
 
         isPublishing = false
@@ -615,6 +663,53 @@ final class AppViewModel: InputRestrictedDelegate {
         }
     }
 
+}
+
+// MARK: - Writing Streak
+
+/// Consecutive-day writing streak, stored in UserDefaults. A day counts when
+/// at least one verified post is published.
+enum WritingStreak {
+    private static let countKey = "sw_streak_count"
+    private static let lastDayKey = "sw_streak_last_day"
+
+    private static func dayString(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
+    }
+
+    /// The streak as of `date`: yesterday's streak still counts (today isn't
+    /// over), anything older is broken.
+    static func current(on date: Date = Date()) -> Int {
+        guard let lastDay = UserDefaults.standard.string(forKey: lastDayKey) else { return 0 }
+        let today = dayString(date)
+        let yesterday = dayString(date.addingTimeInterval(-86_400))
+        guard lastDay == today || lastDay == yesterday else { return 0 }
+        return UserDefaults.standard.integer(forKey: countKey)
+    }
+
+    /// Record a successful publish and return the updated streak.
+    @discardableResult
+    static func recordPublish(on date: Date = Date()) -> Int {
+        let today = dayString(date)
+        let yesterday = dayString(date.addingTimeInterval(-86_400))
+        let lastDay = UserDefaults.standard.string(forKey: lastDayKey)
+
+        let newCount: Int
+        if lastDay == today {
+            newCount = max(UserDefaults.standard.integer(forKey: countKey), 1)
+        } else if lastDay == yesterday {
+            newCount = UserDefaults.standard.integer(forKey: countKey) + 1
+        } else {
+            newCount = 1
+        }
+
+        UserDefaults.standard.set(newCount, forKey: countKey)
+        UserDefaults.standard.set(today, forKey: lastDayKey)
+        return newCount
+    }
 }
 
 // MARK: - Feed Cache

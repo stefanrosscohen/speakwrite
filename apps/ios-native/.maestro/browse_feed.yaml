@@ -6,7 +6,8 @@ name: Browse Feed
 ---
 - launchApp
 
-# Feed tab should be default
+# Write tab is default — switch to Feed first
+- tapOn: "Feed"
 - assertVisible: "Following"
 - assertVisible: "For You"
 

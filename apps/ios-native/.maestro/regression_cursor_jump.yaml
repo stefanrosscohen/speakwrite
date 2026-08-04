@@ -6,7 +6,7 @@ name: "Regression: Cursor Jump Bug"
 - launchApp
 
 # Navigate to compose
-- tapOn: "Compose"
+- tapOn: "Write"
 
 # Type text in segments to test cursor stability
 - tapOn:

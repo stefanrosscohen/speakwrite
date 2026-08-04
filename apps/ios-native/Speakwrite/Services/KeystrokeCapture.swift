@@ -6,6 +6,12 @@ protocol InputRestrictedDelegate: AnyObject {
     func textDidChange(_ text: String)
     func keystrokeCountDidChange(_ count: Int)
     func violationCountDidChange(_ count: Int)
+    func deletionCountDidChange(_ count: Int)
+}
+
+// Default so existing conformers don't have to care about deletions.
+extension InputRestrictedDelegate {
+    func deletionCountDidChange(_ count: Int) {}
 }
 
 // MARK: - UITextView subclass with input restrictions
@@ -20,6 +26,13 @@ class InputRestrictedTextView: UITextView {
 
     /// Number of input restriction violations detected this session.
     private(set) var violationCount = 0
+
+    /// Number of deletions this session — part of the typing odometer.
+    private(set) var deletionCount = 0
+
+    /// Typewriter feel: a soft tap on every keystroke. Toggleable in Settings.
+    var typewriterHaptics = true
+    private let keyTap = UIImpactFeedbackGenerator(style: .light)
 
     // MARK: - Block paste, cut, and other non-typing actions
 
@@ -67,6 +80,7 @@ class InputRestrictedTextView: UITextView {
 
         super.insertText(text)
         keystrokeCount += 1
+        if typewriterHaptics { keyTap.impactOccurred(intensity: 0.5) }
         restrictionDelegate?.keystrokeCountDidChange(keystrokeCount)
         restrictionDelegate?.textDidChange(self.text)
     }
@@ -74,7 +88,10 @@ class InputRestrictedTextView: UITextView {
     override func deleteBackward() {
         super.deleteBackward()
         keystrokeCount += 1
+        deletionCount += 1
+        if typewriterHaptics { keyTap.impactOccurred(intensity: 0.35) }
         restrictionDelegate?.keystrokeCountDidChange(keystrokeCount)
+        restrictionDelegate?.deletionCountDidChange(deletionCount)
         restrictionDelegate?.textDidChange(self.text)
     }
 
@@ -118,6 +135,7 @@ class InputRestrictedTextView: UITextView {
     func resetCounters() {
         keystrokeCount = 0
         violationCount = 0
+        deletionCount = 0
     }
 }
 
@@ -127,9 +145,11 @@ struct InputRestrictedEditor: UIViewRepresentable {
     @Binding var text: String
     var placeholder: String = "Start typing..."
     var inputDelegate: InputRestrictedDelegate?
+    var typewriterHaptics: Bool = true
 
     func makeUIView(context: Context) -> InputRestrictedTextView {
         let textView = InputRestrictedTextView()
+        textView.typewriterHaptics = typewriterHaptics
         textView.font = .monospacedSystemFont(ofSize: 17, weight: .regular)
         textView.textColor = UIColor(named: "textPrimary") ?? .label
         textView.backgroundColor = .clear
@@ -159,6 +179,7 @@ struct InputRestrictedEditor: UIViewRepresentable {
             textView.selectedRange = NSRange(location: endPos, length: 0)
         }
         textView.restrictionDelegate = inputDelegate
+        textView.typewriterHaptics = typewriterHaptics
     }
 
     /// Applies blue foreground color to @mention handles in the text view.

@@ -21,7 +21,15 @@ struct ContentView: View {
         Group {
             if viewModel.atproto.isLoggedIn {
                 @Bindable var vm = viewModel
+                // Write comes first — the editor is the product, the feeds are
+                // a swipe away.
                 TabView(selection: $vm.selectedTab) {
+                    EditorView()
+                        .tabItem {
+                            Label("Write", systemImage: "pencil.line")
+                        }
+                        .tag(AppViewModel.AppTab.compose)
+
                     TimelineView()
                         .tabItem {
                             Label("Feed", systemImage: "house")
@@ -33,12 +41,6 @@ struct ContentView: View {
                             Label("Verified", systemImage: "checkmark.seal")
                         }
                         .tag(AppViewModel.AppTab.verified)
-
-                    EditorView()
-                        .tabItem {
-                            Label("Compose", systemImage: "square.and.pencil")
-                        }
-                        .tag(AppViewModel.AppTab.compose)
 
                     SettingsView()
                         .tabItem {
