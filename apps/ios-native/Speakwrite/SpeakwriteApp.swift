@@ -41,6 +41,17 @@ struct ContentView: View {
                 Task { await viewModel.refreshUnreadCount() }
             }
         }
+        .onChange(of: viewModel.atproto.isLoggedIn) { wasLoggedIn, isLoggedIn in
+            // Fresh sign-in (not session restore): kick off the initial loads
+            if !wasLoggedIn && isLoggedIn {
+                Task {
+                    async let profile: () = viewModel.loadMyProfile()
+                    async let feeds: () = viewModel.loadAllFeeds()
+                    async let unread: () = viewModel.refreshUnreadCount()
+                    _ = await (profile, feeds, unread)
+                }
+            }
+        }
     }
 
     private var loggedInBody: some View {
@@ -63,7 +74,7 @@ struct ContentView: View {
                     .tabItem {
                         Label("Activity", systemImage: "bell")
                     }
-                    .badge(viewModel.unreadNotificationCount > 0 ? viewModel.unreadNotificationCount : 0)
+                    .badge(viewModel.unreadNotificationCount)
                     .tag(AppViewModel.AppTab.notifications)
 
                 MyProfileView()
