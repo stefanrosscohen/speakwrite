@@ -45,6 +45,18 @@ struct TimelineView: View {
                 Divider()
                     .foregroundStyle(Theme.separator(colorScheme))
 
+                // Degraded-network banner — stale cached posts without an
+                // explanation look like a broken app.
+                if selectedFeed == .following, let error = viewModel.followingFeedError {
+                    StatusBanner(message: error) {
+                        Task { await viewModel.loadFollowing() }
+                    }
+                } else if selectedFeed == .forYou, let error = viewModel.timelineFeedError {
+                    StatusBanner(message: error) {
+                        Task { await viewModel.loadTimeline() }
+                    }
+                }
+
                 // Feed content
                 Group {
                     switch selectedFeed {

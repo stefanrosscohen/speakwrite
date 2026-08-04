@@ -40,7 +40,7 @@ struct EditorView: View {
                     HStack(spacing: Theme.sm) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .font(.system(size: 13))
-                        Text("Naughty naughty — use the iPhone keyboard to make a verified post")
+                        Text("Blocked — verified posts must be typed on the iPhone keyboard")
                             .font(.system(size: 13, weight: .medium, design: .monospaced))
                     }
                     .foregroundStyle(.black)
@@ -96,6 +96,12 @@ struct EditorView: View {
                         }
                     )
                 }
+
+                // Live proof-ritual stats — make the guarantees visible
+                IntegrityHUD(
+                    keystrokeCount: viewModel.keystrokeCount,
+                    violationCount: viewModel.violationCount
+                )
 
                 // Compose toolbar
                 ComposeToolbar(
@@ -158,9 +164,14 @@ struct EditorView: View {
                 })
             }
             .onChange(of: viewModel.postText) { _, newText in
+                // Starting a new draft dismisses the "Published ✓" state
+                if !newText.isEmpty { viewModel.lastPublishedURI = nil }
                 detectMentionQuery(in: newText)
             }
-            .onChange(of: viewModel.violationCount) { _, _ in
+            .onChange(of: viewModel.violationCount) { oldCount, newCount in
+                // Only warn when violations increase — the counter also resets
+                // to zero after publishing, which must not trigger the banner.
+                guard newCount > oldCount else { return }
                 violationDismissTask?.cancel()
                 withAnimation(.easeInOut(duration: 0.25)) {
                     showViolationBanner = true

@@ -31,28 +31,61 @@ actor DeviceAttestationService {
     // MARK: - Public API
 
     func initialize() async throws -> String {
-        // Generate or restore App Attest key
-        if let stored = UserDefaults.standard.string(forKey: Self.keyIdKey) {
-            keyId = stored
-        } else {
+        // The key ID and the attestation object must live and die together.
+        // Both are stored in the Keychain: the key ID previously lived in
+        // UserDefaults, which is wiped on reinstall while the Keychain
+        // persists — leaving a stale attestation object paired with a fresh
+        // key, so every subsequent post failed signature verification.
+        if keyId == nil {
+            if let stored = KeychainHelper.load(key: Self.keyIdKey), !stored.isEmpty {
+                keyId = stored
+            } else if let legacy = UserDefaults.standard.string(forKey: Self.keyIdKey) {
+                // Migrate pre-existing installs (key ID was in UserDefaults)
+                keyId = legacy
+                KeychainHelper.save(key: Self.keyIdKey, value: legacy)
+                UserDefaults.standard.removeObject(forKey: Self.keyIdKey)
+            }
+        }
+
+        if keyId == nil {
+            // Fresh key — any attestation object left over in the Keychain
+            // belongs to a previous install's key and must not be reused.
+            KeychainHelper.delete(key: Self.attestDataKey)
+            attestationData = nil
             let newKeyId = try await service.generateKey()
             keyId = newKeyId
-            UserDefaults.standard.set(newKeyId, forKey: Self.keyIdKey)
+            KeychainHelper.save(key: Self.keyIdKey, value: newKeyId)
         }
 
-        guard let keyId else { throw AttestationError.keyGenerationFailed }
+        guard let currentKeyId = keyId else { throw AttestationError.keyGenerationFailed }
 
         // Attest the key with Apple (once per key)
-        if let stored = KeychainHelper.loadData(key: Self.attestDataKey) {
-            attestationData = stored
-        } else {
-            let challenge = Data(SHA256.hash(data: Data(keyId.utf8)))
-            let data = try await service.attestKey(keyId, clientDataHash: challenge)
-            attestationData = data
-            KeychainHelper.saveData(key: Self.attestDataKey, value: data)
+        if attestationData == nil {
+            if let stored = KeychainHelper.loadData(key: Self.attestDataKey) {
+                attestationData = stored
+            } else {
+                do {
+                    let challenge = Data(SHA256.hash(data: Data(currentKeyId.utf8)))
+                    let data = try await service.attestKey(currentKeyId, clientDataHash: challenge)
+                    attestationData = data
+                    KeychainHelper.saveData(key: Self.attestDataKey, value: data)
+                } catch {
+                    // The stored key may have been invalidated (e.g. Keychain
+                    // restored onto a different device). Mint a fresh key and
+                    // retry once before giving up.
+                    let newKeyId = try await service.generateKey()
+                    keyId = newKeyId
+                    KeychainHelper.save(key: Self.keyIdKey, value: newKeyId)
+                    let challenge = Data(SHA256.hash(data: Data(newKeyId.utf8)))
+                    let data = try await service.attestKey(newKeyId, clientDataHash: challenge)
+                    attestationData = data
+                    KeychainHelper.saveData(key: Self.attestDataKey, value: data)
+                    return newKeyId
+                }
+            }
         }
 
-        return keyId
+        return currentKeyId
     }
 
     func generateAssertion(contentHash: Data) async throws -> Data {

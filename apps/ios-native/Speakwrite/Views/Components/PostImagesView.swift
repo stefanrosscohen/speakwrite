@@ -7,6 +7,7 @@ import SwiftUI
 private struct RemoteImage: View {
     let url: URL?
     @State private var uiImage: UIImage?
+    @State private var loadedURL: URL?
     @State private var failed = false
     @Environment(\.colorScheme) private var colorScheme
 
@@ -31,11 +32,16 @@ private struct RemoteImage: View {
             }
         }
         .task(id: url) {
-            guard let url, uiImage == nil else { return }
+            // Reload whenever the URL actually changes — a reused row identity
+            // must not keep showing the previous post's image.
+            guard let url, url != loadedURL else { return }
+            uiImage = nil
+            failed = false
             do {
                 let (data, _) = try await URLSession.shared.data(from: url)
                 if let img = UIImage(data: data) {
                     uiImage = img
+                    loadedURL = url
                 } else {
                     failed = true
                 }
@@ -137,9 +143,13 @@ struct PostVideoView: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .contentShape(Rectangle())
-        .onTapGesture { showPlayer = true }
+        .onTapGesture {
+            if URL(string: playlistURL) != nil { showPlayer = true }
+        }
         .fullScreenCover(isPresented: $showPlayer) {
-            VideoPlayerView(url: URL(string: playlistURL)!)
+            if let url = URL(string: playlistURL) {
+                VideoPlayerView(url: url)
+            }
         }
     }
 }

@@ -251,11 +251,13 @@ export async function pollNotifications(agent: AtpAgent): Promise<void> {
     const mentions: Notification[] = [];
     let notifCursor: string | undefined;
     let foundRead = false;
+    let sawUnread = false;
     while (!foundRead) {
       const res = await agent.listNotifications({ limit: 50, cursor: notifCursor });
       const notifications = res.data.notifications;
       for (const n of notifications) {
         if (n.isRead) { foundRead = true; break; }
+        sawUnread = true;
         if (n.reason === 'mention') mentions.push(n);
       }
       if (notifications.length < 50) break;
@@ -264,6 +266,11 @@ export async function pollNotifications(agent: AtpAgent): Promise<void> {
     }
 
     if (mentions.length === 0) {
+      // Still mark likes/follows/replies as seen — otherwise the unread
+      // backlog grows forever and every 30s poll re-walks all of it.
+      if (sawUnread) {
+        await agent.updateSeenNotifications();
+      }
       return;
     }
 
@@ -319,8 +326,10 @@ export async function pollNotifications(agent: AtpAgent): Promise<void> {
           mention.author.handle
         );
 
-        // Check if we already replied (dedup across restarts)
-        const dedup = await alreadyReplied(agent, target.uri, botDid);
+        // Check if we already replied (dedup across restarts). The bot's reply
+        // is posted as a child of the *mention*, so that's where it must look —
+        // checking the target post misses our reply and duplicates on restart.
+        const dedup = await alreadyReplied(agent, mentionUri, botDid);
         if (dedup !== 'no') {
           console.log(`Already replied or uncertain for ${target.uri}, skipping`);
           continue;

@@ -111,8 +111,14 @@ extension Theme {
 
     // Semantic
     static let error = Color.red
+    static let warning = Color.orange
     static let liked = Color.pink
     static let reposted = Color.green
+
+    /// Verification state colors — the core visual language of the app.
+    static let proofVerified = accent
+    static let proofPending = Color(white: 0.55)
+    static let proofFailed = Color.orange
 
     // Border for avatar on profile (matches background)
     static func avatarBorder(_ scheme: ColorScheme) -> Color {

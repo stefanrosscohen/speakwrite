@@ -99,6 +99,7 @@ struct PostRow<Post: PostDisplayable>: View {
     @State private var showReplySheet = false
     @State private var showRepostMenu = false
     @State private var showQuotePost = false
+    @State private var showProofSheet = false
     @State private var isFollowingAuthor = false
 
     private var verificationStatus: VerificationStatus {
@@ -189,7 +190,25 @@ struct PostRow<Post: PostDisplayable>: View {
         .accessibilityIdentifier("post-row")
         .onAppear { syncEngagementState() }
         .task {
-            viewModel.verification.verify(postUri: post.uri, postText: post.text, authorDID: post.author.did)
+            // Only posts that claim a Speakwrite proof are worth verifying —
+            // running the proof pipeline for every timeline author hammers
+            // their PDSes and always comes back empty.
+            if post.showVerifiedBadge {
+                viewModel.verification.verify(postUri: post.uri, postText: post.text, authorDID: post.author.did)
+            }
+        }
+        .sheet(isPresented: $showProofSheet) {
+            ProofDetailSheet(
+                status: verificationStatus,
+                authorHandle: post.author.handle,
+                postUri: post.uri,
+                onRetry: {
+                    viewModel.verification.verify(
+                        postUri: post.uri, postText: post.text,
+                        authorDID: post.author.did, force: true
+                    )
+                }
+            )
         }
         .sheet(isPresented: $showReplySheet) {
             ReplyView(
@@ -244,16 +263,14 @@ struct PostRow<Post: PostDisplayable>: View {
                     .truncationMode(.tail)
             }
 
-            if verificationStatus == .verified {
-                Image(systemName: "checkmark.seal.fill")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Theme.accent)
-                    .padding(.leading, 2)
-            } else if verificationStatus == .verifying {
-                Image(systemName: "checkmark.seal")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Theme.textTertiary(colorScheme))
-                    .padding(.leading, 2)
+            if post.showVerifiedBadge {
+                Button {
+                    showProofSheet = true
+                } label: {
+                    VerificationBadge(status: verificationStatus)
+                        .padding(.leading, 2)
+                }
+                .buttonStyle(.plain)
             }
 
             Text(" @\(post.author.handle)")

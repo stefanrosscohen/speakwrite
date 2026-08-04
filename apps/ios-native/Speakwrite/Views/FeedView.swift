@@ -29,6 +29,12 @@ struct VerifiedFeedView: View {
                 .padding(.horizontal, Theme.lg)
                 .padding(.vertical, Theme.sm)
 
+                if let error = viewModel.verifiedFeedError {
+                    StatusBanner(message: error) {
+                        Task { await viewModel.loadFeed() }
+                    }
+                }
+
                 // Feed content
                 Group {
                     if viewModel.isFeedLoading && viewModel.verifiedPosts.isEmpty {

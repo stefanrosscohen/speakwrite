@@ -6,8 +6,15 @@ import Foundation
 @MainActor
 final class VerificationService {
     private var cache: [String: VerificationStatus] = [:]
+    private var failedAt: [String: Date] = [:]
     private var inFlight: [String: Task<Void, Never>] = [:]
     private var authorProofCache: [String: [ProofRecord]] = [:]
+
+    /// How long a failed verification stays cached before a retry is allowed.
+    /// Failures are often transient (author's PDS briefly unreachable, proof
+    /// record not yet indexed) — a permanent failure cache turns a blip into
+    /// "this post is fake" for the rest of the session.
+    private let failureRetryInterval: TimeInterval = 60
 
     private let verifier = AppAttestVerifier()
 
@@ -15,9 +22,19 @@ final class VerificationService {
         cache[postUri] ?? .unverified
     }
 
-    func verify(postUri: String, postText: String, authorDID: String) {
-        // Already cached or in-flight
-        if cache[postUri] != nil || inFlight[postUri] != nil { return }
+    func verify(postUri: String, postText: String, authorDID: String, force: Bool = false) {
+        if inFlight[postUri] != nil { return }
+
+        if let cached = cache[postUri], !force {
+            // Success and in-progress states are final for the session.
+            // Failed states expire so transient errors can recover.
+            if case .failed = cached {
+                let lastAttempt = failedAt[postUri] ?? .distantPast
+                guard Date().timeIntervalSince(lastAttempt) > failureRetryInterval else { return }
+            } else {
+                return
+            }
+        }
 
         cache[postUri] = .verifying
 
@@ -25,6 +42,11 @@ final class VerificationService {
             guard let self else { return }
             let result = await self.performVerification(postUri: postUri, postText: postText, authorDID: authorDID)
             self.cache[postUri] = result
+            if case .failed = result {
+                self.failedAt[postUri] = Date()
+            } else {
+                self.failedAt.removeValue(forKey: postUri)
+            }
             self.inFlight.removeValue(forKey: postUri)
         }
         inFlight[postUri] = task
@@ -72,22 +94,39 @@ final class VerificationService {
         return await verifier.verify(proof: proofData, postText: postText)
     }
 
-    /// Resolve PDS endpoint for a DID via the PLC directory.
+    /// Resolve PDS endpoint for a DID. Supports both did:plc (via the PLC
+    /// directory) and did:web (via the domain's well-known DID document).
     private func resolvePDS(did: String) async throws -> String {
-        let encoded = did.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? did
-        let url = URL(string: "https://plc.directory/\(encoded)")!
-        let (data, _) = try await URLSession.shared.data(from: url)
-
         struct DIDDoc: Decodable {
             struct Service: Decodable {
                 let id: String
+                let type: String?
                 let serviceEndpoint: String
             }
             let service: [Service]?
         }
 
+        let url: URL
+        if did.hasPrefix("did:web:") {
+            let host = String(did.dropFirst("did:web:".count))
+                .removingPercentEncoding ?? String(did.dropFirst("did:web:".count))
+            guard let didWebURL = URL(string: "https://\(host)/.well-known/did.json") else {
+                throw URLError(.badURL)
+            }
+            url = didWebURL
+        } else {
+            let encoded = did.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? did
+            guard let plcURL = URL(string: "https://plc.directory/\(encoded)") else {
+                throw URLError(.badURL)
+            }
+            url = plcURL
+        }
+
+        let (data, _) = try await URLSession.shared.data(from: url)
         let doc = try JSONDecoder().decode(DIDDoc.self, from: data)
-        guard let pds = doc.service?.first(where: { $0.id == "#atproto_pds" })?.serviceEndpoint else {
+        guard let pds = doc.service?.first(where: {
+            $0.id.hasSuffix("#atproto_pds") || $0.type == "AtprotoPersonalDataServer"
+        })?.serviceEndpoint else {
             throw URLError(.badServerResponse)
         }
         return pds
@@ -98,28 +137,52 @@ final class VerificationService {
 
         // Resolve the author's PDS — proof records live on their PDS, not a central server
         let pds = try await resolvePDS(did: did)
-        let urlString = "\(pds)/xrpc/com.atproto.repo.listRecords?repo=\(encoded)&collection=io.speakwrite.proof&limit=100"
 
-        let (data, response) = try await URLSession.shared.data(from: URL(string: urlString)!)
+        // Paginate: a single 100-record page silently broke verification for
+        // authors with more than 100 proofs.
+        var proofs: [ProofRecord] = []
+        var cursor: String?
+        let maxPages = 10
 
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode >= 200 && httpResponse.statusCode < 300 else {
-            return []
+        for _ in 0..<maxPages {
+            var urlString = "\(pds)/xrpc/com.atproto.repo.listRecords?repo=\(encoded)&collection=io.speakwrite.proof&limit=100"
+            if let cursor,
+               let encodedCursor = cursor.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
+                urlString += "&cursor=\(encodedCursor)"
+            }
+
+            let (data, response) = try await URLSession.shared.data(from: URL(string: urlString)!)
+
+            guard let httpResponse = response as? HTTPURLResponse else { break }
+            // 4xx → the repo genuinely has no accessible proofs (definitive).
+            // 5xx → the PDS is having trouble (transient) — throw so the failure
+            // is retried instead of being reported as "no proof record".
+            if httpResponse.statusCode >= 500 {
+                throw URLError(.badServerResponse)
+            }
+            guard (200..<300).contains(httpResponse.statusCode) else {
+                return proofs
+            }
+
+            let result = try JSONDecoder().decode(ListRecordsResponse.self, from: data)
+            proofs.append(contentsOf: result.records.compactMap { record -> ProofRecord? in
+                guard let value = record.value else { return nil }
+                return ProofRecord(
+                    postUri: value.postUri ?? "",
+                    keyId: value.keyId ?? "",
+                    attestationObject: value.attestationObject ?? "",
+                    assertion: value.assertion ?? "",
+                    contentHash: value.contentHash ?? "",
+                    appId: value.appId ?? "",
+                    mediaHashes: value.mediaHashes
+                )
+            })
+
+            guard let next = result.cursor, !result.records.isEmpty else { break }
+            cursor = next
         }
 
-        let result = try JSONDecoder().decode(ListRecordsResponse.self, from: data)
-        return result.records.compactMap { record -> ProofRecord? in
-            guard let value = record.value else { return nil }
-            return ProofRecord(
-                postUri: value.postUri ?? "",
-                keyId: value.keyId ?? "",
-                attestationObject: value.attestationObject ?? "",
-                assertion: value.assertion ?? "",
-                contentHash: value.contentHash ?? "",
-                appId: value.appId ?? "",
-                mediaHashes: value.mediaHashes
-            )
-        }
+        return proofs
     }
 }
 

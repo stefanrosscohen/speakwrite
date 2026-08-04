@@ -863,16 +863,22 @@ oyFraWVIyd/dganmrduC1bmTBGwD
       }
 
       try {
-        // Step 1: Resolve handle → DID
+        // Step 1: Resolve handle → DID (AT-URI input already carries a DID)
         let step = addStep(`Resolving @${handle}...`);
         updateContent();
 
-        const resolveResp = await fetchWithTimeout(`https://api.bsky.app/xrpc/com.atproto.identity.resolveHandle?handle=${encodeURIComponent(handle)}`);
-        if (!resolveResp.ok) throw new Error(`Could not resolve handle @${handle}`);
-        const { did } = await resolveResp.json();
+        let did;
+        if (handle.startsWith('did:')) {
+          did = handle;
+          step.label = 'Author identified';
+        } else {
+          const resolveResp = await fetchWithTimeout(`https://api.bsky.app/xrpc/com.atproto.identity.resolveHandle?handle=${encodeURIComponent(handle)}`);
+          if (!resolveResp.ok) throw new Error(`Could not resolve handle @${handle}`);
+          ({ did } = await resolveResp.json());
+          step.label = `Resolved @${handle}`;
+        }
 
         step.status = 'pass';
-        step.label = `Resolved @${handle}`;
         step.detail = did;
         updateContent();
 

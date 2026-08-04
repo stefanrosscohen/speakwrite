@@ -125,7 +125,9 @@ struct ProfileView: View {
                         .tint(Theme.accent)
                         .frame(maxWidth: .infinity)
                         .padding(.top, Theme.xxxl)
-                } else if let error = loadError {
+                } else if let error = loadError, posts.isEmpty {
+                    // Full-screen error only when there's nothing to show —
+                    // a profile-header fetch blip must not hide loaded posts.
                     VStack(spacing: Theme.sm) {
                         Text(error)
                             .font(.system(size: 14))
@@ -227,6 +229,7 @@ struct ProfileView: View {
             let result = try await viewModel.atproto.getAuthorFeed(actor: actorDID)
             posts = result.posts
             postsCursor = result.cursor
+            loadError = nil
         } catch {
             if posts.isEmpty {
                 loadError = "Couldn't load posts. Pull to refresh."

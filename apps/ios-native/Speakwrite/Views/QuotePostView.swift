@@ -33,7 +33,9 @@ struct QuotePostView: View {
                         size: .medium
                     )
 
-                    InputRestrictedEditor(text: $postText, placeholder: "Add your thoughts", inputDelegate: viewModel)
+                    // No inputDelegate: routing keystrokes through the shared
+                    // view model would overwrite the Compose tab's draft.
+                    InputRestrictedEditor(text: $postText, placeholder: "Add your thoughts")
                         .frame(minHeight: 80)
                 }
                 .padding(.horizontal, Theme.lg)

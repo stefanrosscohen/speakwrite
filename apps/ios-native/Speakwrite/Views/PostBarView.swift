@@ -6,7 +6,10 @@ struct PostBarView: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var showPublishConfirm = false
 
-    private let charLimit = 300
+    // Bluesky's limit is 300 graphemes, but publishing appends the
+    // "✓ Verify a human wrote this · Try Speakwrite" footer (~46 chars) —
+    // a full 300-character draft would be rejected by the server.
+    private let charLimit = 254
 
     var body: some View {
         VStack(spacing: 0) {

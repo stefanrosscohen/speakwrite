@@ -114,12 +114,24 @@ final class ATProtoService {
     func signIn(handle: String, serviceHost: String = "https://bsky.social", presentationAnchor: ASPresentationAnchor) async throws {
         let (resolvedDID, pds) = try await resolveHandle(handle, serviceHost: serviceHost)
 
-        // Discover the authorization server from the PDS's protected resource metadata
-        let authServer = try await discoverAuthorizationServer(pds: pds)
+        // Discover the authorization server from the PDS's protected resource metadata.
+        // A dead or unreachable PDS is a common, user-fixable failure (especially for
+        // self-hosted servers) — surface it as such instead of a generic error.
+        let authServer: String
+        do {
+            authServer = try await discoverAuthorizationServer(pds: pds)
+        } catch {
+            throw ATProtoError.pdsUnreachable(URL(string: pds)?.host ?? pds)
+        }
 
-        let metadataURL = URL(string: "\(authServer)/.well-known/oauth-authorization-server")!
-        let (metaData, _) = try await URLSession.shared.data(from: metadataURL)
-        let metadata = try JSONDecoder().decode(OAuthServerMetadata.self, from: metaData)
+        let metadata: OAuthServerMetadata
+        do {
+            let metadataURL = URL(string: "\(authServer)/.well-known/oauth-authorization-server")!
+            let (metaData, _) = try await URLSession.shared.data(from: metadataURL)
+            metadata = try JSONDecoder().decode(OAuthServerMetadata.self, from: metaData)
+        } catch {
+            throw ATProtoError.pdsUnreachable(URL(string: authServer)?.host ?? authServer)
+        }
 
         let codeVerifier = generateCodeVerifier()
         let codeChallenge = computeCodeChallenge(codeVerifier)
@@ -353,8 +365,11 @@ final class ATProtoService {
         }
 
         if let reply {
+            // Resolve the true thread root — replying to a reply must keep the
+            // original root, otherwise the post detaches from its thread.
+            let root = await resolveThreadRoot(parentUri: reply.parentUri, parentCid: reply.parentCid)
             postRecord["reply"] = [
-                "root": ["uri": reply.parentUri, "cid": reply.parentCid] as [String: Any],
+                "root": ["uri": root.uri, "cid": root.cid] as [String: Any],
                 "parent": ["uri": reply.parentUri, "cid": reply.parentCid] as [String: Any],
             ] as [String: Any]
         }
@@ -380,11 +395,51 @@ final class ATProtoService {
             proofRecord["mediaHashes"] = mediaHashes
         }
 
-        let _: CreateRecordResponse? = try? await createRecord(
-            pds: pds, did: did, collection: "io.speakwrite.proof", record: proofRecord
-        )
+        // The proof record IS the product. If it can't be stored, the post must
+        // not go out — it would carry a "Verify a human wrote this" footer and
+        // a verify link that reports "no proof found" forever.
+        do {
+            let _: CreateRecordResponse = try await createRecord(
+                pds: pds, did: did, collection: "io.speakwrite.proof", record: proofRecord
+            )
+        } catch {
+            // Roll back the post so an unverifiable "verified" post never goes out.
+            try? await deleteRecord(collection: "app.bsky.feed.post", recordUri: postResult.uri)
+            throw ATProtoError.oauthError(
+                "proof_write_failed",
+                "The post was not published: its verification proof could not be stored on your server. Try again."
+            )
+        }
 
         return (uri: postResult.uri, cid: postResult.cid)
+    }
+
+    /// Fetch the parent post's record to find the thread root. If the parent is a
+    /// top-level post (or the lookup fails), the parent itself is the root.
+    private func resolveThreadRoot(parentUri: String, parentCid: String) async -> (uri: String, cid: String) {
+        struct GetPostsResponse: Decodable {
+            struct Post: Decodable {
+                let record: Record?
+                struct Record: Decodable { let reply: PostReplyRef? }
+            }
+            let posts: [Post]
+        }
+
+        let encoded = parentUri.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? parentUri
+        guard let url = URL(string: "https://api.bsky.app/xrpc/app.bsky.feed.getPosts?uris=\(encoded)") else {
+            return (uri: parentUri, cid: parentCid)
+        }
+
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            let result = try JSONDecoder().decode(GetPostsResponse.self, from: data)
+            if let root = result.posts.first?.record?.reply?.root {
+                return (uri: root.uri, cid: root.cid)
+            }
+        } catch {
+            // Fall through — treat the parent as the root
+        }
+        return (uri: parentUri, cid: parentCid)
     }
 
     // MARK: - @Mention Facets
@@ -590,8 +645,13 @@ final class ATProtoService {
             )
         }
 
+        // Dedupe by URI — a repost and its original in the same page share a
+        // URI, and SwiftUI's ForEach requires unique IDs.
+        var seen = Set<String>()
+        let unique = posts.filter { seen.insert($0.uri).inserted }
+
         // Sort by indexedAt descending (newest first), falling back to createdAt
-        return posts.sorted { a, b in
+        return unique.sorted { a, b in
             let dateA = a.indexedAt ?? a.createdAt
             let dateB = b.indexedAt ?? b.createdAt
             return dateA > dateB
@@ -691,41 +751,6 @@ final class ATProtoService {
 
     func unrepost(repostUri: String) async throws {
         try await deleteRecord(collection: "app.bsky.feed.repost", recordUri: repostUri)
-    }
-
-    func replyToPost(text: String, parentUri: String, parentCid: String) async throws {
-        guard let pds = pdsURL, let did = self.did else { throw ATProtoError.notLoggedIn }
-        let record: [String: Any] = [
-            "$type": "app.bsky.feed.post",
-            "text": text,
-            "reply": [
-                "root": ["uri": parentUri, "cid": parentCid],
-                "parent": ["uri": parentUri, "cid": parentCid],
-            ] as [String: Any],
-            "createdAt": ISO8601DateFormatter().string(from: Date()),
-        ]
-        let _: CreateRecordResponse = try await createRecord(
-            pds: pds, did: did, collection: "app.bsky.feed.post", record: record
-        )
-    }
-
-    func quotePost(text: String, quotedUri: String, quotedCid: String) async throws {
-        guard let pds = pdsURL, let did = self.did else { throw ATProtoError.notLoggedIn }
-        let record: [String: Any] = [
-            "$type": "app.bsky.feed.post",
-            "text": text,
-            "embed": [
-                "$type": "app.bsky.embed.record",
-                "record": [
-                    "uri": quotedUri,
-                    "cid": quotedCid,
-                ] as [String: Any],
-            ] as [String: Any],
-            "createdAt": ISO8601DateFormatter().string(from: Date()),
-        ]
-        let _: CreateRecordResponse = try await createRecord(
-            pds: pds, did: did, collection: "app.bsky.feed.post", record: record
-        )
     }
 
     // MARK: - Post Thread
@@ -879,45 +904,71 @@ final class ATProtoService {
         throw ATProtoError.oauthError("video_timeout", "Video processing timed out")
     }
 
-    /// Upload an image blob to the PDS. Returns the blob JSON for use in profile updates.
+    /// Upload an image blob to the PDS. Returns the blob JSON for use in embeds and profile updates.
+    /// Throws if the upload fails — publishing a post with a missing blob ref would
+    /// silently produce a broken image on every client.
     func uploadBlob(imageData: Data, mimeType: String) async throws -> [String: Any] {
-        guard let pds = pdsURL, let token = accessToken else { throw ATProtoError.notLoggedIn }
+        guard let pds = pdsURL, accessToken != nil else { throw ATProtoError.notLoggedIn }
         let url = "\(pds)/xrpc/com.atproto.repo.uploadBlob"
 
-        var request = URLRequest(url: URL(string: url)!)
-        request.httpMethod = "POST"
-        request.setValue(mimeType, forHTTPHeaderField: "Content-Type")
-        request.setValue("DPoP \(token)", forHTTPHeaderField: "Authorization")
-        if let dpopHeader = try createDPoPProof(method: "POST", url: url, accessToken: token) {
-            request.setValue(dpopHeader, forHTTPHeaderField: "DPoP")
+        func buildRequest() throws -> URLRequest {
+            guard let token = accessToken else { throw ATProtoError.notLoggedIn }
+            var request = URLRequest(url: URL(string: url)!)
+            request.httpMethod = "POST"
+            request.setValue(mimeType, forHTTPHeaderField: "Content-Type")
+            request.setValue("DPoP \(token)", forHTTPHeaderField: "Authorization")
+            if let dpopHeader = try createDPoPProof(method: "POST", url: url, accessToken: token) {
+                request.setValue(dpopHeader, forHTTPHeaderField: "DPoP")
+            }
+            request.httpBody = imageData
+            return request
         }
-        request.httpBody = imageData
 
+        func extractBlob(_ data: Data) throws -> [String: Any] {
+            let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+            guard let blob = json?["blob"] as? [String: Any], !blob.isEmpty else {
+                throw ATProtoError.oauthError("upload_failed", "Server returned no blob reference")
+            }
+            return blob
+        }
+
+        let request = try buildRequest()
         let (data, response) = try await URLSession.shared.data(for: request)
 
-        // Handle DPoP nonce
-        if let httpResponse = response as? HTTPURLResponse,
-           let nonce = httpResponse.value(forHTTPHeaderField: "DPoP-Nonce") {
-            dpopNonce = nonce
-
-            if httpResponse.statusCode == 401 {
-                // Retry with nonce
-                var retryReq = URLRequest(url: URL(string: url)!)
-                retryReq.httpMethod = "POST"
-                retryReq.setValue(mimeType, forHTTPHeaderField: "Content-Type")
-                retryReq.setValue("DPoP \(token)", forHTTPHeaderField: "Authorization")
-                if let dpopHeader = try createDPoPProof(method: "POST", url: url, accessToken: token) {
-                    retryReq.setValue(dpopHeader, forHTTPHeaderField: "DPoP")
-                }
-                retryReq.httpBody = imageData
-                let (retryData, _) = try await URLSession.shared.data(for: retryReq)
-                let blob = try JSONSerialization.jsonObject(with: retryData) as? [String: Any]
-                return blob?["blob"] as? [String: Any] ?? [:]
-            }
+        guard let httpResponse = response as? HTTPURLResponse else {
+            return try extractBlob(data)
         }
 
-        let blob = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        return blob?["blob"] as? [String: Any] ?? [:]
+        if let nonce = httpResponse.value(forHTTPHeaderField: "DPoP-Nonce") {
+            dpopNonce = nonce
+        }
+
+        if (200..<300).contains(httpResponse.statusCode) {
+            return try extractBlob(data)
+        }
+
+        // 401 may be a DPoP nonce challenge or an expired token — retry once
+        // (refreshing the token if needed), then fail loudly.
+        if httpResponse.statusCode == 401 {
+            if refreshToken != nil {
+                try? await refreshAccessToken()
+            }
+            let retryRequest = try buildRequest()
+            let (retryData, retryResponse) = try await URLSession.shared.data(for: retryRequest)
+            if let retryHttp = retryResponse as? HTTPURLResponse {
+                if let nonce = retryHttp.value(forHTTPHeaderField: "DPoP-Nonce") {
+                    dpopNonce = nonce
+                }
+                guard (200..<300).contains(retryHttp.statusCode) else {
+                    let body = String(data: retryData, encoding: .utf8) ?? "HTTP \(retryHttp.statusCode)"
+                    throw ATProtoError.oauthError("upload_failed_\(retryHttp.statusCode)", body)
+                }
+            }
+            return try extractBlob(retryData)
+        }
+
+        let body = String(data: data, encoding: .utf8) ?? "HTTP \(httpResponse.statusCode)"
+        throw ATProtoError.oauthError("upload_failed_\(httpResponse.statusCode)", body)
     }
 
     /// Update the user's profile (display name, bio, avatar, banner).
@@ -1651,6 +1702,7 @@ private class PresentationContextProvider: NSObject, ASWebAuthenticationPresenta
 
 enum ATProtoError: Error, LocalizedError {
     case noPDS, authCancelled, noAuthCode, notLoggedIn, sessionExpired, handleNotFound
+    case pdsUnreachable(String) // host that could not be reached
     case oauthError(String, String?) // error code, description
     var errorDescription: String? {
         switch self {
@@ -1660,6 +1712,7 @@ enum ATProtoError: Error, LocalizedError {
         case .notLoggedIn: return "Not logged in"
         case .sessionExpired: return "Your session has expired. Please sign in again."
         case .handleNotFound: return "Handle not found. Check spelling and try again."
+        case .pdsUnreachable(let host): return "Can't reach your server (\(host)). It may be offline — your account's data server must be online to sign in and post."
         case .oauthError(let code, let desc): return "OAuth error (\(code)): \(desc ?? "unknown")"
         }
     }

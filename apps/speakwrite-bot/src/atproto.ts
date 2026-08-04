@@ -103,7 +103,9 @@ export async function fetchProofForPost(
     url.searchParams.set('repo', authorDid);
     url.searchParams.set('collection', 'io.speakwrite.proof');
     url.searchParams.set('limit', '100');
-    url.searchParams.set('reverse', 'true');
+    // Newest-first (default order): the post being verified is almost always
+    // recent, so it's found on page one instead of after walking the entire
+    // proof history oldest-first.
     if (cursor) url.searchParams.set('cursor', cursor);
 
     const resp = await fetchWithTimeout(url.toString());

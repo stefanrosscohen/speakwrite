@@ -101,6 +101,15 @@ export async function verifyPost(
           reason: 'Leaf cert not issued by intermediate',
         };
       }
+      // Cryptographically verify the leaf's signature — checkIssued() is only
+      // an issuer-name match, so without this a self-signed leaf that copies
+      // Apple's intermediate DN would pass with an attacker-controlled key.
+      if (!leafCert.verify(intermediateCert.publicKey)) {
+        return {
+          verified: false,
+          reason: 'Leaf cert signature not valid against intermediate',
+        };
+      }
       // Cryptographically verify intermediate was signed by Apple root
       if (!intermediateCert.verify(rootCert.publicKey)) {
         return {

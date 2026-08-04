@@ -97,14 +97,7 @@ struct SettingsView: View {
                         .listRowBackground(Theme.surfaceElevated(colorScheme))
                         .alert("Sign out?", isPresented: $showLogoutConfirm) {
                             Button("Sign Out", role: .destructive) {
-                                viewModel.atproto.logout()
-                                viewModel.myProfile = nil
-                                viewModel.verifiedPosts = []
-                                viewModel.timelinePosts = []
-                                viewModel.followingPosts = []
-                                viewModel.feedCursor = nil
-                                viewModel.timelineCursor = nil
-                                viewModel.followingCursor = nil
+                                viewModel.signOut()
                             }
                             Button("Cancel", role: .cancel) {}
                         } message: {

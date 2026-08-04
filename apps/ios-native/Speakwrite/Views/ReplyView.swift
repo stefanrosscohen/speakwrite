@@ -90,7 +90,9 @@ struct ReplyView: View {
                         .padding(.bottom, 12)
 
                         // Compose area — flows right after the thread connector
-                        InputRestrictedEditor(text: $replyText, placeholder: "Post your reply", inputDelegate: viewModel)
+                        // No inputDelegate: routing keystrokes through the shared
+                        // view model would overwrite the Compose tab's draft.
+                        InputRestrictedEditor(text: $replyText, placeholder: "Post your reply")
                             .frame(minHeight: 100)
                     }
                 }
@@ -209,7 +211,7 @@ struct ReplyView: View {
                 detectMentionQuery(in: newText)
             }
             .fullScreenCover(isPresented: $showCamera) {
-                CameraCaptureView(mode: cameraMode) { media in
+                CameraCaptureView(mode: cameraMode, onCapture: { media in
                     if media.mimeType.starts(with: "video/") {
                         capturedPhotos = []
                         capturedVideo = media
@@ -219,7 +221,9 @@ struct ReplyView: View {
                             capturedPhotos.append(media)
                         }
                     }
-                }
+                }, onError: { captureError in
+                    error = captureError
+                })
             }
         }
     }

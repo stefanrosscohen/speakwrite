@@ -50,16 +50,19 @@ final class AppViewModel: InputRestrictedDelegate {
     var verifiedPosts: [VerifiedPost] = []
     var feedCursor: String?
     var isFeedLoading: Bool = false
+    var verifiedFeedError: String?
 
     // Timeline feed state (For You — discover feed)
     var timelinePosts: [TimelinePost] = []
     var timelineCursor: String?
     var isTimelineLoading: Bool = false
+    var timelineFeedError: String?
 
     // Following feed state (authenticated following timeline)
     var followingPosts: [TimelinePost] = []
     var followingCursor: String?
     var isFollowingLoading: Bool = false
+    var followingFeedError: String?
 
     enum AppTab: Hashable {
         case timeline
@@ -95,6 +98,29 @@ final class AppViewModel: InputRestrictedDelegate {
         Task { @MainActor in
             self.violationCount = count
         }
+    }
+
+    // MARK: - Sign Out
+
+    /// Sign out and clear all account-scoped state, including the on-disk feed
+    /// cache — otherwise the next account sees the previous account's feeds.
+    func signOut() {
+        atproto.logout()
+        myProfile = nil
+        verifiedPosts = []
+        timelinePosts = []
+        followingPosts = []
+        feedCursor = nil
+        timelineCursor = nil
+        followingCursor = nil
+        verifiedFeedError = nil
+        timelineFeedError = nil
+        followingFeedError = nil
+        postText = ""
+        capturedPhotos = []
+        capturedVideo = nil
+        lastPublishedURI = nil
+        FeedCache.clearAll()
     }
 
     // MARK: - Profile
@@ -261,9 +287,10 @@ final class AppViewModel: InputRestrictedDelegate {
             videoProcessingStatus = nil
             isPublishing = false
 
-            // Navigate to verified feed where the new post appears
+            // Navigate to verified feed where the new post appears.
+            // lastPublishedURI stays set so the compose bar shows "Published ✓"
+            // when the user returns — it clears when they start a new draft.
             selectedTab = .verified
-            lastPublishedURI = nil
             return
         } catch {
             publishError = error.localizedDescription
@@ -442,25 +469,54 @@ final class AppViewModel: InputRestrictedDelegate {
             let result = try await atproto.fetchVerifiedFeed(cursor: nil)
             if !result.posts.isEmpty || verifiedPosts.isEmpty {
                 let fetchedURIs = Set(result.posts.map(\.uri))
-                let optimistic = verifiedPosts.filter { !fetchedURIs.contains($0.uri) }
+                // Keep only *recent* posts search hasn't indexed yet (the
+                // just-published optimistic insert). Older cache-only posts have
+                // simply aged out of the feed — pinning them on top forever made
+                // the feed look frozen.
+                let indexingGracePeriod = Date().addingTimeInterval(-15 * 60)
+                let iso = ISO8601DateFormatter()
+                let optimistic = verifiedPosts.filter { post in
+                    guard !fetchedURIs.contains(post.uri) else { return false }
+                    guard let created = iso.date(from: post.createdAt) else { return false }
+                    return created > indexingGracePeriod
+                }
                 verifiedPosts = optimistic + result.posts
                 feedCursor = result.cursor
                 FeedCache.save(verifiedPosts, key: "verified")
             }
+            verifiedFeedError = nil
         } catch {
-            print("[Feed] Error loading verified feed: \(error)")
+            verifiedFeedError = Self.friendlyNetworkMessage(for: error)
         }
 
         if isFirstLoad { isFeedLoading = false }
     }
 
+    private var isLoadingMoreFeed = false
+    private var isLoadingMoreTimeline = false
+    private var isLoadingMoreFollowing = false
+
+    /// Append a page of posts, skipping any URI already in the list. Duplicate
+    /// IDs in a SwiftUI ForEach are undefined behavior (blank rows, broken
+    /// scrolling), and overlapping pages / reposts make them common.
+    private static func appendUnique<T: Identifiable>(_ newItems: [T], to items: inout [T]) {
+        var seen = Set(items.map { "\($0.id)" })
+        for item in newItems where seen.insert("\(item.id)").inserted {
+            items.append(item)
+        }
+    }
+
     func loadMoreFeed() async {
-        guard let cursor = feedCursor else { return }
+        guard let cursor = feedCursor, !isLoadingMoreFeed else { return }
+        isLoadingMoreFeed = true
+        defer { isLoadingMoreFeed = false }
 
         do {
             let result = try await atproto.fetchVerifiedFeed(cursor: cursor)
-            verifiedPosts.append(contentsOf: result.posts)
-            feedCursor = result.cursor
+            Self.appendUnique(result.posts, to: &verifiedPosts)
+            // An empty page or unchanged cursor means the end — clearing the
+            // cursor stops the infinite-spinner retrigger loop.
+            feedCursor = (result.posts.isEmpty || result.cursor == cursor) ? nil : result.cursor
         } catch {
             print("[Feed] Error loading more: \(error)")
         }
@@ -476,20 +532,23 @@ final class AppViewModel: InputRestrictedDelegate {
             timelinePosts = result.posts
             timelineCursor = result.cursor
             FeedCache.save(timelinePosts, key: "timeline")
+            timelineFeedError = nil
         } catch {
-            print("[Timeline] Error loading discover feed: \(error)")
+            timelineFeedError = Self.friendlyNetworkMessage(for: error)
         }
 
         isTimelineLoading = false
     }
 
     func loadMoreTimeline() async {
-        guard let cursor = timelineCursor else { return }
+        guard let cursor = timelineCursor, !isLoadingMoreTimeline else { return }
+        isLoadingMoreTimeline = true
+        defer { isLoadingMoreTimeline = false }
 
         do {
             let result = try await atproto.fetchTimeline(cursor: cursor)
-            timelinePosts.append(contentsOf: result.posts)
-            timelineCursor = result.cursor
+            Self.appendUnique(result.posts, to: &timelinePosts)
+            timelineCursor = (result.posts.isEmpty || result.cursor == cursor) ? nil : result.cursor
         } catch {
             print("[Timeline] Error loading more: \(error)")
         }
@@ -505,20 +564,52 @@ final class AppViewModel: InputRestrictedDelegate {
             followingPosts = result.posts
             followingCursor = result.cursor
             FeedCache.save(followingPosts, key: "following")
+            followingFeedError = nil
         } catch {
-            print("[Timeline] Error loading following feed: \(error)")
+            followingFeedError = Self.friendlyNetworkMessage(for: error)
         }
 
         isFollowingLoading = false
     }
 
+    /// Translate a feed-load failure into a short, human-readable banner message.
+    static func friendlyNetworkMessage(for error: Error) -> String {
+        if let atError = error as? ATProtoError {
+            switch atError {
+            case .pdsUnreachable(let host):
+                return "Can't reach your server (\(host))"
+            case .sessionExpired:
+                return "Session expired — sign in again"
+            case .notLoggedIn:
+                return "Sign in to load this feed"
+            default:
+                break
+            }
+        }
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .notConnectedToInternet, .networkConnectionLost:
+                return "No internet connection"
+            case .timedOut:
+                return "Server not responding"
+            case .cannotConnectToHost, .cannotFindHost:
+                return "Can't reach the server — it may be offline"
+            default:
+                return "Network error — pull to retry"
+            }
+        }
+        return "Couldn't update feed — pull to retry"
+    }
+
     func loadMoreFollowing() async {
-        guard let cursor = followingCursor else { return }
+        guard let cursor = followingCursor, !isLoadingMoreFollowing else { return }
+        isLoadingMoreFollowing = true
+        defer { isLoadingMoreFollowing = false }
 
         do {
             let result = try await atproto.fetchFollowingTimeline(cursor: cursor)
-            followingPosts.append(contentsOf: result.posts)
-            followingCursor = result.cursor
+            Self.appendUnique(result.posts, to: &followingPosts)
+            followingCursor = (result.posts.isEmpty || result.cursor == cursor) ? nil : result.cursor
         } catch {
             print("[Following] Error loading more: \(error)")
         }
@@ -549,6 +640,13 @@ enum FeedCache {
                 try? FileManager.default.removeItem(at: url(for: key))
             }
             UserDefaults.standard.set(cacheVersion, forKey: versionKey)
+        }
+    }
+
+    /// Remove all cached feeds (e.g. on sign-out).
+    static func clearAll() {
+        for key in ["verified", "following", "timeline"] {
+            try? FileManager.default.removeItem(at: url(for: key))
         }
     }
 

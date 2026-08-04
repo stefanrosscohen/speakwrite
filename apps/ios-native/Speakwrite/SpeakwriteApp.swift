@@ -60,12 +60,16 @@ struct ContentView: View {
             }
         }
         .onAppear {
-            if viewModel.atproto.restoreSession() {
-                Task {
-                    async let profile: () = viewModel.loadMyProfile()
-                    async let feeds: () = viewModel.loadAllFeeds()
-                    _ = await (profile, feeds)
-                }
+            viewModel.atproto.restoreSession()
+        }
+        .onChange(of: viewModel.atproto.isLoggedIn) { _, isLoggedIn in
+            // Fires for both restored sessions and fresh sign-ins, so the
+            // profile (avatar, display name) and feeds load in either path.
+            guard isLoggedIn else { return }
+            Task {
+                async let profile: () = viewModel.loadMyProfile()
+                async let feeds: () = viewModel.loadAllFeeds()
+                _ = await (profile, feeds)
             }
         }
     }
