@@ -51,7 +51,10 @@ Single `AppViewModel` (`@Observable`) serves as global state, injected via `.env
 
 ## Theme System
 
-`Theme` enum: spacing tokens (xs/sm/md/lg/xl), typography, colorScheme-aware colors.
+`Theme` enum — "Signed ink" design language:
+- Spacing tokens (xs/sm/md/lg/xl/xxl/xxxl), radius, avatar sizes
+- Typography via Dynamic Type text styles: serif for post text (`Theme.postBody`), sans for chrome, monospace only for proof/crypto surfaces
+- Adaptive colors (light=warm paper, dark=ink) via UIColor dynamic providers: `Theme.bg`, `Theme.ink*`, `Theme.accent` (seal green), `Theme.hairline`, etc. Legacy `Theme.background(colorScheme)`-style functions delegate to the adaptive palette.
 
 ## Testing
 

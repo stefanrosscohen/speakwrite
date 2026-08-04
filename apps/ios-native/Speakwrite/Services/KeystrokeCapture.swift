@@ -17,6 +17,7 @@ class InputRestrictedTextView: UITextView {
     weak var restrictionDelegate: InputRestrictedDelegate?
     private var keystrokeCount = 0
     private var isComposing = false
+    private var lastHardwareKeyPressAt: TimeInterval = 0
 
     /// Number of input restriction violations detected this session.
     private(set) var violationCount = 0
@@ -56,10 +57,35 @@ class InputRestrictedTextView: UITextView {
 
     override func insertText(_ text: String) {
         // Dictation inserts bulk text in a single call.
-        // During IME composition, multi-character insertions are expected.
+        // During IME composition, multi-character insertions are expected:
+        // committing a CJK candidate calls insertText with the whole composed
+        // string. Check markedTextRange directly in addition to the isComposing
+        // flag — some IMEs commit while the marked range is still active without
+        // a matching unmarkText, and the flag alone can miss (or outlive) the
+        // composition, which would block valid input and miscount violations.
         // Swift's Character handles emoji correctly — "🇺🇸".count == 1
-        if text.count > 1 && !isComposing {
+        let composing = isComposing || markedTextRange != nil
+        if text.count > 1 && !composing {
             // Likely dictation or programmatic insertion — block it
+            violationCount += 1
+            restrictionDelegate?.violationCountDidChange(violationCount)
+            return
+        }
+
+        // Hardware keyboards deliver characters through the text-input system
+        // as ordinary single-char insertText calls — pressesBegan alone can't
+        // stop them. Drop any insertion arriving right after a hardware key
+        // press so external keyboards genuinely don't type.
+        if ProcessInfo.processInfo.systemUptime - lastHardwareKeyPressAt < 0.15 {
+            violationCount += 1
+            restrictionDelegate?.violationCountDidChange(violationCount)
+            return
+        }
+
+        // Dictation streams results through the composition path, so the
+        // multi-char check above can't catch it — refuse input while the
+        // active input mode is dictation.
+        if textInputMode?.primaryLanguage == "dictation" {
             violationCount += 1
             restrictionDelegate?.violationCountDidChange(violationCount)
             return
@@ -85,6 +111,9 @@ class InputRestrictedTextView: UITextView {
         // Software keyboard generates UIPress events without a key property
         let hardwareKeys = presses.filter { $0.key != nil }
         guard !hardwareKeys.isEmpty else { return }
+        // Stamp the press time — insertText uses it to drop the characters
+        // these key presses produce (see insertText).
+        lastHardwareKeyPressAt = ProcessInfo.processInfo.systemUptime
         violationCount += hardwareKeys.count
         restrictionDelegate?.violationCountDidChange(violationCount)
     }
@@ -104,7 +133,18 @@ class InputRestrictedTextView: UITextView {
     // MARK: - IME composition tracking (for CJK input)
 
     override func setMarkedText(_ markedText: String?, selectedRange: NSRange) {
-        isComposing = true
+        // Dictation stages interim results as marked text — refuse it so the
+        // composition path can't be used as a dictation loophole. Genuine IME
+        // keyboards report a language ("ja-JP", "zh-Hans"), dictation reports
+        // "dictation".
+        if textInputMode?.primaryLanguage == "dictation" {
+            violationCount += 1
+            restrictionDelegate?.violationCountDidChange(violationCount)
+            return
+        }
+        // nil/empty marked text means composition ended or was cancelled —
+        // don't leave the flag stuck on, or dictation could slip through later.
+        isComposing = !(markedText?.isEmpty ?? true)
         super.setMarkedText(markedText, selectedRange: selectedRange)
     }
 
@@ -128,10 +168,30 @@ struct InputRestrictedEditor: UIViewRepresentable {
     var placeholder: String = "Start typing..."
     var inputDelegate: InputRestrictedDelegate?
 
+    /// Serif body font that tracks Dynamic Type — the compose editor is where
+    /// the human writes, so it uses the same editorial voice as post display.
+    static var editorFont: UIFont {
+        let base = UIFont.preferredFont(forTextStyle: .body)
+        if let serifDescriptor = base.fontDescriptor.withDesign(.serif) {
+            return UIFont(descriptor: serifDescriptor, size: 0)
+        }
+        return base
+    }
+
+    /// The seal green, matching Theme.accent, for mention highlighting.
+    static var editorAccentColor: UIColor {
+        UIColor { traits in
+            traits.userInterfaceStyle == .dark
+                ? UIColor(red: 52 / 255.0, green: 208 / 255.0, blue: 124 / 255.0, alpha: 1)
+                : UIColor(red: 18 / 255.0, green: 122 / 255.0, blue: 68 / 255.0, alpha: 1)
+        }
+    }
+
     func makeUIView(context: Context) -> InputRestrictedTextView {
         let textView = InputRestrictedTextView()
-        textView.font = .monospacedSystemFont(ofSize: 17, weight: .regular)
-        textView.textColor = UIColor(named: "textPrimary") ?? .label
+        textView.font = Self.editorFont
+        textView.adjustsFontForContentSizeCategory = true
+        textView.textColor = .label
         textView.backgroundColor = .clear
 
         // Disable all auto-correction and smart text features
@@ -146,6 +206,29 @@ struct InputRestrictedEditor: UIViewRepresentable {
         textView.delegate = context.coordinator
         textView.text = text
         Self.applyMentionHighlighting(textView)
+
+        // Placeholder — previously accepted as a parameter but never rendered,
+        // leaving reply/quote composers as a blank void.
+        let placeholderLabel = UILabel()
+        placeholderLabel.text = placeholder
+        placeholderLabel.font = Self.editorFont
+        placeholderLabel.adjustsFontForContentSizeCategory = true
+        placeholderLabel.textColor = .tertiaryLabel
+        placeholderLabel.numberOfLines = 0
+        placeholderLabel.translatesAutoresizingMaskIntoConstraints = false
+        placeholderLabel.isAccessibilityElement = false
+        textView.addSubview(placeholderLabel)
+        NSLayoutConstraint.activate([
+            placeholderLabel.topAnchor.constraint(equalTo: textView.topAnchor, constant: textView.textContainerInset.top),
+            placeholderLabel.leadingAnchor.constraint(
+                equalTo: textView.leadingAnchor,
+                constant: textView.textContainerInset.left + textView.textContainer.lineFragmentPadding
+            ),
+            placeholderLabel.widthAnchor.constraint(lessThanOrEqualTo: textView.widthAnchor, constant: -2 * textView.textContainer.lineFragmentPadding),
+        ])
+        placeholderLabel.isHidden = !text.isEmpty
+        context.coordinator.placeholderLabel = placeholderLabel
+
         return textView
     }
 
@@ -158,18 +241,19 @@ struct InputRestrictedEditor: UIViewRepresentable {
             let endPos = (textView.text as NSString).length
             textView.selectedRange = NSRange(location: endPos, length: 0)
         }
+        context.coordinator.placeholderLabel?.isHidden = !text.isEmpty
         textView.restrictionDelegate = inputDelegate
     }
 
-    /// Applies blue foreground color to @mention handles in the text view.
+    /// Applies the accent color to @mention handles in the text view.
     static func applyMentionHighlighting(_ textView: UITextView) {
         guard let text = textView.text, !text.isEmpty else { return }
 
-        let defaultColor = UIColor(named: "textPrimary") ?? .label
-        let accentColor = UIColor(named: "AccentColor") ?? .systemBlue
+        let defaultColor = UIColor.label
+        let accentColor = editorAccentColor
 
         let attributed = NSMutableAttributedString(string: text, attributes: [
-            .font: textView.font ?? .monospacedSystemFont(ofSize: 17, weight: .regular),
+            .font: textView.font ?? editorFont,
             .foregroundColor: defaultColor
         ])
 
@@ -188,7 +272,7 @@ struct InputRestrictedEditor: UIViewRepresentable {
         textView.selectedRange = selectedRange
         // Reset typing attributes so new text after a mention is default color
         textView.typingAttributes = [
-            .font: textView.font ?? .monospacedSystemFont(ofSize: 17, weight: .regular),
+            .font: textView.font ?? editorFont,
             .foregroundColor: defaultColor
         ]
     }
@@ -199,6 +283,7 @@ struct InputRestrictedEditor: UIViewRepresentable {
 
     class Coordinator: NSObject, UITextViewDelegate {
         let parent: InputRestrictedEditor
+        weak var placeholderLabel: UILabel?
 
         init(_ parent: InputRestrictedEditor) {
             self.parent = parent
@@ -206,6 +291,13 @@ struct InputRestrictedEditor: UIViewRepresentable {
 
         func textViewDidChange(_ textView: UITextView) {
             parent.text = textView.text
+            placeholderLabel?.isHidden = !textView.text.isEmpty
+            // Rewriting attributedText while IME composition is active
+            // (Japanese/Chinese/Korean marked text) discards the provisional
+            // text and cancels the composition — skip until it commits.
+            // textViewDidChange fires again after the commit (markedTextRange
+            // becomes nil), so highlighting is reapplied then.
+            guard textView.markedTextRange == nil else { return }
             InputRestrictedEditor.applyMentionHighlighting(textView)
         }
     }

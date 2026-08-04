@@ -20,6 +20,9 @@ struct PostDetailView: View {
     @State private var localRepostCount: Int = 0
     @State private var showRepostMenu = false
     @State private var showQuotePost = false
+    /// Guards the engagement sync so popping back from a pushed view
+    /// doesn't re-run onAppear and revert optimistic like/repost state.
+    @State private var hasSyncedEngagement = false
 
     var body: some View {
         ScrollView {
@@ -80,6 +83,8 @@ struct PostDetailView: View {
             ProfileView(actorDID: did)
         }
         .onAppear {
+            guard !hasSyncedEngagement else { return }
+            hasSyncedEngagement = true
             isLiked = nav.viewerLike != nil
             likeUri = nav.viewerLike
             localLikeCount = nav.likeCount
@@ -387,6 +392,9 @@ private struct ReplyRowView: View {
     @State private var showReplySheet = false
     @State private var showRepostMenu = false
     @State private var showQuotePost = false
+    /// Guards the engagement sync so re-appearing (e.g. after popping a pushed
+    /// profile) doesn't revert optimistic like/repost state.
+    @State private var hasSyncedEngagement = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -449,6 +457,8 @@ private struct ReplyRowView: View {
             }
         }
         .onAppear {
+            guard !hasSyncedEngagement else { return }
+            hasSyncedEngagement = true
             isLiked = reply.viewer?.like != nil
             likeUri = reply.viewer?.like
             localLikeCount = reply.likeCount

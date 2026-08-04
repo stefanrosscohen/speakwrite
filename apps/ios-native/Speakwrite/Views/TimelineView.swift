@@ -17,33 +17,37 @@ struct TimelineView: View {
     var body: some View {
         NavigationStack(path: $path) {
             VStack(spacing: 0) {
-                // App header
-                HStack(spacing: Theme.sm) {
-                    AvatarButton(
-                        avatarURL: viewModel.myProfile?.avatar,
-                        handle: viewModel.atproto.handle
-                    ) {
-                        showMyProfile = true
-                    }
-                    Text("speakwrite")
-                        .font(Theme.monoTitle)
-                        .foregroundStyle(Theme.accent)
-                    Spacer()
+                AppHeader(onAvatarTap: { showMyProfile = true }) {
                     Button {
                         showSearch = true
                     } label: {
                         Image(systemName: "magnifyingglass")
-                            .foregroundStyle(Theme.accent)
+                            .font(.body)
+                            .foregroundStyle(Theme.inkSecondary)
+                            .padding(Theme.xs)
+                            .contentShape(Rectangle())
                     }
+                    .accessibilityLabel("Search users")
                 }
-                .padding(.horizontal, Theme.lg)
-                .padding(.vertical, Theme.sm)
 
                 // Sub-tab picker
                 feedPicker
 
                 Divider()
                     .foregroundStyle(Theme.separator(colorScheme))
+
+                // Surfaced load failures (e.g. unreachable PDS) — previously
+                // swallowed, leaving a silently stale feed.
+                if let message = viewModel.feedErrorMessage {
+                    FeedStatusBanner(message: message) {
+                        Task {
+                            await viewModel.loadFollowing()
+                            await viewModel.loadTimeline()
+                        }
+                    }
+                    Divider()
+                        .foregroundStyle(Theme.separator(colorScheme))
+                }
 
                 // Feed content
                 Group {
@@ -96,8 +100,8 @@ struct TimelineView: View {
                 } label: {
                     VStack(spacing: 6) {
                         Text(feed.rawValue)
-                            .font(.system(size: 14, weight: selectedFeed == feed ? .semibold : .regular, design: .monospaced))
-                            .foregroundStyle(selectedFeed == feed ? Theme.textPrimary(colorScheme) : Theme.textSecondary(colorScheme))
+                            .font(Theme.subhead.weight(selectedFeed == feed ? .semibold : .regular))
+                            .foregroundStyle(selectedFeed == feed ? Theme.ink : Theme.inkSecondary)
 
                         Rectangle()
                             .fill(selectedFeed == feed ? Theme.accent : Color.clear)

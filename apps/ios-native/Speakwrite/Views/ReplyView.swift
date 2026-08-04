@@ -36,6 +36,67 @@ struct ReplyView: View {
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 0) {
+                // Scrollable content — keeps small screens (iPhone SE) usable with the keyboard up
+                ScrollView {
+                    scrollableContent
+                }
+
+                // Pinned action bar
+                actionBar
+
+                if let error {
+                    Text(error)
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.error)
+                        .padding(.horizontal, Theme.lg)
+                        .padding(.bottom, Theme.xs)
+                }
+            }
+            .background(Theme.background(colorScheme))
+            .navigationTitle("")
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { dismiss() }
+                        .font(.system(size: 16))
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    if isSending {
+                        ProgressView().tint(Theme.accent)
+                    } else {
+                        Button("Reply") {
+                            Task { await sendReply() }
+                        }
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Theme.accent)
+                        .disabled(replyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !hasMedia)
+                    }
+                }
+            }
+            .onChange(of: replyText) { _, newText in
+                detectMentionQuery(in: newText)
+            }
+            .fullScreenCover(isPresented: $showCamera) {
+                CameraCaptureView(mode: cameraMode, onCapture: { media in
+                    if media.mimeType.starts(with: "video/") {
+                        capturedPhotos = []
+                        capturedVideo = media
+                    } else {
+                        capturedVideo = nil
+                        if capturedPhotos.count < 4 {
+                            capturedPhotos.append(media)
+                        }
+                    }
+                }, onError: { message in
+                    error = message
+                })
+            }
+        }
+    }
+
+    // MARK: - Scrollable Content
+
+    private var scrollableContent: some View {
+        VStack(alignment: .leading, spacing: 0) {
                 // Original post + reply compose as a continuous thread
                 HStack(alignment: .top, spacing: 10) {
                     // Left column: avatars + thread connector
@@ -134,8 +195,13 @@ struct ReplyView: View {
                     .padding(.top, Theme.xs)
                 }
 
-                // Camera menu
-                HStack(spacing: Theme.xl) {
+        }
+    }
+
+    // MARK: - Action Bar (pinned)
+
+    private var actionBar: some View {
+        HStack(spacing: Theme.xl) {
                     Menu {
                         Button {
                             cameraMode = .photo
@@ -172,56 +238,8 @@ struct ReplyView: View {
 
                     Spacer()
                 }
-                .padding(.horizontal, Theme.lg)
-                .padding(.vertical, 6)
-
-                if let error {
-                    Text(error)
-                        .font(.system(size: 13))
-                        .foregroundStyle(Theme.error)
-                        .padding(.horizontal, Theme.lg)
-                        .padding(.top, Theme.xs)
-                }
-
-                Spacer()
-            }
-            .background(Theme.background(colorScheme))
-            .navigationTitle("")
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") { dismiss() }
-                        .font(.system(size: 16))
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    if isSending {
-                        ProgressView().tint(Theme.accent)
-                    } else {
-                        Button("Reply") {
-                            Task { await sendReply() }
-                        }
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(Theme.accent)
-                        .disabled(replyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !hasMedia)
-                    }
-                }
-            }
-            .onChange(of: replyText) { _, newText in
-                detectMentionQuery(in: newText)
-            }
-            .fullScreenCover(isPresented: $showCamera) {
-                CameraCaptureView(mode: cameraMode) { media in
-                    if media.mimeType.starts(with: "video/") {
-                        capturedPhotos = []
-                        capturedVideo = media
-                    } else {
-                        capturedVideo = nil
-                        if capturedPhotos.count < 4 {
-                            capturedPhotos.append(media)
-                        }
-                    }
-                }
-            }
-        }
+        .padding(.horizontal, Theme.lg)
+        .padding(.vertical, 6)
     }
 
     // MARK: - @Mention Detection

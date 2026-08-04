@@ -10,10 +10,10 @@ struct SearchUsersView: View {
     @State private var results: [ProfileViewBasic] = []
     @State private var isSearching = false
     @State private var searchTask: Task<Void, Never>?
-    @State private var selectedDID: String?
+    @State private var path = NavigationPath()
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             VStack(spacing: 0) {
                 // Search bar
                 HStack(spacing: Theme.sm) {
@@ -95,6 +95,20 @@ struct SearchUsersView: View {
             .navigationDestination(for: String.self) { did in
                 ProfileView(actorDID: did)
             }
+            // Profiles pushed from search show posts — without this
+            // registration, tapping a post did nothing in this stack.
+            .navigationDestination(for: PostNavigation.self) { nav in
+                PostDetailView(nav: nav)
+            }
+            // Handle speakwrite://profile/<handle> mention taps in this stack.
+            .environment(\.openURL, OpenURLAction { url in
+                if url.scheme == "speakwrite", url.host == "profile",
+                   let handle = url.pathComponents.dropFirst().first {
+                    path.append(handle)
+                    return .handled
+                }
+                return .systemAction
+            })
             .onChange(of: query) { _, newQuery in
                 performSearch(query: newQuery)
             }

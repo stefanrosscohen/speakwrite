@@ -19,57 +19,32 @@ struct EditorView: View {
 
         NavigationStack {
             VStack(spacing: 0) {
-                // App header
-                HStack(spacing: Theme.sm) {
-                    AvatarButton(
-                        avatarURL: viewModel.myProfile?.avatar,
-                        handle: viewModel.atproto.handle
-                    ) {
-                        showMyProfile = true
-                    }
-                    Text("speakwrite")
-                        .font(Theme.monoTitle)
-                        .foregroundStyle(Theme.accent)
-                    Spacer()
-                }
-                .padding(.horizontal, Theme.lg)
-                .padding(.vertical, Theme.sm)
+                AppHeader(onAvatarTap: { showMyProfile = true })
 
                 // Violation banner
                 if showViolationBanner {
                     HStack(spacing: Theme.sm) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 13))
-                        Text("Naughty naughty — use the iPhone keyboard to make a verified post")
-                            .font(.system(size: 13, weight: .medium, design: .monospaced))
+                        Image(systemName: "hand.raised.fill")
+                            .font(.footnote)
+                        Text("Blocked — verified posts are typed by hand on the on-screen keyboard.")
+                            .font(Theme.subhead.weight(.medium))
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    .foregroundStyle(.black)
+                    .foregroundStyle(Theme.ink)
                     .padding(.horizontal, Theme.lg)
                     .padding(.vertical, Theme.sm)
-                    .frame(maxWidth: .infinity)
-                    .background(Theme.accent.opacity(0.9))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Theme.warning.opacity(0.18))
                     .transition(.move(edge: .top).combined(with: .opacity))
                 }
 
-                // Editor area with mention overlay
-                ZStack(alignment: .topLeading) {
-                    InputRestrictedEditor(
-                        text: $vm.postText,
-                        placeholder: "What's on your mind?",
-                        inputDelegate: viewModel
-                    )
-                    .accessibilityIdentifier("compose-editor")
-
-                    // Placeholder text (shown when empty)
-                    if viewModel.postText.isEmpty {
-                        Text("What's on your mind?")
-                            .font(.system(size: 17, design: .monospaced))
-                            .foregroundStyle(Theme.textTertiary(colorScheme))
-                            .padding(.top, 8)
-                            .padding(.leading, 5)
-                            .allowsHitTesting(false)
-                    }
-                }
+                // Editor — placeholder is rendered by InputRestrictedEditor itself
+                InputRestrictedEditor(
+                    text: $vm.postText,
+                    placeholder: "Write it yourself.",
+                    inputDelegate: viewModel
+                )
+                .accessibilityIdentifier("compose-editor")
                 .padding(.horizontal, Theme.lg)
                 .padding(.top, Theme.sm)
 
@@ -172,6 +147,10 @@ struct EditorView: View {
                         showViolationBanner = false
                     }
                 }
+            }
+            .onDisappear {
+                violationDismissTask?.cancel()
+                mentionSearchTask?.cancel()
             }
         }
     }

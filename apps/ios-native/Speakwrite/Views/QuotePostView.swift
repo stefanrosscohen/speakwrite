@@ -24,7 +24,9 @@ struct QuotePostView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 0) {
+            // Scrollable so the content stays reachable on small screens with the keyboard up
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
                 // Compose area
                 HStack(alignment: .top, spacing: 10) {
                     AvatarView(
@@ -61,8 +63,7 @@ struct QuotePostView: View {
                         .padding(.horizontal, Theme.lg)
                         .padding(.top, Theme.xs)
                 }
-
-                Spacer()
+                }
             }
             .background(Theme.background(colorScheme))
             .onChange(of: postText) { _, newText in

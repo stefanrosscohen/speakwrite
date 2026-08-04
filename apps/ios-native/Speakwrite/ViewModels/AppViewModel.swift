@@ -22,7 +22,7 @@ enum CameraMode {
 @MainActor
 final class AppViewModel: InputRestrictedDelegate {
     let attestation = DeviceAttestationService()
-    let verification = VerificationService()
+    private(set) var verification = VerificationService()
     var atproto: ATProtoService
 
     // Navigation — default to feed for preview
@@ -32,12 +32,51 @@ final class AppViewModel: InputRestrictedDelegate {
     var myProfile: ProfileViewDetailed?
 
     // Compose state
-    var postText: String = ""
+    //
+    // The draft persists across app restarts — on a soft-keyboard-only editor,
+    // losing a half-typed post is brutal. Restoring is safe: the text was
+    // necessarily typed in-app, and the content hash is computed at publish.
+    private static let draftKey = "sw_draft_text"
+    var postText: String = "" {
+        didSet {
+            guard postText != oldValue else { return }
+            if postText.isEmpty {
+                UserDefaults.standard.removeObject(forKey: Self.draftKey)
+            } else {
+                UserDefaults.standard.set(postText, forKey: Self.draftKey)
+            }
+        }
+    }
     var isPublishing: Bool = false
     var publishError: String?
     var lastPublishedURI: String?
+    /// Set when a post publishes successfully — drives the "sealed & published"
+    /// confirmation banner on the Verified feed.
+    var publishSuccessAt: Date?
     var keystrokeCount: Int = 0
     var violationCount: Int = 0
+
+    // Engagement state shared across all row instances.
+    //
+    // Optimistic like/repost/follow state used to live in per-row @State, which
+    // LazyVStack recycles — scrolling a liked post offscreen and back reverted
+    // the UI to the stale post model and allowed duplicate like records. These
+    // overrides are keyed by post URI (likes/reposts) and author DID (follows)
+    // so every copy of a post in every feed agrees.
+    struct EngagementOverride {
+        var isLiked: Bool
+        var likeUri: String?
+        var likeCount: Int
+        var isReposted: Bool
+        var repostUri: String?
+        var repostCount: Int
+    }
+    var engagement: [String: EngagementOverride] = [:]
+    var followedDIDs: Set<String> = []
+
+    // Feed error surfacing — set when a load fails (e.g. the user's PDS is
+    // unreachable), cleared on the next successful load.
+    var feedErrorMessage: String?
 
     // Media capture state
     var capturedPhotos: [CapturedMedia] = []
@@ -75,6 +114,8 @@ final class AppViewModel: InputRestrictedDelegate {
         verifiedPosts = FeedCache.load("verified") ?? []
         followingPosts = FeedCache.load("following") ?? []
         timelinePosts = FeedCache.load("timeline") ?? []
+        // Restore the compose draft
+        postText = UserDefaults.standard.string(forKey: Self.draftKey) ?? ""
     }
 
     // MARK: - InputRestrictedDelegate
@@ -120,6 +161,7 @@ final class AppViewModel: InputRestrictedDelegate {
 
         isPublishing = true
         publishError = nil
+        lastPublishedURI = nil
 
         do {
             // Initialize attestation (generates + attests App Attest key if needed)
@@ -261,9 +303,10 @@ final class AppViewModel: InputRestrictedDelegate {
             videoProcessingStatus = nil
             isPublishing = false
 
-            // Navigate to verified feed where the new post appears
+            // Navigate to verified feed where the new post appears, with a
+            // success confirmation banner (publishSuccessAt drives it).
+            publishSuccessAt = Date()
             selectedTab = .verified
-            lastPublishedURI = nil
             return
         } catch {
             publishError = error.localizedDescription
@@ -422,6 +465,49 @@ final class AppViewModel: InputRestrictedDelegate {
         )
     }
 
+    // MARK: - Logout
+
+    /// Clear every trace of the signed-in user. Called from Settings on sign-out.
+    /// Previously logout left the draft, captured media, keystroke counters,
+    /// engagement state, and verification cache behind — all visible to (or
+    /// attributed to) the next account that signs in on this device.
+    func resetForLogout() {
+        atproto.logout()
+
+        myProfile = nil
+        selectedTab = .timeline
+
+        // Compose state
+        postText = ""
+        isPublishing = false
+        publishError = nil
+        lastPublishedURI = nil
+        publishSuccessAt = nil
+        keystrokeCount = 0
+        violationCount = 0
+        capturedPhotos = []
+        capturedVideo = nil
+        showCamera = false
+        videoProcessingStatus = nil
+
+        // Feeds
+        verifiedPosts = []
+        feedCursor = nil
+        timelinePosts = []
+        timelineCursor = nil
+        followingPosts = []
+        followingCursor = nil
+        feedErrorMessage = nil
+        for key in ["verified", "following", "timeline"] {
+            FeedCache.remove(key)
+        }
+
+        // Per-user caches
+        engagement = [:]
+        followedDIDs = []
+        verification = VerificationService()
+    }
+
     // MARK: - Preload All Feeds
 
     func loadAllFeeds() async {
@@ -433,7 +519,13 @@ final class AppViewModel: InputRestrictedDelegate {
 
     // MARK: - Verified Feed
 
+    private var feedLoadInFlight = false
+
     func loadFeed() async {
+        guard !feedLoadInFlight else { return }
+        feedLoadInFlight = true
+        defer { feedLoadInFlight = false }
+
         // Only show loading spinner on first load (no cached posts)
         let isFirstLoad = verifiedPosts.isEmpty
         if isFirstLoad { isFeedLoading = true }
@@ -447,8 +539,10 @@ final class AppViewModel: InputRestrictedDelegate {
                 feedCursor = result.cursor
                 FeedCache.save(verifiedPosts, key: "verified")
             }
+            feedErrorMessage = nil
         } catch {
             print("[Feed] Error loading verified feed: \(error)")
+            setFeedError(from: error)
         }
 
         if isFirstLoad { isFeedLoading = false }
@@ -468,7 +562,12 @@ final class AppViewModel: InputRestrictedDelegate {
 
     // MARK: - Timeline (For You / Discover Feed)
 
+    private var timelineLoadInFlight = false
+
     func loadTimeline() async {
+        guard !timelineLoadInFlight else { return }
+        timelineLoadInFlight = true
+        defer { timelineLoadInFlight = false }
         isTimelineLoading = true
 
         do {
@@ -476,8 +575,10 @@ final class AppViewModel: InputRestrictedDelegate {
             timelinePosts = result.posts
             timelineCursor = result.cursor
             FeedCache.save(timelinePosts, key: "timeline")
+            feedErrorMessage = nil
         } catch {
             print("[Timeline] Error loading discover feed: \(error)")
+            setFeedError(from: error)
         }
 
         isTimelineLoading = false
@@ -497,7 +598,12 @@ final class AppViewModel: InputRestrictedDelegate {
 
     // MARK: - Following Timeline (Authenticated)
 
+    private var followingLoadInFlight = false
+
     func loadFollowing() async {
+        guard !followingLoadInFlight else { return }
+        followingLoadInFlight = true
+        defer { followingLoadInFlight = false }
         isFollowingLoading = true
 
         do {
@@ -505,11 +611,33 @@ final class AppViewModel: InputRestrictedDelegate {
             followingPosts = result.posts
             followingCursor = result.cursor
             FeedCache.save(followingPosts, key: "following")
+            feedErrorMessage = nil
         } catch {
             print("[Timeline] Error loading following feed: \(error)")
+            setFeedError(from: error)
         }
 
         isFollowingLoading = false
+    }
+
+    /// Translate a feed-load failure into a short, user-facing message.
+    private func setFeedError(from error: Error) {
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .notConnectedToInternet, .networkConnectionLost:
+                feedErrorMessage = "No internet connection."
+            case .cannotConnectToHost, .cannotFindHost, .timedOut, .secureConnectionFailed:
+                feedErrorMessage = "Can't reach your server (PDS). Your posts are safe — showing cached content."
+            default:
+                feedErrorMessage = "Network error while loading."
+            }
+            return
+        }
+        if let atError = error as? ATProtoError, case .sessionExpired = atError {
+            feedErrorMessage = "Session expired — please sign in again."
+            return
+        }
+        feedErrorMessage = "Couldn't refresh right now."
     }
 
     func loadMoreFollowing() async {
@@ -559,6 +687,10 @@ enum FeedCache {
         } catch {
             print("[FeedCache] Save failed for \(key): \(error)")
         }
+    }
+
+    static func remove(_ key: String) {
+        try? FileManager.default.removeItem(at: url(for: key))
     }
 
     static func load<T: Decodable>(_ key: String) -> [T]? {

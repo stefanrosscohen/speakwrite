@@ -11,21 +11,7 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // App header
-                HStack(spacing: Theme.sm) {
-                    AvatarButton(
-                        avatarURL: viewModel.myProfile?.avatar,
-                        handle: viewModel.atproto.handle
-                    ) {
-                        showMyProfile = true
-                    }
-                    Text("speakwrite")
-                        .font(Theme.monoTitle)
-                        .foregroundStyle(Theme.accent)
-                    Spacer()
-                }
-                .padding(.horizontal, Theme.lg)
-                .padding(.vertical, Theme.sm)
+                AppHeader(onAvatarTap: { showMyProfile = true })
 
                 List {
                     // Profile header
@@ -97,14 +83,7 @@ struct SettingsView: View {
                         .listRowBackground(Theme.surfaceElevated(colorScheme))
                         .alert("Sign out?", isPresented: $showLogoutConfirm) {
                             Button("Sign Out", role: .destructive) {
-                                viewModel.atproto.logout()
-                                viewModel.myProfile = nil
-                                viewModel.verifiedPosts = []
-                                viewModel.timelinePosts = []
-                                viewModel.followingPosts = []
-                                viewModel.feedCursor = nil
-                                viewModel.timelineCursor = nil
-                                viewModel.followingCursor = nil
+                                viewModel.resetForLogout()
                             }
                             Button("Cancel", role: .cancel) {}
                         } message: {

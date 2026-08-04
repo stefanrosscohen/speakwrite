@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - Appearance Mode
 
@@ -25,6 +26,19 @@ enum AppearanceMode: Int, CaseIterable {
 }
 
 // MARK: - Theme
+//
+// Design language: "Signed ink."
+// The product proves a human wrote something, so the visual language pairs
+// editorial warmth (serif post text on paper/ink surfaces) with cryptographic
+// precision (monospace reserved for proofs, hashes, and the seal).
+//
+// Rules:
+// - Post text is serif. It's the human artifact.
+// - UI chrome is the system sans, always via Dynamic Type text styles.
+// - Monospace appears only on proof/crypto elements (hashes, seal details,
+//   keystroke counter) — never for general chrome.
+// - One accent: the seal green. Deep emerald in light mode (readable as text
+//   on paper), mint in dark mode.
 
 enum Theme {
 
@@ -50,76 +64,106 @@ enum Theme {
     static let radiusMd: CGFloat = 12
     static let radiusLg: CGFloat = 16
 
-    // MARK: - Typography
+    // MARK: - Typography (Dynamic Type)
+    //
+    // Every token maps to a text style so the whole app scales with the
+    // user's accessibility settings. Base sizes match the previous fixed
+    // sizes at the default content size category.
 
-    static var title: Font { .system(size: 20, weight: .bold) }
-    static var headline: Font { .system(size: 17, weight: .semibold) }
-    static var body: Font { .system(size: 15) }
-    static var subhead: Font { .system(size: 13) }
-    static var caption: Font { .system(size: 12) }
-    static var mono: Font { .system(size: 13, design: .monospaced) }
-    static var monoSmall: Font { .system(size: 11, design: .monospaced) }
-    static var monoTitle: Font { .system(size: 18, weight: .bold, design: .monospaced) }
-    static var monoBody: Font { .system(size: 15, design: .monospaced) }
-    static var monoCaption: Font { .system(size: 12, weight: .medium, design: .monospaced) }
-    static var monoHeadline: Font { .system(size: 16, weight: .semibold, design: .monospaced) }
-    static var monoBold: Font { .system(size: 13, weight: .bold, design: .monospaced) }
-    static var monoStat: Font { .system(size: 16, weight: .bold, design: .monospaced) }
+    /// Screen titles — 20pt base.
+    static var title: Font { .system(.title3, design: .default).weight(.bold) }
+    /// Row/name emphasis — 17pt base.
+    static var headline: Font { .system(.headline) }
+    /// General UI text — 15pt base.
+    static var body: Font { .system(.subheadline) }
+    /// Secondary rows — 13pt base.
+    static var subhead: Font { .system(.footnote) }
+    /// Metadata — 12pt base.
+    static var caption: Font { .system(.caption) }
+
+    /// Post body text — serif, 17pt base. The human artifact.
+    static var postBody: Font { .system(.body, design: .serif) }
+    /// Large serif for display moments (login tagline, empty states).
+    static var display: Font { .system(.title2, design: .serif).weight(.semibold) }
+
+    // Monospace suite — proof/crypto surfaces only.
+    static var mono: Font { .system(.footnote, design: .monospaced) }
+    static var monoSmall: Font { .system(.caption2, design: .monospaced) }
+    static var monoTitle: Font { .system(.title3, design: .monospaced).weight(.bold) }
+    static var monoBody: Font { .system(.subheadline, design: .monospaced) }
+    static var monoCaption: Font { .system(.caption, design: .monospaced).weight(.medium) }
+    static var monoHeadline: Font { .system(.callout, design: .monospaced).weight(.semibold) }
+    static var monoBold: Font { .system(.footnote, design: .monospaced).weight(.bold) }
+    static var monoStat: Font { .system(.callout, design: .monospaced).weight(.bold) }
 }
 
-// MARK: - Semantic Colors
+// MARK: - Adaptive Colors
 
 extension Theme {
 
-    // Backgrounds
-    static func background(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color(red: 0.04, green: 0.04, blue: 0.04) : Color(red: 0.98, green: 0.98, blue: 0.98)
+    private static func adaptive(light: UIColor, dark: UIColor) -> Color {
+        Color(UIColor { traits in
+            traits.userInterfaceStyle == .dark ? dark : light
+        })
     }
 
-    static func surface(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color(red: 0.10, green: 0.10, blue: 0.10) : Color(red: 0.96, green: 0.96, blue: 0.96)
+    private static func rgb(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat) -> UIColor {
+        UIColor(red: r / 255.0, green: g / 255.0, blue: b / 255.0, alpha: 1)
     }
 
-    static func surfaceElevated(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color(red: 0.13, green: 0.13, blue: 0.13) : .white
-    }
+    // Backgrounds — warm paper in light, near-black ink in dark.
+
+    /// App background.
+    static let bg = adaptive(light: rgb(250, 249, 246), dark: rgb(10, 10, 12))
+    /// Inset surface (cards, fields).
+    static let surfaceColor = adaptive(light: rgb(243, 241, 237), dark: rgb(20, 20, 23))
+    /// Elevated surface (sheets, menus).
+    static let surfaceElevatedColor = adaptive(light: .white, dark: rgb(28, 28, 31))
 
     // Text
-    static func textPrimary(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? .white : Color(red: 0.07, green: 0.07, blue: 0.07)
-    }
 
-    static func textSecondary(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color(white: 0.6) : Color(white: 0.4)
-    }
+    static let ink = adaptive(light: rgb(26, 25, 23), dark: rgb(242, 241, 238))
+    static let inkSecondary = adaptive(light: rgb(110, 106, 99), dark: rgb(156, 154, 148))
+    static let inkTertiary = adaptive(light: rgb(165, 161, 153), dark: rgb(96, 94, 88))
 
-    static func textTertiary(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color(white: 0.35) : Color(white: 0.65)
-    }
+    // Accent — the seal green. Deep emerald on paper (≈5.4:1 contrast),
+    // mint on ink. Safe to use as text in both modes.
+    static let accent = adaptive(light: rgb(18, 122, 68), dark: rgb(52, 208, 124))
 
-    // Accent
-    static let accent = Color(red: 0.0, green: 0.85, blue: 0.30)
+    static var accentSubtle: Color { accent.opacity(0.13) }
 
-    static var accentSubtle: Color {
-        accent.opacity(0.15)
-    }
+    /// Fill color for solid accent buttons; label on top should be `onAccent`.
+    static let accentFill = adaptive(light: rgb(18, 122, 68), dark: rgb(52, 208, 124))
+    static let onAccent = adaptive(light: .white, dark: rgb(10, 10, 12))
 
-    // Separator
-    static func separator(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color(white: 0.13) : Color(white: 0.88)
-    }
+    // Hairlines
+
+    static let hairline = adaptive(light: rgb(231, 228, 222), dark: rgb(35, 35, 38))
 
     // Semantic
+
     static let error = Color.red
-    static let liked = Color.pink
-    static let reposted = Color.green
+    static let liked = adaptive(light: rgb(214, 31, 105), dark: rgb(236, 72, 137))
+    static let reposted = adaptive(light: rgb(18, 122, 68), dark: rgb(52, 208, 124))
+    /// Warning (character limit, violations).
+    static let warning = adaptive(light: rgb(178, 108, 0), dark: rgb(255, 179, 64))
 
-    // Border for avatar on profile (matches background)
-    static func avatarBorder(_ scheme: ColorScheme) -> Color {
-        background(scheme)
-    }
+    // MARK: - Legacy scheme-parameter API
+    //
+    // Older views pass ColorScheme explicitly. These now delegate to the
+    // adaptive palette (which resolves against the environment), so both
+    // call styles stay consistent during the migration.
 
-    // Corner radii
+    static func background(_ scheme: ColorScheme) -> Color { bg }
+    static func surface(_ scheme: ColorScheme) -> Color { surfaceColor }
+    static func surfaceElevated(_ scheme: ColorScheme) -> Color { surfaceElevatedColor }
+    static func textPrimary(_ scheme: ColorScheme) -> Color { ink }
+    static func textSecondary(_ scheme: ColorScheme) -> Color { inkSecondary }
+    static func textTertiary(_ scheme: ColorScheme) -> Color { inkTertiary }
+    static func separator(_ scheme: ColorScheme) -> Color { hairline }
+    static func avatarBorder(_ scheme: ColorScheme) -> Color { bg }
+
+    // Legacy radius aliases
     static let cornerRadiusSm: CGFloat = 8
     static let cornerRadiusMd: CGFloat = 12
     static let cornerRadiusLg: CGFloat = 16

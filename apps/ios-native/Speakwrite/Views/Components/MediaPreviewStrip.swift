@@ -47,14 +47,16 @@ struct MediaPreviewStrip: View {
                     .offset(x: -4, y: 4)
             }
 
-            // Remove button
+            // Remove button — glyph stays 18pt but the tappable area is 44x44
             Button(action: onRemove) {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 18))
                     .foregroundStyle(.white)
                     .background(Circle().fill(.black.opacity(0.5)))
+                    .frame(width: 44, height: 44, alignment: .topTrailing)
+                    .contentShape(Rectangle())
             }
-            .offset(x: 4, y: -4)
+            .buttonStyle(.plain)
         }
     }
 }

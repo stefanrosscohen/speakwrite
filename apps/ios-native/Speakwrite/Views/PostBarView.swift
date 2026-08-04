@@ -13,45 +13,56 @@ struct PostBarView: View {
             HStack(spacing: Theme.md) {
                 CharacterCountRing(count: graphemeCount, limit: charLimit)
 
+                // Proof-in-progress: the keystroke count is what gets sealed.
+                if viewModel.keystrokeCount > 0 {
+                    HStack(spacing: Theme.xs) {
+                        Image(systemName: "hand.tap")
+                            .font(.caption2)
+                        Text("\(viewModel.keystrokeCount) keys")
+                            .font(Theme.monoCaption)
+                    }
+                    .foregroundStyle(Theme.inkTertiary)
+                    .accessibilityLabel("\(viewModel.keystrokeCount) keystrokes recorded")
+                }
+
                 Spacer()
 
                 if viewModel.isPublishing {
                     HStack(spacing: Theme.sm) {
                         ProgressView()
                             .tint(Theme.accent)
-                        if let status = viewModel.videoProcessingStatus {
-                            Text(status)
-                                .font(Theme.monoSmall)
-                                .foregroundStyle(Theme.textSecondary(colorScheme))
-                        }
+                        Text(viewModel.videoProcessingStatus ?? "Signing & publishing…")
+                            .font(Theme.monoSmall)
+                            .foregroundStyle(Theme.textSecondary(colorScheme))
                     }
                     .padding(.trailing, Theme.sm)
-                } else if viewModel.lastPublishedURI != nil {
-                    HStack(spacing: Theme.xs) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(Theme.accent)
-                        Text("Published")
-                            .font(Theme.monoBold)
-                            .foregroundStyle(Theme.accent)
-                    }
                 } else {
                     Button {
                         showPublishConfirm = true
                     } label: {
-                        Text("Publish")
-                            .font(Theme.monoBold)
-                            .padding(.horizontal, Theme.xl)
-                            .padding(.vertical, Theme.sm)
+                        HStack(spacing: Theme.xs) {
+                            Image(systemName: "checkmark.seal.fill")
+                                .font(.footnote)
+                            Text("Publish")
+                                .font(Theme.subhead.weight(.bold))
+                        }
+                        .foregroundStyle(Theme.onAccent)
+                        .padding(.horizontal, Theme.xl)
+                        .padding(.vertical, Theme.sm)
+                        .background(Capsule().fill(Theme.accentFill))
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(Theme.accent)
-                    .foregroundStyle(.black)
-                    .clipShape(Capsule())
+                    .buttonStyle(.plain)
                     .disabled(
                         (viewModel.postText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                          && viewModel.capturedPhotos.isEmpty
                          && viewModel.capturedVideo == nil)
                         || isOverLimit
+                    )
+                    .opacity(
+                        ((viewModel.postText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                          && viewModel.capturedPhotos.isEmpty
+                          && viewModel.capturedVideo == nil)
+                         || isOverLimit) ? 0.4 : 1
                     )
                 }
             }
@@ -101,7 +112,7 @@ struct CharacterCountRing: View {
     private var remaining: Int { limit - count }
     private var ringColor: Color {
         if remaining < 0 { return Theme.error }
-        else if remaining <= 20 { return .yellow }
+        else if remaining <= 20 { return Theme.warning }
         else { return Theme.accent }
     }
     private var showNumber: Bool { remaining <= 20 }

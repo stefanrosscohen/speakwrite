@@ -27,6 +27,8 @@
 		A10001010000000000000031 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000031 /* Theme.swift */; };
 		A10001010000000000000032 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000032 /* SettingsView.swift */; };
 		A10001010000000000000033 /* PostRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000033 /* PostRow.swift */; };
+		A10001010000000000000060 /* AppChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000060 /* AppChrome.swift */; };
+		A10001010000000000000061 /* ProofDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000061 /* ProofDetailView.swift */; };
 		A10001010000000000000034 /* AvatarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000034 /* AvatarView.swift */; };
 		A10001010000000000000035 /* StatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000035 /* StatView.swift */; };
 		A10001010000000000000036 /* PostDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000036 /* PostDetailView.swift */; };
@@ -69,6 +71,8 @@
 		A10002010000000000000031 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		A10002010000000000000032 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A10002010000000000000033 /* PostRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostRow.swift; sourceTree = "<group>"; };
+		A10002010000000000000060 /* AppChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppChrome.swift; sourceTree = "<group>"; };
+		A10002010000000000000061 /* ProofDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProofDetailView.swift; sourceTree = "<group>"; };
 		A10002010000000000000034 /* AvatarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvatarView.swift; sourceTree = "<group>"; };
 		A10002010000000000000035 /* StatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatView.swift; sourceTree = "<group>"; };
 		A10002010000000000000036 /* PostDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostDetailView.swift; sourceTree = "<group>"; };
@@ -208,6 +212,7 @@
 				A10002010000000000000037 /* QuotePostView.swift */,
 				A10002010000000000000038 /* SearchUsersView.swift */,
 				A10002010000000000000043 /* CameraCaptureView.swift */,
+				A10002010000000000000061 /* ProofDetailView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -220,6 +225,7 @@
 				A10002010000000000000035 /* StatView.swift */,
 				A10002010000000000000044 /* PostImagesView.swift */,
 				A10002010000000000000045 /* MediaPreviewStrip.swift */,
+				A10002010000000000000060 /* AppChrome.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -387,6 +393,8 @@
 				A10001010000000000000032 /* SettingsView.swift in Sources */,
 				A10001010000000000000033 /* PostRow.swift in Sources */,
 				A10001010000000000000034 /* AvatarView.swift in Sources */,
+				A10001010000000000000060 /* AppChrome.swift in Sources */,
+				A10001010000000000000061 /* ProofDetailView.swift in Sources */,
 				A10001010000000000000035 /* StatView.swift in Sources */,
 				A10001010000000000000036 /* PostDetailView.swift in Sources */,
 				A10001010000000000000037 /* QuotePostView.swift in Sources */,

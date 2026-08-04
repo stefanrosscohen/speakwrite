@@ -6,28 +6,20 @@ struct VerifiedFeedView: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var showMyProfile = false
     @State private var path = NavigationPath()
+    @State private var showPublishToast = false
 
     var body: some View {
         NavigationStack(path: $path) {
             VStack(spacing: 0) {
-                // App header
-                HStack(spacing: Theme.sm) {
-                    AvatarButton(
-                        avatarURL: viewModel.myProfile?.avatar,
-                        handle: viewModel.atproto.handle
-                    ) {
-                        showMyProfile = true
+                AppHeader(showSeal: true, onAvatarTap: { showMyProfile = true })
+
+                if let message = viewModel.feedErrorMessage {
+                    FeedStatusBanner(message: message) {
+                        Task { await viewModel.loadFeed() }
                     }
-                    Text("speakwrite")
-                        .font(Theme.monoTitle)
-                        .foregroundStyle(Theme.accent)
-                    Image(systemName: "checkmark.seal.fill")
-                        .foregroundStyle(Theme.accent)
-                        .font(.system(size: 14))
-                    Spacer()
+                    Divider()
+                        .foregroundStyle(Theme.separator(colorScheme))
                 }
-                .padding(.horizontal, Theme.lg)
-                .padding(.vertical, Theme.sm)
 
                 // Feed content
                 Group {
@@ -78,6 +70,23 @@ struct VerifiedFeedView: View {
             }
             .background(Theme.background(colorScheme))
             .navigationBarHidden(true)
+            .overlay(alignment: .top) {
+                // Publish confirmation — the one moment the product pays off.
+                if showPublishToast {
+                    SuccessToast(message: "Published & sealed")
+                        .padding(.top, Theme.sm)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+            }
+            .onChange(of: viewModel.publishSuccessAt) { _, newValue in
+                guard newValue != nil else { return }
+                withAnimation(.spring(duration: 0.35)) { showPublishToast = true }
+                Task {
+                    try? await Task.sleep(for: .seconds(2.5))
+                    withAnimation(.easeOut(duration: 0.25)) { showPublishToast = false }
+                    viewModel.publishSuccessAt = nil
+                }
+            }
             .sheet(isPresented: $showMyProfile) {
                 MyProfileView()
             }
@@ -89,6 +98,15 @@ struct VerifiedFeedView: View {
             }
             .task {
                 await viewModel.loadFeed()
+                // Handle the publish → tab-switch case where the toast trigger
+                // fires before this view is on screen.
+                if let publishedAt = viewModel.publishSuccessAt,
+                   Date().timeIntervalSince(publishedAt) < 5 {
+                    withAnimation(.spring(duration: 0.35)) { showPublishToast = true }
+                    try? await Task.sleep(for: .seconds(2.5))
+                    withAnimation(.easeOut(duration: 0.25)) { showPublishToast = false }
+                    viewModel.publishSuccessAt = nil
+                }
             }
             .environment(\.openURL, OpenURLAction { url in
                 if url.scheme == "speakwrite", url.host == "profile",

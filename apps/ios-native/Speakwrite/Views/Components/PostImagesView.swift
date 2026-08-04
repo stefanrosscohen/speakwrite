@@ -1,7 +1,18 @@
 import AVKit
+import ImageIO
 import SwiftUI
+import UIKit
 
 // MARK: - URLSession Image Loader
+
+/// Small in-memory cache shared by all RemoteImage instances, keyed by URL string.
+private enum RemoteImageCache {
+    static let shared: NSCache<NSString, UIImage> = {
+        let cache = NSCache<NSString, UIImage>()
+        cache.countLimit = 200
+        return cache
+    }()
+}
 
 /// Manual image loader using URLSession for reliable loading in LazyVStack.
 private struct RemoteImage: View {
@@ -32,9 +43,19 @@ private struct RemoteImage: View {
         }
         .task(id: url) {
             guard let url, uiImage == nil else { return }
+            let cacheKey = url.absoluteString as NSString
+            if let cached = RemoteImageCache.shared.object(forKey: cacheKey) {
+                uiImage = cached
+                return
+            }
             do {
                 let (data, _) = try await URLSession.shared.data(from: url)
-                if let img = UIImage(data: data) {
+                // Decode + downsample off the main thread.
+                let img = await Task.detached(priority: .userInitiated) {
+                    Self.downsampledImage(from: data, maxPixelSize: 1200)
+                }.value
+                if let img {
+                    RemoteImageCache.shared.setObject(img, forKey: cacheKey)
                     uiImage = img
                 } else {
                     failed = true
@@ -43,6 +64,25 @@ private struct RemoteImage: View {
                 failed = true
             }
         }
+    }
+
+    /// Decode with ImageIO, capping the longest side at `maxPixelSize` to avoid
+    /// holding full-resolution bitmaps in memory for grid thumbnails.
+    static func downsampledImage(from data: Data, maxPixelSize: Int) -> UIImage? {
+        let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
+        guard let source = CGImageSourceCreateWithData(data as CFData, sourceOptions) else {
+            return UIImage(data: data)
+        }
+        let thumbnailOptions = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
+        ] as [CFString: Any] as CFDictionary
+        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbnailOptions) else {
+            return UIImage(data: data)
+        }
+        return UIImage(cgImage: cgImage)
     }
 }
 
@@ -107,6 +147,9 @@ struct PostImagesView: View {
 
     private func imageCell(_ image: EmbedImageView, aspectRatio: CGFloat) -> some View {
         RemoteImage(url: URL(string: image.thumb))
+            // Draw the image content at the declared cell ratio, filling the cell,
+            // then crop to the cell bounds set by the surrounding grid.
+            .aspectRatio(aspectRatio, contentMode: .fill)
             .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
             .clipped()
             .contentShape(Rectangle())
@@ -139,7 +182,40 @@ struct PostVideoView: View {
         .contentShape(Rectangle())
         .onTapGesture { showPlayer = true }
         .fullScreenCover(isPresented: $showPlayer) {
-            VideoPlayerView(url: URL(string: playlistURL)!)
+            if let url = URL(string: playlistURL) {
+                VideoPlayerView(url: url)
+            } else {
+                VideoUnavailableView()
+            }
+        }
+    }
+}
+
+/// Fallback shown when a video's playlist URL is malformed.
+private struct VideoUnavailableView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            Color.black.ignoresSafeArea()
+
+            VStack(spacing: 8) {
+                Image(systemName: "video.slash")
+                    .font(.system(size: 40))
+                Text("Video unavailable")
+                    .font(.system(size: 15))
+            }
+            .foregroundStyle(.white.opacity(0.7))
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 28))
+                    .foregroundStyle(.white.opacity(0.8))
+                    .padding()
+            }
         }
     }
 }
