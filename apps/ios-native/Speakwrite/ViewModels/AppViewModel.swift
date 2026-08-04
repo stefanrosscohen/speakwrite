@@ -58,6 +58,16 @@ final class AppViewModel: InputRestrictedDelegate {
     }
     var publishStage: PublishStage?
 
+    /// Stats of the most recently sealed entry — the share card is built
+    /// from these after the compose counters reset.
+    struct SealedEntry: Equatable {
+        let uri: String
+        let keystrokes: Int
+        let words: Int
+        let date: Date
+    }
+    var lastEntry: SealedEntry?
+
     /// Consecutive days with at least one verified post.
     var writingStreak: Int = WritingStreak.current()
 
@@ -323,6 +333,14 @@ final class AppViewModel: InputRestrictedDelegate {
                 videoURL: nil, videoThumbnail: nil
             )
             verifiedPosts.insert(optimisticPost, at: 0)
+
+            // Capture the entry's stats before the counters reset
+            lastEntry = SealedEntry(
+                uri: result.uri,
+                keystrokes: keystrokeCount,
+                words: text.split(whereSeparator: { $0.isWhitespace || $0.isNewline }).count,
+                date: Date()
+            )
 
             // Reset for next post
             postText = ""

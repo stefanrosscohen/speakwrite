@@ -6,8 +6,8 @@ name: Verified Feed
 ---
 - launchApp
 
-# Switch to Verified tab
-- tapOn: "Verified"
+# Switch to Record tab
+- tapOn: "Record"
 
 # Verified feed should show
 - assertVisible:

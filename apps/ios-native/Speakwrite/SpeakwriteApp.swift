@@ -38,7 +38,7 @@ struct ContentView: View {
 
                     VerifiedFeedView()
                         .tabItem {
-                            Label("Verified", systemImage: "checkmark.seal")
+                            Label("Record", systemImage: "checkmark.seal")
                         }
                         .tag(AppViewModel.AppTab.verified)
 

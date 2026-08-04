@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Human Record — Speakwrite</title>
+  <meta name="description" content="A public archive of writing provably typed by humans — one keystroke at a time, signed by hardware. No AI can add to it.">
+  <meta property="og:title" content="The Human Record">
+  <meta property="og:description" content="A public archive of writing provably typed by humans. No AI can add to it. Add your entry.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="https://speakwrite.io/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://speakwrite.io/og-image.png">
+  <meta name="theme-color" content="#0a0a0a">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' https: data:; connect-src 'self' https:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✍</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../styles.css">
+  <style>
+    .record-container {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+
+    .record-header {
+      padding: 1.5rem 0 0.5rem;
+    }
+
+    .record-header h1 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+      text-shadow: 0 0 20px rgba(0, 255, 65, 0.3);
+      margin-bottom: 0.6rem;
+    }
+
+    .record-header .thesis {
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      line-height: 1.7;
+    }
+
+    .record-stats {
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+      padding: 1.25rem 0;
+      margin: 1rem 0 0.5rem;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .stat .stat-value {
+      color: var(--accent);
+      font-size: 1.3rem;
+      font-weight: 700;
+    }
+
+    .stat .stat-label {
+      color: var(--text-secondary);
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .day-heading {
+      margin: 2.25rem 0 0.75rem;
+      display: flex;
+      align-items: baseline;
+      gap: 0.75rem;
+    }
+
+    .day-heading .day-date {
+      color: var(--text-primary);
+      font-weight: 600;
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .day-heading .day-count {
+      color: var(--text-secondary);
+      font-size: 0.75rem;
+    }
+
+    .day-heading.today .day-date { color: var(--accent); }
+
+    .entry-card {
+      border: 1px solid var(--border);
+      background: var(--bg-secondary);
+      padding: 1.1rem 1.25rem;
+      margin: 0.75rem 0;
+    }
+
+    .entry-meta {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin-bottom: 0.6rem;
+    }
+
+    .entry-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--bg-surface);
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+
+    .entry-author { min-width: 0; }
+
+    .entry-author .display-name {
+      color: var(--text-primary);
+      font-weight: 600;
+      font-size: 0.85rem;
+    }
+
+    .entry-author .handle {
+      color: var(--text-secondary);
+      font-size: 0.75rem;
+    }
+
+    .entry-number {
+      margin-left: auto;
+      color: var(--text-secondary);
+      font-size: 0.7rem;
+      white-space: nowrap;
+    }
+
+    .entry-text {
+      color: var(--text-primary);
+      font-size: 0.9rem;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+
+    .entry-footer {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-top: 0.7rem;
+      font-size: 0.72rem;
+    }
+
+    .entry-verified {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .entry-verified:hover { text-decoration: underline; }
+
+    .entry-time { color: var(--text-secondary); }
+
+    .empty-today {
+      border: 1px dashed var(--border);
+      padding: 1.5rem 1.25rem;
+      margin: 0.75rem 0;
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+    }
+
+    .empty-today a { color: var(--accent); }
+
+    .cta-block {
+      margin-top: 3rem;
+      border: 1px solid var(--accent-dim);
+      background: var(--accent-glow);
+      padding: 1.5rem 1.25rem;
+      font-size: 0.85rem;
+      line-height: 1.7;
+    }
+
+    .cta-block a.cta-button {
+      display: inline-block;
+      margin-top: 0.75rem;
+      background: var(--accent);
+      color: var(--bg-primary);
+      font-weight: 700;
+      text-decoration: none;
+      padding: 0.6rem 1.2rem;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .loading, .error-message {
+      color: var(--text-secondary);
+      padding: 2rem 0;
+      font-size: 0.85rem;
+    }
+
+    .spinner { animation: spin 1s linear infinite; display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .earlier-note {
+      color: var(--text-secondary);
+      font-size: 0.75rem;
+      margin-top: 1.5rem;
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/" class="wordmark">Speakwrite</a>
+    <div class="nav-links">
+      <a href="/record/" class="nav-link">Record</a>
+      <a href="/verify" class="nav-link">Verify</a>
+      <a href="https://testflight.apple.com/join/TtPndBU4" class="nav-link" rel="noopener noreferrer">Try the App</a>
+    </div>
+  </nav>
+
+  <main class="record-container">
+    <header class="record-header">
+      <h1>The Human Record</h1>
+      <p class="thesis">
+        A public archive of things provably written by humans — typed by hand,
+        one keystroke at a time, on a real device, signed by hardware.
+        Every entry carries a cryptographic proof anyone can check.
+        No AI can add to it.
+      </p>
+    </header>
+
+    <div class="record-stats" id="stats" hidden>
+      <div class="stat"><div class="stat-value" id="stat-entries">—</div><div class="stat-label">entries</div></div>
+      <div class="stat"><div class="stat-value" id="stat-humans">—</div><div class="stat-label">humans</div></div>
+      <div class="stat"><div class="stat-value" id="stat-days">—</div><div class="stat-label">days written</div></div>
+    </div>
+
+    <div id="content">
+      <p class="loading"><span class="spinner">⟳</span> Reading the record…</p>
+    </div>
+
+    <div class="cta-block">
+      <strong style="color: var(--accent);">Add your entry.</strong><br>
+      Post once a day, typed by hand, to help build the authentic record of
+      what humans actually wrote in the AI era.
+      <br>
+      <a class="cta-button" href="https://testflight.apple.com/join/TtPndBU4" rel="noopener noreferrer">Get Speakwrite</a>
+    </div>
+  </main>
+
+  <script>
+    const API = 'https://api.bsky.app/xrpc';
+    const MAX_PAGES = 5; // 500 newest entries; plenty of headroom for now
+
+    function escapeHtml(s) {
+      return String(s)
+        .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;').replaceAll("'", '&#39;');
+    }
+
+    // Strip the app-appended verify footer for clean display
+    function stripFooter(text) {
+      for (const marker of [
+        '\n\n✓ Verify a human wrote this',
+        '\n\n✓ Verify authentic content',
+        '\n\n✓ speakwrite',
+      ]) {
+        const i = text.lastIndexOf(marker);
+        if (i !== -1) return text.slice(0, i);
+      }
+      return text;
+    }
+
+    // Days in the record are UTC — one canonical calendar for all readers.
+    function utcDay(iso) {
+      return (iso || '').slice(0, 10);
+    }
+
+    function formatDay(dayStr) {
+      const d = new Date(dayStr + 'T00:00:00Z');
+      if (isNaN(d)) return dayStr;
+      return d.toLocaleDateString('en-US', {
+        timeZone: 'UTC', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+      });
+    }
+
+    function formatTime(iso) {
+      const d = new Date(iso);
+      if (isNaN(d)) return '';
+      return d.toLocaleTimeString('en-US', {
+        timeZone: 'UTC', hour: '2-digit', minute: '2-digit', hour12: false,
+      }) + ' UTC';
+    }
+
+    async function fetchEntries() {
+      const entries = [];
+      let cursor = null;
+      let truncated = false;
+
+      for (let page = 0; page < MAX_PAGES; page++) {
+        const url = new URL(API + '/app.bsky.feed.searchPosts');
+        url.searchParams.set('q', '#speakwrite');
+        url.searchParams.set('limit', '100');
+        url.searchParams.set('sort', 'latest');
+        if (cursor) url.searchParams.set('cursor', cursor);
+
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error('search failed: ' + resp.status);
+        const data = await resp.json();
+
+        for (const post of (data.posts || [])) {
+          const rec = post.record || {};
+          const tags = rec.tags || [];
+          if (!tags.includes('speakwrite')) continue; // must carry the real tag
+          if (rec.reply) continue;                    // top-level entries only
+          const rkey = (post.uri || '').split('/').pop();
+          entries.push({
+            handle: post.author?.handle || '',
+            displayName: post.author?.displayName || '',
+            avatar: (post.author?.avatar || '').startsWith('https://') ? post.author.avatar : '',
+            did: post.author?.did || '',
+            text: stripFooter(rec.text || ''),
+            createdAt: rec.createdAt || '',
+            rkey,
+          });
+        }
+
+        cursor = data.cursor;
+        if (!cursor || (data.posts || []).length === 0) { cursor = null; break; }
+      }
+      if (cursor) truncated = true;
+      return { entries, truncated };
+    }
+
+    function render(entries, truncated) {
+      const content = document.getElementById('content');
+
+      // Oldest-first numbering: entry #1 is the first ever written.
+      const chronological = [...entries].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      const numbers = new Map();
+      chronological.forEach((e, i) => numbers.set(e.rkey + e.did, i + 1));
+
+      // Stats
+      document.getElementById('stat-entries').textContent = entries.length;
+      document.getElementById('stat-humans').textContent = new Set(entries.map(e => e.did)).size;
+      const dayKeys = [...new Set(entries.map(e => utcDay(e.createdAt)))].sort().reverse();
+      document.getElementById('stat-days').textContent = dayKeys.length;
+      document.getElementById('stats').hidden = false;
+
+      const today = utcDay(new Date().toISOString());
+      let html = '';
+
+      // Today first — even (especially) when empty.
+      const todaysEntries = entries.filter(e => utcDay(e.createdAt) === today);
+      html += `<div class="day-heading today"><span class="day-date">${escapeHtml(formatDay(today))}</span>` +
+              `<span class="day-count">today · ${todaysEntries.length} ${todaysEntries.length === 1 ? 'entry' : 'entries'}</span></div>`;
+      if (todaysEntries.length === 0) {
+        html += `<div class="empty-today">No one has written today yet. ` +
+                `<a href="https://testflight.apple.com/join/TtPndBU4" rel="noopener noreferrer">Be the first entry of the day →</a></div>`;
+      } else {
+        html += todaysEntries
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+          .map(e => entryCard(e, numbers, truncated)).join('');
+      }
+
+      // Then every past day, newest day first.
+      for (const day of dayKeys) {
+        if (day === today) continue;
+        const dayEntries = entries
+          .filter(e => utcDay(e.createdAt) === day)
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+        html += `<div class="day-heading"><span class="day-date">${escapeHtml(formatDay(day))}</span>` +
+                `<span class="day-count">${dayEntries.length} ${dayEntries.length === 1 ? 'entry' : 'entries'}</span></div>`;
+        html += dayEntries.map(e => entryCard(e, numbers, truncated)).join('');
+      }
+
+      if (truncated) {
+        html += `<p class="earlier-note">Showing the latest ${entries.length} entries — the record continues further back.</p>`;
+      }
+
+      content.innerHTML = html;
+    }
+
+    function entryCard(e, numbers, truncated) {
+      const verifyUrl = `/verify/${encodeURIComponent(e.handle)}/${encodeURIComponent(e.rkey)}`;
+      const name = e.displayName || e.handle;
+      // Absolute numbers are only honest when the whole record is loaded.
+      const num = truncated ? '' : `<span class="entry-number">entry #${numbers.get(e.rkey + e.did)}</span>`;
+      const avatar = e.avatar
+        ? `<img class="entry-avatar" src="${escapeHtml(e.avatar)}" alt="" loading="lazy">`
+        : `<div class="entry-avatar"></div>`;
+      return `<article class="entry-card">
+        <div class="entry-meta">
+          ${avatar}
+          <div class="entry-author">
+            <div class="display-name">${escapeHtml(name)}</div>
+            <div class="handle">@${escapeHtml(e.handle)}</div>
+          </div>
+          ${num}
+        </div>
+        <div class="entry-text">${escapeHtml(e.text)}</div>
+        <div class="entry-footer">
+          <a class="entry-verified" href="${verifyUrl}">✓ verified entry</a>
+          <span class="entry-time">${escapeHtml(formatTime(e.createdAt))}</span>
+        </div>
+      </article>`;
+    }
+
+    (async () => {
+      try {
+        const { entries, truncated } = await fetchEntries();
+        render(entries, truncated);
+      } catch (err) {
+        document.getElementById('content').innerHTML =
+          `<p class="error-message">Couldn't read the record right now (${escapeHtml(err.message)}). Refresh to try again.</p>`;
+      }
+    })();
+  </script>
+</body>
+</html>

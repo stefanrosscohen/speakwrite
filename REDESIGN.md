@@ -228,6 +228,51 @@ Deliberately not done (yet): keystroke *sound* (needs audio-session care),
 full-screen zen mode hiding the toolbar, and a swipe-pager instead of the tab
 bar — each needs on-device iteration.
 
+## 3c. The Human Record — contribute to authentic human written history
+
+The growth thesis: posting isn't content creation (which needs an audience the
+network doesn't have yet) — it's **contribution to a collective archive**. AI is
+flooding the world with synthetic text; the Human Record is the provably-human
+primary source of this era. Post every day, typed by hand, to help build it.
+
+Shipped:
+
+- **speakwrite.io/record** — the public ledger. A day-grouped archive of every
+  verified entry, rendered entirely client-side from the public Bluesky search
+  API (no backend). Live stats (entries · humans · days written), today pinned
+  at the top — and when today is empty, the empty state *is* the call to
+  action: "Be the first entry of the day →". Entries are numbered oldest-first
+  (entry #1 is the first ever written; numbers hide automatically if the fetch
+  is truncated and the count would be dishonest). Each entry links to its
+  cryptographic verification page. Linked from the site nav.
+- **The app reframed around the record** — the Verified tab is now **Record**
+  ("the record" header); the seal ceremony ends on "Added to the record /
+  Part of the human record now" with the entry's stats (words, keystrokes,
+  no paste · no AI).
+- **The shareable entry card** — the off-network viral artifact. After sealing,
+  "Share your entry" renders a square card (ImageRenderer): seal, "WRITTEN BY
+  HAND", date, words/keystrokes, streak, and speakwrite.io/record. Designed to
+  travel to iMessage/Bluesky/anywhere a user's real audience lives and carry
+  a link back into the record.
+
+Next steps for this direction (not yet built): a daily prompt ("today's
+question, answered only by humans") to solve the blank-page problem; "Real or
+Robot" — a daily Turing-test game built from record entries + AI decoys,
+shareable Wordle-style; pass-the-pen nomination chains via mentions; global
+entry numbers served once the record outgrows client-side counting.
+
+## 3d. Parked for later: letters (effort as a gift)
+
+Private hand-typed notes, planned but deliberately after the record. The
+protocol insight: verification only needs the *hash* public, never the content.
+Design sketch: the letter travels in a URL fragment (`#s=<salt>&t=<text>`) so
+content never touches any server; the app publishes only a proof record with
+`SHA-256(salt ‖ text)`; the recipient's browser verifies client-side at
+speakwrite.io/letter. Salt prevents brute-forcing short notes. Encrypted PDS
+blobs for letters with media; recipient-bound X25519 encryption once both
+parties run the app; optional public "sealed envelope" record (visible
+keystroke count, unreadable contents) as the flex artifact.
+
 ## 4. Feature / protocol roadmap ideas
 
 - **Proof caching by post** (rather than per-author `listRecords`) once volume

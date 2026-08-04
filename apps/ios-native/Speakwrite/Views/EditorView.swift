@@ -157,6 +157,7 @@ struct EditorView: View {
                         hasMedia: !viewModel.capturedPhotos.isEmpty || viewModel.capturedVideo != nil,
                         streak: viewModel.writingStreak,
                         videoStatus: viewModel.videoProcessingStatus,
+                        entry: viewModel.lastEntry,
                         onViewPost: {
                             viewModel.publishStage = nil
                             viewModel.selectedTab = .verified

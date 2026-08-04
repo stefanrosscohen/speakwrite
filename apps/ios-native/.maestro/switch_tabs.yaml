@@ -12,8 +12,8 @@ name: Switch Tabs
 - tapOn: "Feed"
 - assertVisible: "Following"
 
-# Switch to Verified tab
-- tapOn: "Verified"
+# Switch to Record tab
+- tapOn: "Record"
 - assertVisible:
     id: "verified-feed"
 
@@ -26,13 +26,13 @@ name: Switch Tabs
 - assertVisible: "Appearance"
 
 # Go back through tabs
-- tapOn: "Verified"
+- tapOn: "Record"
 - tapOn: "Feed"
 
 # Rapid tab switching stress test
 - tapOn: "Settings"
 - tapOn: "Write"
-- tapOn: "Verified"
+- tapOn: "Record"
 - tapOn: "Feed"
 - tapOn: "Settings"
 - tapOn: "Feed"

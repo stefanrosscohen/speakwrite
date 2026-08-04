@@ -18,7 +18,7 @@ struct VerifiedFeedView: View {
                     ) {
                         showMyProfile = true
                     }
-                    Text("speakwrite")
+                    Text("the record")
                         .font(Theme.monoTitle)
                         .foregroundStyle(Theme.accent)
                     Image(systemName: "checkmark.seal.fill")
@@ -48,9 +48,9 @@ struct VerifiedFeedView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else if viewModel.verifiedPosts.isEmpty {
                         ContentUnavailableView {
-                            Label("No verified posts yet", systemImage: "checkmark.seal")
+                            Label("The record is empty", systemImage: "checkmark.seal")
                         } description: {
-                            Text("Posts written with Speakwrite will appear here.\nBe the first to publish one.")
+                            Text("Every entry here was provably typed by a human.\nAdd the first entry of the day.")
                                 .font(Theme.mono)
                         }
                     } else {
