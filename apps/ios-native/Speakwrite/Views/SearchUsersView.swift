@@ -3,14 +3,12 @@ import SwiftUI
 /// User search screen — search bar with debounced input, results list with profiles.
 struct SearchUsersView: View {
     @Environment(AppViewModel.self) private var viewModel
-    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dismiss) private var dismiss
 
     @State private var query = ""
     @State private var results: [ProfileViewBasic] = []
     @State private var isSearching = false
     @State private var searchTask: Task<Void, Never>?
-    @State private var selectedDID: String?
 
     var body: some View {
         NavigationStack {
@@ -18,10 +16,10 @@ struct SearchUsersView: View {
                 // Search bar
                 HStack(spacing: Theme.sm) {
                     Image(systemName: "magnifyingglass")
-                        .foregroundStyle(Theme.textSecondary(colorScheme))
+                        .foregroundStyle(Theme.textSecondary)
 
                     TextField("Search users...", text: $query)
-                        .font(.system(size: 16, design: .monospaced))
+                        .font(Theme.monoBody)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .accessibilityIdentifier("search-field")
@@ -32,16 +30,16 @@ struct SearchUsersView: View {
                             results = []
                         } label: {
                             Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(Theme.textTertiary(colorScheme))
+                                .foregroundStyle(Theme.textTertiary)
                         }
+                        .accessibilityLabel("Clear search")
                     }
                 }
                 .padding(.horizontal, Theme.lg)
                 .padding(.vertical, Theme.sm)
-                .background(Theme.surfaceElevated(colorScheme))
+                .background(Theme.surfaceElevated)
 
-                Divider()
-                    .foregroundStyle(Theme.separator(colorScheme))
+                ThemedDivider()
 
                 // Results
                 if isSearching && results.isEmpty {
@@ -50,7 +48,7 @@ struct SearchUsersView: View {
                             .tint(Theme.accent)
                         Text("Searching...")
                             .font(Theme.mono)
-                            .foregroundStyle(Theme.textSecondary(colorScheme))
+                            .foregroundStyle(Theme.textSecondary)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if results.isEmpty && !query.isEmpty {
@@ -77,14 +75,13 @@ struct SearchUsersView: View {
                                 .buttonStyle(.plain)
                                 .accessibilityIdentifier("search-result")
 
-                                Divider()
-                                    .foregroundStyle(Theme.separator(colorScheme))
+                                ThemedDivider()
                             }
                         }
                     }
                 }
             }
-            .background(Theme.background(colorScheme))
+            .background(Theme.background)
             .navigationTitle("Search")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -94,6 +91,9 @@ struct SearchUsersView: View {
             }
             .navigationDestination(for: String.self) { did in
                 ProfileView(actorDID: did)
+            }
+            .navigationDestination(for: PostNavigation.self) { nav in
+                PostDetailView(nav: nav)
             }
             .onChange(of: query) { _, newQuery in
                 performSearch(query: newQuery)
@@ -134,7 +134,6 @@ struct SearchUsersView: View {
 
 struct SearchResultRow: View {
     let profile: ProfileViewBasic
-    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         HStack(spacing: Theme.md) {
@@ -142,11 +141,11 @@ struct SearchResultRow: View {
                 image.resizable().scaledToFill()
             } placeholder: {
                 Circle()
-                    .fill(Theme.surfaceElevated(colorScheme))
+                    .fill(Theme.surfaceElevated)
                     .overlay {
                         Text(String(profile.handle.prefix(1)).uppercased())
-                            .font(.system(size: 16, weight: .bold, design: .monospaced))
-                            .foregroundStyle(Theme.textSecondary(colorScheme))
+                            .font(Theme.monoStat)
+                            .foregroundStyle(Theme.textSecondary)
                     }
             }
             .frame(width: 44, height: 44)
@@ -155,19 +154,19 @@ struct SearchResultRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 if let name = profile.displayName, !name.isEmpty {
                     Text(name)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Theme.textPrimary(colorScheme))
+                        .font(Theme.bodyEmphasis)
+                        .foregroundStyle(Theme.textPrimary)
                 }
                 Text("@\(profile.handle)")
-                    .font(.system(size: 14, design: .monospaced))
-                    .foregroundStyle(Theme.textSecondary(colorScheme))
+                    .font(Theme.mono)
+                    .foregroundStyle(Theme.textSecondary)
             }
 
             Spacer()
 
             Image(systemName: "chevron.right")
-                .font(.system(size: 12))
-                .foregroundStyle(Theme.textTertiary(colorScheme))
+                .font(Theme.caption)
+                .foregroundStyle(Theme.textTertiary)
         }
         .padding(.horizontal, Theme.lg)
         .padding(.vertical, Theme.sm)

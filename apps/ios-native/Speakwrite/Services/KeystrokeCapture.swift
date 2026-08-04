@@ -90,15 +90,20 @@ class InputRestrictedTextView: UITextView {
     }
 
     override func pressesEnded(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
-        // Consume hardware keyboard events without calling super
+        // Consume hardware keyboard presses; forward everything else (game
+        // controllers, pencil, remotes) up the responder chain
+        let nonKeyboard = presses.filter { $0.key == nil }
+        if !nonKeyboard.isEmpty { super.pressesEnded(nonKeyboard, with: event) }
     }
 
     override func pressesChanged(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
-        // Consume hardware keyboard events without calling super
+        let nonKeyboard = presses.filter { $0.key == nil }
+        if !nonKeyboard.isEmpty { super.pressesChanged(nonKeyboard, with: event) }
     }
 
     override func pressesCancelled(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
-        // Consume hardware keyboard events without calling super
+        let nonKeyboard = presses.filter { $0.key == nil }
+        if !nonKeyboard.isEmpty { super.pressesCancelled(nonKeyboard, with: event) }
     }
 
     // MARK: - IME composition tracking (for CJK input)
@@ -114,10 +119,12 @@ class InputRestrictedTextView: UITextView {
         restrictionDelegate?.textDidChange(self.text)
     }
 
-    /// Reset counters (call when starting a new session).
+    /// Reset counters (call when starting a new post).
     func resetCounters() {
         keystrokeCount = 0
         violationCount = 0
+        restrictionDelegate?.keystrokeCountDidChange(0)
+        restrictionDelegate?.violationCountDidChange(0)
     }
 }
 
@@ -127,11 +134,15 @@ struct InputRestrictedEditor: UIViewRepresentable {
     @Binding var text: String
     var placeholder: String = "Start typing..."
     var inputDelegate: InputRestrictedDelegate?
+    /// Increment to reset the text view's internal keystroke/violation counters.
+    var resetSignal: Int = 0
+
+    private static let placeholderTag = 987_431
 
     func makeUIView(context: Context) -> InputRestrictedTextView {
         let textView = InputRestrictedTextView()
         textView.font = .monospacedSystemFont(ofSize: 17, weight: .regular)
-        textView.textColor = UIColor(named: "textPrimary") ?? .label
+        textView.textColor = Theme.uiTextPrimary
         textView.backgroundColor = .clear
 
         // Disable all auto-correction and smart text features
@@ -146,6 +157,26 @@ struct InputRestrictedEditor: UIViewRepresentable {
         textView.delegate = context.coordinator
         textView.text = text
         Self.applyMentionHighlighting(textView)
+
+        // Placeholder — shown while the text view is empty
+        let label = UILabel()
+        label.tag = Self.placeholderTag
+        label.text = placeholder
+        label.font = .monospacedSystemFont(ofSize: 17, weight: .regular)
+        label.textColor = .tertiaryLabel
+        label.numberOfLines = 0
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.isAccessibilityElement = false
+        textView.addSubview(label)
+        NSLayoutConstraint.activate([
+            label.topAnchor.constraint(equalTo: textView.topAnchor, constant: textView.textContainerInset.top),
+            label.leadingAnchor.constraint(
+                equalTo: textView.leadingAnchor,
+                constant: textView.textContainerInset.left + textView.textContainer.lineFragmentPadding
+            ),
+        ])
+        label.isHidden = !text.isEmpty
+
         return textView
     }
 
@@ -159,14 +190,24 @@ struct InputRestrictedEditor: UIViewRepresentable {
             textView.selectedRange = NSRange(location: endPos, length: 0)
         }
         textView.restrictionDelegate = inputDelegate
+        Self.updatePlaceholderVisibility(textView)
+
+        if context.coordinator.lastResetSignal != resetSignal {
+            context.coordinator.lastResetSignal = resetSignal
+            textView.resetCounters()
+        }
     }
 
-    /// Applies blue foreground color to @mention handles in the text view.
+    static func updatePlaceholderVisibility(_ textView: UITextView) {
+        textView.viewWithTag(placeholderTag)?.isHidden = !(textView.text ?? "").isEmpty
+    }
+
+    /// Applies accent foreground color to @mention handles in the text view.
     static func applyMentionHighlighting(_ textView: UITextView) {
         guard let text = textView.text, !text.isEmpty else { return }
 
-        let defaultColor = UIColor(named: "textPrimary") ?? .label
-        let accentColor = UIColor(named: "AccentColor") ?? .systemBlue
+        let defaultColor = Theme.uiTextPrimary
+        let accentColor = Theme.uiAccent
 
         let attributed = NSMutableAttributedString(string: text, attributes: [
             .font: textView.font ?? .monospacedSystemFont(ofSize: 17, weight: .regular),
@@ -199,14 +240,17 @@ struct InputRestrictedEditor: UIViewRepresentable {
 
     class Coordinator: NSObject, UITextViewDelegate {
         let parent: InputRestrictedEditor
+        var lastResetSignal: Int
 
         init(_ parent: InputRestrictedEditor) {
             self.parent = parent
+            self.lastResetSignal = parent.resetSignal
         }
 
         func textViewDidChange(_ textView: UITextView) {
             parent.text = textView.text
             InputRestrictedEditor.applyMentionHighlighting(textView)
+            InputRestrictedEditor.updatePlaceholderVisibility(textView)
         }
     }
 }

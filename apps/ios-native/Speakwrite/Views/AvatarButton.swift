@@ -14,6 +14,7 @@ struct AvatarButton: View {
                 size: .small
             )
         }
+        .accessibilityLabel("My profile")
     }
 }
 

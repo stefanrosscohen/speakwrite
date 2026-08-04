@@ -3,7 +3,6 @@ import SwiftUI
 /// Bottom toolbar showing character count ring and publish button.
 struct PostBarView: View {
     @Environment(AppViewModel.self) private var viewModel
-    @Environment(\.colorScheme) private var colorScheme
     @State private var showPublishConfirm = false
 
     private let charLimit = 300
@@ -12,6 +11,18 @@ struct PostBarView: View {
         VStack(spacing: 0) {
             HStack(spacing: Theme.md) {
                 CharacterCountRing(count: graphemeCount, limit: charLimit)
+
+                if viewModel.keystrokeCount > 0 {
+                    HStack(spacing: Theme.xs) {
+                        Image(systemName: "keyboard")
+                            .font(Theme.caption)
+                        Text("\(viewModel.keystrokeCount)")
+                            .font(Theme.monoCaption)
+                    }
+                    .foregroundStyle(Theme.textTertiary)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("\(viewModel.keystrokeCount) keystrokes recorded")
+                }
 
                 Spacer()
 
@@ -22,7 +33,7 @@ struct PostBarView: View {
                         if let status = viewModel.videoProcessingStatus {
                             Text(status)
                                 .font(Theme.monoSmall)
-                                .foregroundStyle(Theme.textSecondary(colorScheme))
+                                .foregroundStyle(Theme.textSecondary)
                         }
                     }
                     .padding(.trailing, Theme.sm)
@@ -45,7 +56,7 @@ struct PostBarView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(Theme.accent)
-                    .foregroundStyle(.black)
+                    .foregroundStyle(Theme.onAccent)
                     .clipShape(Capsule())
                     .disabled(
                         (viewModel.postText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -95,7 +106,6 @@ struct PostBarView: View {
 struct CharacterCountRing: View {
     let count: Int
     let limit: Int
-    @Environment(\.colorScheme) private var colorScheme
 
     private var progress: Double { min(Double(count) / Double(limit), 1.0) }
     private var remaining: Int { limit - count }
@@ -108,7 +118,7 @@ struct CharacterCountRing: View {
 
     var body: some View {
         ZStack {
-            Circle().stroke(Theme.surface(colorScheme), lineWidth: 2.5)
+            Circle().stroke(Theme.surface, lineWidth: 2.5)
             Circle()
                 .trim(from: 0, to: progress)
                 .stroke(ringColor, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
@@ -122,11 +132,15 @@ struct CharacterCountRing: View {
             if showNumber {
                 Text("\(remaining)")
                     .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .foregroundStyle(remaining < 0 ? Theme.error : Theme.textSecondary(colorScheme))
+                    .foregroundStyle(remaining < 0 ? Theme.error : Theme.textSecondary)
             }
         }
         .frame(width: 30, height: 30)
         .animation(.easeInOut(duration: 0.15), value: count)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(remaining >= 0
+            ? "\(remaining) characters remaining"
+            : "\(-remaining) characters over the limit")
     }
 }
 

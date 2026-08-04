@@ -15,7 +15,6 @@
 		A10001010000000000000018 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000018 /* LoginView.swift */; };
 		A10001010000000000000019 /* EditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000019 /* EditorView.swift */; };
 		A10001010000000000000020 /* PostBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000020 /* PostBarView.swift */; };
-		A10001010000000000000022 /* PublishView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000022 /* PublishView.swift */; };
 		A10001010000000000000023 /* FeedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000023 /* FeedView.swift */; };
 		A10001010000000000000024 /* TimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000024 /* TimelineView.swift */; };
 		A10001010000000000000025 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000025 /* Assets.xcassets */; };
@@ -40,6 +39,8 @@
 		A10001010000000000000044 /* PostImagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000044 /* PostImagesView.swift */; };
 		A10001010000000000000045 /* MediaPreviewStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000045 /* MediaPreviewStrip.swift */; };
 		A10001010000000000000046 /* PreviewHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000046 /* PreviewHelpers.swift */; };
+		A10001010000000000000047 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000047 /* DesignSystem.swift */; };
+		A10001010000000000000048 /* NotificationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000048 /* NotificationsView.swift */; };
 		A10003010000000000000001 /* CryptoKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A10004010000000000000001 /* CryptoKit.framework */; };
 		A10003010000000000000002 /* DeviceCheck.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A10004010000000000000002 /* DeviceCheck.framework */; };
 		A10003010000000000000004 /* AuthenticationServices.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A10004010000000000000004 /* AuthenticationServices.framework */; };
@@ -57,7 +58,6 @@
 		A10002010000000000000018 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		A10002010000000000000019 /* EditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorView.swift; sourceTree = "<group>"; };
 		A10002010000000000000020 /* PostBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostBarView.swift; sourceTree = "<group>"; };
-		A10002010000000000000022 /* PublishView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublishView.swift; sourceTree = "<group>"; };
 		A10002010000000000000023 /* FeedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedView.swift; sourceTree = "<group>"; };
 		A10002010000000000000024 /* TimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineView.swift; sourceTree = "<group>"; };
 		A10002010000000000000025 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -82,6 +82,8 @@
 		A10002010000000000000044 /* PostImagesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostImagesView.swift; sourceTree = "<group>"; };
 		A10002010000000000000045 /* MediaPreviewStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaPreviewStrip.swift; sourceTree = "<group>"; };
 		A10002010000000000000046 /* PreviewHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewHelpers.swift; sourceTree = "<group>"; };
+		A10002010000000000000047 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
+		A10002010000000000000048 /* NotificationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsView.swift; sourceTree = "<group>"; };
 		A10004010000000000000001 /* CryptoKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CryptoKit.framework; path = System/Library/Frameworks/CryptoKit.framework; sourceTree = SDKROOT; };
 		A10004010000000000000002 /* DeviceCheck.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = DeviceCheck.framework; path = System/Library/Frameworks/DeviceCheck.framework; sourceTree = SDKROOT; };
 		A10004010000000000000004 /* AuthenticationServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AuthenticationServices.framework; path = System/Library/Frameworks/AuthenticationServices.framework; sourceTree = SDKROOT; };
@@ -196,7 +198,6 @@
 				A10002010000000000000018 /* LoginView.swift */,
 				A10002010000000000000019 /* EditorView.swift */,
 				A10002010000000000000020 /* PostBarView.swift */,
-				A10002010000000000000022 /* PublishView.swift */,
 				A10002010000000000000023 /* FeedView.swift */,
 				A10002010000000000000024 /* TimelineView.swift */,
 				A10002010000000000000027 /* ProfileView.swift */,
@@ -208,6 +209,7 @@
 				A10002010000000000000037 /* QuotePostView.swift */,
 				A10002010000000000000038 /* SearchUsersView.swift */,
 				A10002010000000000000043 /* CameraCaptureView.swift */,
+				A10002010000000000000048 /* NotificationsView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -220,6 +222,7 @@
 				A10002010000000000000035 /* StatView.swift */,
 				A10002010000000000000044 /* PostImagesView.swift */,
 				A10002010000000000000045 /* MediaPreviewStrip.swift */,
+				A10002010000000000000047 /* DesignSystem.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -375,7 +378,6 @@
 				A10001010000000000000018 /* LoginView.swift in Sources */,
 				A10001010000000000000019 /* EditorView.swift in Sources */,
 				A10001010000000000000020 /* PostBarView.swift in Sources */,
-				A10001010000000000000022 /* PublishView.swift in Sources */,
 				A10001010000000000000023 /* FeedView.swift in Sources */,
 				A10001010000000000000024 /* TimelineView.swift in Sources */,
 				A10001010000000000000026 /* KeychainHelper.swift in Sources */,
@@ -398,6 +400,8 @@
 				A10001010000000000000044 /* PostImagesView.swift in Sources */,
 				A10001010000000000000045 /* MediaPreviewStrip.swift in Sources */,
 				A10001010000000000000046 /* PreviewHelpers.swift in Sources */,
+				A10001010000000000000047 /* DesignSystem.swift in Sources */,
+				A10001010000000000000048 /* NotificationsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -541,6 +545,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Speakwrite/Speakwrite.entitlements;
 				CODE_SIGN_STYLE = Automatic;
+				APP_ATTEST_ENVIRONMENT = development;
 				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = J3Y68ZC9L2;
 				ENABLE_PREVIEWS = YES;
@@ -577,6 +582,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Speakwrite/Speakwrite.entitlements;
 				CODE_SIGN_STYLE = Automatic;
+				APP_ATTEST_ENVIRONMENT = production;
 				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = J3Y68ZC9L2;
 				ENABLE_PREVIEWS = YES;

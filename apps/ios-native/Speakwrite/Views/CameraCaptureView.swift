@@ -135,7 +135,7 @@ struct CameraCaptureView: UIViewControllerRepresentable {
 #Preview {
     // CameraCaptureView requires camera hardware — preview shows placeholder
     Text("Camera preview requires device")
-        .font(.system(size: 15, design: .monospaced))
+        .font(Theme.monoBody)
         .foregroundStyle(.secondary)
 }
 #endif

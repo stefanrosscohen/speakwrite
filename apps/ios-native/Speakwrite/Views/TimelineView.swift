@@ -3,8 +3,6 @@ import SwiftUI
 /// Feed tab with "Following" and "For You" sub-tabs.
 struct TimelineView: View {
     @Environment(AppViewModel.self) private var viewModel
-    @Environment(\.colorScheme) private var colorScheme
-    @State private var showMyProfile = false
     @State private var showSearch = false
     @State private var selectedFeed: FeedType = .following
     @State private var path = NavigationPath()
@@ -23,7 +21,7 @@ struct TimelineView: View {
                         avatarURL: viewModel.myProfile?.avatar,
                         handle: viewModel.atproto.handle
                     ) {
-                        showMyProfile = true
+                        viewModel.selectedTab = .profile
                     }
                     Text("speakwrite")
                         .font(Theme.monoTitle)
@@ -35,6 +33,7 @@ struct TimelineView: View {
                         Image(systemName: "magnifyingglass")
                             .foregroundStyle(Theme.accent)
                     }
+                    .accessibilityLabel("Search")
                 }
                 .padding(.horizontal, Theme.lg)
                 .padding(.vertical, Theme.sm)
@@ -42,8 +41,7 @@ struct TimelineView: View {
                 // Sub-tab picker
                 feedPicker
 
-                Divider()
-                    .foregroundStyle(Theme.separator(colorScheme))
+                ThemedDivider()
 
                 // Feed content
                 Group {
@@ -55,11 +53,8 @@ struct TimelineView: View {
                     }
                 }
             }
-            .background(Theme.background(colorScheme))
+            .background(Theme.background)
             .navigationBarHidden(true)
-            .sheet(isPresented: $showMyProfile) {
-                MyProfileView()
-            }
             .sheet(isPresented: $showSearch) {
                 SearchUsersView()
             }
@@ -96,8 +91,8 @@ struct TimelineView: View {
                 } label: {
                     VStack(spacing: 6) {
                         Text(feed.rawValue)
-                            .font(.system(size: 14, weight: selectedFeed == feed ? .semibold : .regular, design: .monospaced))
-                            .foregroundStyle(selectedFeed == feed ? Theme.textPrimary(colorScheme) : Theme.textSecondary(colorScheme))
+                            .font(Theme.mono.weight(selectedFeed == feed ? .semibold : .regular))
+                            .foregroundStyle(selectedFeed == feed ? Theme.textPrimary : Theme.textSecondary)
 
                         Rectangle()
                             .fill(selectedFeed == feed ? Theme.accent : Color.clear)
@@ -123,16 +118,21 @@ struct TimelineView: View {
                         .tint(Theme.accent)
                     Text("Loading feed...")
                         .font(Theme.mono)
-                        .foregroundStyle(Theme.textSecondary(colorScheme))
+                        .foregroundStyle(Theme.textSecondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let error = viewModel.followingError, viewModel.followingPosts.isEmpty {
+                ErrorStateView(message: error) {
+                    Task { await viewModel.loadFollowing() }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if viewModel.followingPosts.isEmpty {
-                ContentUnavailableView {
-                    Label("No posts", systemImage: "person.2")
-                } description: {
-                    Text("Follow people to see their posts here.")
-                        .font(Theme.mono)
-                }
+                EmptyStateView(
+                    icon: "person.2",
+                    title: "No posts",
+                    subtitle: "Follow people to see their posts here."
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
                     LazyVStack(spacing: 0) {
@@ -140,8 +140,7 @@ struct TimelineView: View {
                             PostRow(post: post)
                                 .padding(.horizontal, Theme.lg)
 
-                            Divider()
-                                .foregroundStyle(Theme.separator(colorScheme))
+                            ThemedDivider()
                         }
 
                         if viewModel.followingCursor != nil {
@@ -172,16 +171,21 @@ struct TimelineView: View {
                         .tint(Theme.accent)
                     Text("Loading feed...")
                         .font(Theme.mono)
-                        .foregroundStyle(Theme.textSecondary(colorScheme))
+                        .foregroundStyle(Theme.textSecondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let error = viewModel.timelineError, viewModel.timelinePosts.isEmpty {
+                ErrorStateView(message: error) {
+                    Task { await viewModel.loadTimeline() }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if viewModel.timelinePosts.isEmpty {
-                ContentUnavailableView {
-                    Label("No posts", systemImage: "house")
-                } description: {
-                    Text("Your feed is empty.")
-                        .font(Theme.mono)
-                }
+                EmptyStateView(
+                    icon: "house",
+                    title: "No posts",
+                    subtitle: "Your feed is empty."
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
                     LazyVStack(spacing: 0) {
@@ -189,8 +193,7 @@ struct TimelineView: View {
                             PostRow(post: post)
                                 .padding(.horizontal, Theme.lg)
 
-                            Divider()
-                                .foregroundStyle(Theme.separator(colorScheme))
+                            ThemedDivider()
                         }
 
                         if viewModel.timelineCursor != nil {

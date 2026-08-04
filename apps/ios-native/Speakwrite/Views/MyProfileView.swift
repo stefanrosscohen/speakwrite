@@ -1,15 +1,15 @@
 import PhotosUI
 import SwiftUI
 
-/// Shows the logged-in user's own profile with posts, edit, and delete capabilities.
+/// The Profile tab — the logged-in user's own profile with posts, edit,
+/// delete, and a path into Settings.
 struct MyProfileView: View {
     @Environment(AppViewModel.self) private var viewModel
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.dismiss) private var dismiss
 
     @State private var posts: [TimelinePost] = []
     @State private var postsCursor: String?
     @State private var isLoading = true
+    @State private var loadError: String?
     @State private var showEditProfile = false
     @State private var postToDelete: TimelinePost?
     @State private var showDeleteConfirm = false
@@ -23,183 +23,25 @@ struct MyProfileView: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    // Banner
-                    PhotosPicker(selection: $bannerItem, matching: .images) {
-                        if let bannerURL = viewModel.myProfile?.banner, let url = URL(string: bannerURL) {
-                            Color.clear
-                                .frame(height: 150)
-                                .frame(maxWidth: .infinity)
-                                .background {
-                                    AsyncImage(url: url) { image in
-                                        image.resizable().aspectRatio(contentMode: .fill)
-                                    } placeholder: {
-                                        Rectangle().fill(Theme.surface(colorScheme))
-                                    }
-                                }
-                                .clipped()
-                                .overlay(alignment: .bottomTrailing) {
-                                    bannerOverlayIcon
-                                }
-                        } else {
-                            Rectangle()
-                                .fill(Theme.surface(colorScheme))
-                                .frame(height: 150)
-                                .overlay {
-                                    if isUploadingBanner {
-                                        ProgressView().tint(Theme.accent)
-                                    } else {
-                                        Image(systemName: "camera")
-                                            .foregroundStyle(Theme.textTertiary(colorScheme))
-                                            .font(.system(size: 24))
-                                    }
-                                }
-                        }
-                    }
-
-                    // Avatar + Edit Profile button
-                    HStack {
-                        PhotosPicker(selection: $avatarItem, matching: .images) {
-                            AvatarView(
-                                url: viewModel.myProfile?.avatar,
-                                handle: viewModel.myProfile?.handle ?? viewModel.atproto.handle,
-                                size: .large
-                            )
-                            .overlay(Circle().stroke(Theme.avatarBorder(colorScheme), lineWidth: 3))
-                            .overlay(alignment: .bottomTrailing) {
-                                if isUploadingAvatar {
-                                    ProgressView()
-                                        .tint(Theme.accent)
-                                        .frame(width: 24, height: 24)
-                                        .background(Theme.background(colorScheme))
-                                        .clipShape(Circle())
-                                } else {
-                                    Image(systemName: "camera.circle.fill")
-                                        .font(.system(size: 22))
-                                        .foregroundStyle(Theme.accent)
-                                        .background(Theme.background(colorScheme))
-                                        .clipShape(Circle())
-                                }
-                            }
-                        }
-
-                        Spacer()
-
-                        Button {
-                            showEditProfile = true
-                        } label: {
-                            Text("Edit Profile")
-                                .font(.system(size: 14, weight: .semibold))
-                                .padding(.horizontal, Theme.xl)
-                                .padding(.vertical, Theme.sm)
-                        }
-                        .buttonStyle(.bordered)
-                        .tint(Theme.accent)
-                    }
-                    .padding(.horizontal, Theme.lg)
-                    .padding(.top, Theme.md)
-
-                    // Name + handle
-                    VStack(alignment: .leading, spacing: Theme.xs) {
-                        if let name = viewModel.myProfile?.displayName, !name.isEmpty {
-                            Text(name)
-                                .font(Theme.title)
-                                .foregroundStyle(Theme.textPrimary(colorScheme))
-                        }
-                        Text("@\(viewModel.myProfile?.handle ?? viewModel.atproto.handle ?? "")")
-                            .font(Theme.mono)
-                            .foregroundStyle(Theme.textSecondary(colorScheme))
-                    }
-                    .padding(.horizontal, Theme.lg)
-                    .padding(.top, Theme.sm)
-
-                    // Bio
-                    if let bio = viewModel.myProfile?.description, !bio.isEmpty {
-                        Text(bio)
+            VStack(spacing: 0) {
+                TabHeader("Profile") {
+                    NavigationLink {
+                        SettingsView()
+                    } label: {
+                        Image(systemName: "gearshape")
                             .font(Theme.body)
-                            .foregroundStyle(Theme.textPrimary(colorScheme))
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.horizontal, Theme.lg)
-                            .padding(.top, Theme.sm)
+                            .foregroundStyle(Theme.accent)
                     }
-
-                    // Stats
-                    HStack(spacing: Theme.xxl) {
-                        StatView(count: viewModel.myProfile?.postsCount ?? 0, label: "Posts")
-                        StatView(count: viewModel.myProfile?.followersCount ?? 0, label: "Followers")
-                        StatView(count: viewModel.myProfile?.followsCount ?? 0, label: "Following")
-                    }
-                    .padding(.horizontal, Theme.lg)
-                    .padding(.top, Theme.md)
-                    .accessibilityIdentifier("my-profile-header")
-
-                    Divider()
-                        .foregroundStyle(Theme.separator(colorScheme))
-                        .padding(.top, Theme.lg)
-
-                    // Posts list
-                    if isLoading {
-                        ProgressView("Loading posts…")
-                            .tint(Theme.accent)
-                            .frame(maxWidth: .infinity)
-                            .padding(.top, Theme.xxxl)
-                    } else if posts.isEmpty {
-                        Text("No posts yet")
-                            .font(Theme.subhead)
-                            .foregroundStyle(Theme.textTertiary(colorScheme))
-                            .frame(maxWidth: .infinity)
-                            .padding(.top, Theme.xxxl)
-                    } else {
-                        LazyVStack(spacing: 0) {
-                            ForEach(posts) { post in
-                                VStack(spacing: 0) {
-                                    PostRow(post: post, hideFollowButton: true)
-                                        .padding(.horizontal, Theme.lg)
-                                        .overlay(alignment: .topTrailing) {
-                                            Menu {
-                                                Button(role: .destructive) {
-                                                    postToDelete = post
-                                                    showDeleteConfirm = true
-                                                } label: {
-                                                    Label("Delete Post", systemImage: "trash")
-                                                }
-                                            } label: {
-                                                Image(systemName: "ellipsis")
-                                                    .font(.system(size: 14))
-                                                    .foregroundStyle(Theme.textTertiary(colorScheme))
-                                                    .frame(width: 32, height: 32)
-                                                    .contentShape(Rectangle())
-                                            }
-                                            .padding(.trailing, Theme.lg)
-                                            .padding(.top, 10)
-                                        }
-
-                                    Divider()
-                                        .foregroundStyle(Theme.separator(colorScheme))
-                                }
-                            }
-
-                            if postsCursor != nil {
-                                ProgressView("Loading more…")
-                                    .tint(Theme.accent)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, Theme.xl)
-                                    .onAppear { Task { await loadMorePosts() } }
-                            }
-                        }
-                    }
+                    .accessibilityLabel("Settings")
+                    .accessibilityIdentifier("settings-button")
                 }
+
+                ThemedDivider()
+
+                profileScroll
             }
-            .background(Theme.background(colorScheme))
-            .navigationTitle("")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
-                        .font(Theme.monoHeadline)
-                        .foregroundStyle(Theme.accent)
-                }
-            }
+            .background(Theme.background)
+            .navigationBarHidden(true)
             .navigationDestination(for: String.self) { did in
                 ProfileView(actorDID: did)
             }
@@ -231,10 +73,6 @@ struct MyProfileView: View {
                 await viewModel.loadMyProfile()
                 await loadPosts()
             }
-            .refreshable {
-                await viewModel.loadMyProfile()
-                await loadPosts()
-            }
             .environment(\.openURL, OpenURLAction { url in
                 if url.scheme == "speakwrite", url.host == "profile",
                    let handle = url.pathComponents.dropFirst().first {
@@ -243,6 +81,187 @@ struct MyProfileView: View {
                 }
                 return .systemAction
             })
+        }
+    }
+
+    private var profileScroll: some View {
+        ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    // Banner
+                    PhotosPicker(selection: $bannerItem, matching: .images) {
+                        if let bannerURL = viewModel.myProfile?.banner, let url = URL(string: bannerURL) {
+                            Color.clear
+                                .frame(height: 150)
+                                .frame(maxWidth: .infinity)
+                                .background {
+                                    AsyncImage(url: url) { image in
+                                        image.resizable().aspectRatio(contentMode: .fill)
+                                    } placeholder: {
+                                        Rectangle().fill(Theme.surface)
+                                    }
+                                }
+                                .clipped()
+                                .overlay(alignment: .bottomTrailing) {
+                                    bannerOverlayIcon
+                                }
+                                .accessibilityLabel("Change banner photo")
+                        } else {
+                            Rectangle()
+                                .fill(Theme.surface)
+                                .frame(height: 150)
+                                .overlay {
+                                    if isUploadingBanner {
+                                        ProgressView().tint(Theme.accent)
+                                    } else {
+                                        Image(systemName: "camera")
+                                            .foregroundStyle(Theme.textTertiary)
+                                            .font(.system(size: 24))
+                                    }
+                                }
+                                .accessibilityLabel("Change banner photo")
+                        }
+                    }
+
+                    // Avatar + Edit Profile button
+                    HStack {
+                        PhotosPicker(selection: $avatarItem, matching: .images) {
+                            AvatarView(
+                                url: viewModel.myProfile?.avatar,
+                                handle: viewModel.myProfile?.handle ?? viewModel.atproto.handle,
+                                size: .large
+                            )
+                            .overlay(Circle().stroke(Theme.background, lineWidth: 3))
+                            .overlay(alignment: .bottomTrailing) {
+                                if isUploadingAvatar {
+                                    ProgressView()
+                                        .tint(Theme.accent)
+                                        .frame(width: 24, height: 24)
+                                        .background(Theme.background)
+                                        .clipShape(Circle())
+                                } else {
+                                    Image(systemName: "camera.circle.fill")
+                                        .font(.system(size: 22))
+                                        .foregroundStyle(Theme.accent)
+                                        .background(Theme.background)
+                                        .clipShape(Circle())
+                                }
+                            }
+                        }
+                        .accessibilityLabel("Change profile photo")
+
+                        Spacer()
+
+                        Button {
+                            showEditProfile = true
+                        } label: {
+                            Text("Edit Profile")
+                                .font(Theme.subhead.weight(.semibold))
+                                .padding(.horizontal, Theme.xl)
+                                .padding(.vertical, Theme.sm)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(Theme.accent)
+                    }
+                    .padding(.horizontal, Theme.lg)
+                    .padding(.top, Theme.md)
+
+                    // Name + handle
+                    VStack(alignment: .leading, spacing: Theme.xs) {
+                        if let name = viewModel.myProfile?.displayName, !name.isEmpty {
+                            Text(name)
+                                .font(Theme.title)
+                                .foregroundStyle(Theme.textPrimary)
+                        }
+                        Text("@\(viewModel.myProfile?.handle ?? viewModel.atproto.handle ?? "")")
+                            .font(Theme.mono)
+                            .foregroundStyle(Theme.textSecondary)
+                    }
+                    .padding(.horizontal, Theme.lg)
+                    .padding(.top, Theme.sm)
+
+                    // Bio
+                    if let bio = viewModel.myProfile?.description, !bio.isEmpty {
+                        Text(bio)
+                            .font(Theme.body)
+                            .foregroundStyle(Theme.textPrimary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.horizontal, Theme.lg)
+                            .padding(.top, Theme.sm)
+                    }
+
+                    // Stats
+                    HStack(spacing: Theme.xl) {
+                        ProfileStat(count: viewModel.myProfile?.postsCount ?? 0, label: "posts")
+                        ProfileStat(count: viewModel.myProfile?.followersCount ?? 0, label: "followers")
+                        ProfileStat(count: viewModel.myProfile?.followsCount ?? 0, label: "following")
+                    }
+                    .padding(.horizontal, Theme.lg)
+                    .padding(.top, Theme.md)
+                    .accessibilityIdentifier("my-profile-header")
+
+                    ThemedDivider()
+                        .padding(.top, Theme.lg)
+
+                    // Posts list
+                    if isLoading {
+                        ProgressView("Loading posts…")
+                            .tint(Theme.accent)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, Theme.xxxl)
+                    } else if let loadError, posts.isEmpty {
+                        ErrorStateView(message: loadError) {
+                            Task { await loadPosts() }
+                        }
+                    } else if posts.isEmpty {
+                        Text("No posts yet")
+                            .font(Theme.subhead)
+                            .foregroundStyle(Theme.textTertiary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, Theme.xxxl)
+                    } else {
+                        LazyVStack(spacing: 0) {
+                            ForEach(posts) { post in
+                                VStack(spacing: 0) {
+                                    PostRow(post: post, hideFollowButton: true)
+                                        .padding(.horizontal, Theme.lg)
+                                        .overlay(alignment: .topTrailing) {
+                                            Menu {
+                                                Button(role: .destructive) {
+                                                    postToDelete = post
+                                                    showDeleteConfirm = true
+                                                } label: {
+                                                    Label("Delete Post", systemImage: "trash")
+                                                }
+                                            } label: {
+                                                Image(systemName: "ellipsis")
+                                                    .font(Theme.subhead)
+                                                    .foregroundStyle(Theme.textTertiary)
+                                                    .frame(width: 32, height: 32)
+                                                    .contentShape(Rectangle())
+                                            }
+                                            .accessibilityLabel("More options")
+                                            .padding(.trailing, Theme.lg)
+                                            .padding(.top, 10)
+                                        }
+
+                                    ThemedDivider()
+                                }
+                            }
+
+                            if postsCursor != nil {
+                                ProgressView("Loading more…")
+                                    .tint(Theme.accent)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, Theme.xl)
+                                    .onAppear { Task { await loadMorePosts() } }
+                            }
+                        }
+                    }
+                }
+            }
+        .refreshable {
+            await viewModel.loadMyProfile()
+            await loadPosts()
         }
     }
 
@@ -268,12 +287,13 @@ struct MyProfileView: View {
     private func loadPosts() async {
         guard let did = viewModel.atproto.did else { return }
         isLoading = true
+        loadError = nil
         do {
             let result = try await viewModel.atproto.getAuthorFeed(actor: did)
             posts = result.posts
             postsCursor = result.cursor
         } catch {
-            print("[MyProfile] Failed to load posts: \(error)")
+            loadError = error.localizedDescription
         }
         isLoading = false
     }
@@ -342,7 +362,6 @@ struct MyProfileView: View {
 
 struct EditProfileSheet: View {
     @Environment(AppViewModel.self) private var viewModel
-    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dismiss) private var dismiss
 
     @State private var displayName: String = ""
@@ -367,9 +386,9 @@ struct EditProfileSheet: View {
                 } footer: {
                     Text("\(displayName.count)/\(displayNameLimit)")
                         .font(Theme.monoSmall)
-                        .foregroundStyle(displayName.count >= displayNameLimit ? Theme.error : Theme.textTertiary(colorScheme))
+                        .foregroundStyle(displayName.count >= displayNameLimit ? Theme.error : Theme.textTertiary)
                 }
-                .listRowBackground(Theme.surfaceElevated(colorScheme))
+                .listRowBackground(Theme.surfaceElevated)
 
                 Section {
                     TextEditor(text: $bio)
@@ -383,9 +402,9 @@ struct EditProfileSheet: View {
                 } footer: {
                     Text("\(bio.count)/\(bioLimit)")
                         .font(Theme.monoSmall)
-                        .foregroundStyle(bio.count >= bioLimit ? Theme.error : Theme.textTertiary(colorScheme))
+                        .foregroundStyle(bio.count >= bioLimit ? Theme.error : Theme.textTertiary)
                 }
-                .listRowBackground(Theme.surfaceElevated(colorScheme))
+                .listRowBackground(Theme.surfaceElevated)
 
                 if let error = errorMessage {
                     Section {
@@ -393,17 +412,17 @@ struct EditProfileSheet: View {
                             .font(Theme.monoSmall)
                             .foregroundStyle(Theme.error)
                     }
-                    .listRowBackground(Theme.surfaceElevated(colorScheme))
+                    .listRowBackground(Theme.surfaceElevated)
                 }
             }
             .scrollContentBackground(.hidden)
-            .background(Theme.background(colorScheme))
+            .background(Theme.background)
             .navigationTitle("Edit Profile")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { dismiss() }
-                        .foregroundStyle(Theme.textSecondary(colorScheme))
+                        .foregroundStyle(Theme.textSecondary)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {

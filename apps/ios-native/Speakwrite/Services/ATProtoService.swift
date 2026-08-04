@@ -76,9 +76,18 @@ final class ATProtoService {
 
     // MARK: - OAuth Flow
 
+    /// Build a URL from a string, throwing instead of crashing on malformed input
+    /// (server metadata and user-typed hosts both flow through here).
+    private static func makeURL(_ string: String) throws -> URL {
+        guard let url = URL(string: string), url.scheme != nil else {
+            throw ATProtoError.invalidURL(string)
+        }
+        return url
+    }
+
     func resolveHandle(_ handle: String, serviceHost: String = "https://bsky.social") async throws -> (did: String, pds: String) {
         let encoded = handle.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? handle
-        let url = URL(string: "\(serviceHost)/xrpc/com.atproto.identity.resolveHandle?handle=\(encoded)")!
+        let url = try Self.makeURL("\(serviceHost)/xrpc/com.atproto.identity.resolveHandle?handle=\(encoded)")
         let (data, response) = try await URLSession.shared.data(from: url)
 
         if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode != 200 {
@@ -89,7 +98,7 @@ final class ATProtoService {
             throw ATProtoError.handleNotFound
         }
 
-        let didDocURL = URL(string: "https://plc.directory/\(result.did)")!
+        let didDocURL = try Self.makeURL("https://plc.directory/\(result.did)")
         let (didData, _) = try await URLSession.shared.data(from: didDocURL)
         let didDoc = try JSONDecoder().decode(DIDDocument.self, from: didData)
 
@@ -102,7 +111,7 @@ final class ATProtoService {
 
     /// Discover the authorization server URL from a PDS's protected resource metadata.
     private func discoverAuthorizationServer(pds: String) async throws -> String {
-        let url = URL(string: "\(pds)/.well-known/oauth-protected-resource")!
+        let url = try Self.makeURL("\(pds)/.well-known/oauth-protected-resource")
         let (data, _) = try await URLSession.shared.data(from: url)
         let resource = try JSONDecoder().decode(OAuthProtectedResource.self, from: data)
         guard let server = resource.authorizationServers.first else {
@@ -117,7 +126,7 @@ final class ATProtoService {
         // Discover the authorization server from the PDS's protected resource metadata
         let authServer = try await discoverAuthorizationServer(pds: pds)
 
-        let metadataURL = URL(string: "\(authServer)/.well-known/oauth-authorization-server")!
+        let metadataURL = try Self.makeURL("\(authServer)/.well-known/oauth-authorization-server")
         let (metaData, _) = try await URLSession.shared.data(from: metadataURL)
         let metadata = try JSONDecoder().decode(OAuthServerMetadata.self, from: metaData)
 
@@ -127,7 +136,7 @@ final class ATProtoService {
 
         let state = UUID().uuidString
         let redirectURI = "io.speakwrite.www:/oauth/callback"
-        let clientId = "https://www.speakwrite.io/app/client-metadata.json"
+        let clientId = Self.clientId
 
         let authParams: [(String, String)] = [
             ("response_type", "code"),
@@ -141,22 +150,22 @@ final class ATProtoService {
         ]
 
         // Build the auth URL — use PAR if required by the server
-        let authURL: URL
+        guard var components = URLComponents(string: metadata.authorizationEndpoint) else {
+            throw ATProtoError.invalidURL(metadata.authorizationEndpoint)
+        }
         if let parEndpoint = metadata.pushedAuthorizationRequestEndpoint {
             // Pushed Authorization Request: POST params to PAR endpoint, get request_uri back
             let parResult = try await performPAR(endpoint: parEndpoint, params: authParams)
-
-            var components = URLComponents(string: metadata.authorizationEndpoint)!
             components.queryItems = [
                 URLQueryItem(name: "client_id", value: clientId),
                 URLQueryItem(name: "request_uri", value: parResult.requestUri),
             ]
-            authURL = components.url!
         } else {
             // Standard authorization request (no PAR)
-            var components = URLComponents(string: metadata.authorizationEndpoint)!
             components.queryItems = authParams.map { URLQueryItem(name: $0.0, value: $0.1) }
-            authURL = components.url!
+        }
+        guard let authURL = components.url else {
+            throw ATProtoError.invalidURL(metadata.authorizationEndpoint)
         }
 
         let callbackURL = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, Error>) in
@@ -178,8 +187,23 @@ final class ATProtoService {
             session.start()
         }
 
-        guard let callbackComponents = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false),
-              let code = callbackComponents.queryItems?.first(where: { $0.name == "code" })?.value else {
+        guard let callbackComponents = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false) else {
+            throw ATProtoError.noAuthCode
+        }
+        let callbackItems = callbackComponents.queryItems ?? []
+
+        // Surface authorization-server errors instead of a generic "no code"
+        if let oauthError = callbackItems.first(where: { $0.name == "error" })?.value {
+            let description = callbackItems.first(where: { $0.name == "error_description" })?.value
+            throw ATProtoError.oauthError(oauthError, description)
+        }
+
+        // CSRF protection: the returned state must match what we sent
+        guard callbackItems.first(where: { $0.name == "state" })?.value == state else {
+            throw ATProtoError.stateMismatch
+        }
+
+        guard let code = callbackItems.first(where: { $0.name == "code" })?.value else {
             throw ATProtoError.noAuthCode
         }
 
@@ -199,7 +223,7 @@ final class ATProtoService {
     /// Perform a Pushed Authorization Request (PAR), handling DPoP nonce exchange.
     private func performPAR(endpoint: String, params: [(String, String)]) async throws -> PARResponse {
         func buildRequest() throws -> URLRequest {
-            var request = URLRequest(url: URL(string: endpoint)!)
+            var request = URLRequest(url: try Self.makeURL(endpoint))
             request.httpMethod = "POST"
             request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
             if let dpopHeader = try createDPoPProof(method: "POST", url: endpoint) {
@@ -247,23 +271,48 @@ final class ATProtoService {
         return try decodePARResponse(data, statusCode: httpResponse?.statusCode ?? 0)
     }
 
+    /// Percent-encode a form value per application/x-www-form-urlencoded.
+    private static func formEncode(_ params: [String: String]) -> Data {
+        var allowed = CharacterSet.alphanumerics
+        allowed.insert(charactersIn: "-._~")
+        let body = params
+            .map { key, value in
+                let k = key.addingPercentEncoding(withAllowedCharacters: allowed) ?? key
+                let v = value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value
+                return "\(k)=\(v)"
+            }
+            .joined(separator: "&")
+        return Data(body.utf8)
+    }
+
+    /// Decode a token response, converting OAuth error bodies into readable errors.
+    private func decodeTokenResponse(_ data: Data, statusCode: Int) throws -> TokenResponse {
+        if (200..<300).contains(statusCode) {
+            return try JSONDecoder().decode(TokenResponse.self, from: data)
+        }
+        if let oauthErr = try? JSONDecoder().decode(OAuthErrorResponse.self, from: data) {
+            throw ATProtoError.oauthError(oauthErr.error, oauthErr.errorDescription)
+        }
+        throw ATProtoError.oauthError("http_\(statusCode)", String(data: data, encoding: .utf8))
+    }
+
     private func exchangeCodeForTokens(
         code: String, codeVerifier: String, redirectURI: String,
         clientId: String, tokenEndpoint: String, pds: String
     ) async throws {
-        let bodyDict: [String: String] = [
+        // RFC 6749 §4.1.3: the token endpoint takes form encoding, not JSON
+        let bodyData = Self.formEncode([
             "grant_type": "authorization_code",
             "code": code,
             "redirect_uri": redirectURI,
             "client_id": clientId,
             "code_verifier": codeVerifier,
-        ]
-        let bodyData = try JSONEncoder().encode(bodyDict)
+        ])
 
         func buildRequest() throws -> URLRequest {
-            var request = URLRequest(url: URL(string: tokenEndpoint)!)
+            var request = URLRequest(url: try Self.makeURL(tokenEndpoint))
             request.httpMethod = "POST"
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
             if let dpopHeader = try createDPoPProof(method: "POST", url: tokenEndpoint) {
                 request.setValue(dpopHeader, forHTTPHeaderField: "DPoP")
             }
@@ -273,36 +322,61 @@ final class ATProtoService {
 
         let request = try buildRequest()
         let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw ATProtoError.oauthError("no_response", nil)
+        }
 
-        if let httpResponse = response as? HTTPURLResponse,
-           let nonce = httpResponse.value(forHTTPHeaderField: "DPoP-Nonce") {
+        if let nonce = httpResponse.value(forHTTPHeaderField: "DPoP-Nonce") {
             dpopNonce = nonce
 
-            // Retry with nonce if we got a 400 (DPoP nonce challenge)
-            if httpResponse.statusCode == 400 {
+            // Retry with nonce if we got a 400/401 (DPoP nonce challenge)
+            if httpResponse.statusCode == 400 || httpResponse.statusCode == 401 {
                 let retryRequest = try buildRequest()
                 let (retryData, retryResponse) = try await URLSession.shared.data(for: retryRequest)
-                if let retryHttp = retryResponse as? HTTPURLResponse,
-                   let retryNonce = retryHttp.value(forHTTPHeaderField: "DPoP-Nonce") {
+                let retryStatus = (retryResponse as? HTTPURLResponse)?.statusCode ?? 0
+                if let retryNonce = (retryResponse as? HTTPURLResponse)?.value(forHTTPHeaderField: "DPoP-Nonce") {
                     dpopNonce = retryNonce
                 }
-                let tokens = try JSONDecoder().decode(TokenResponse.self, from: retryData)
+                let tokens = try decodeTokenResponse(retryData, statusCode: retryStatus)
                 accessToken = tokens.accessToken
                 refreshToken = tokens.refreshToken
                 return
             }
         }
 
-        let tokens = try JSONDecoder().decode(TokenResponse.self, from: data)
+        let tokens = try decodeTokenResponse(data, statusCode: httpResponse.statusCode)
         accessToken = tokens.accessToken
         refreshToken = tokens.refreshToken
     }
 
-    // MARK: - Publishing
+    // MARK: - Constants
 
     private static let speakwriteURL = "https://www.speakwrite.io"
+    private static let clientId = "https://www.speakwrite.io/app/client-metadata.json"
+    /// Bluesky's unauthenticated AppView host. `api.bsky.app` requires auth.
+    private static let publicAppView = "https://public.api.bsky.app"
 
-    func publishAttestedPost(text: String, attestation: AttestationRecord, embed: [String: Any]? = nil, reply: (parentUri: String, parentCid: String)? = nil) async throws -> (uri: String, cid: String) {
+    // MARK: - Publishing
+
+    /// Reply references for threading. `root` is the thread's root post —
+    /// for a reply to a top-level post it equals the parent.
+    struct ReplyRefs {
+        let parentUri: String
+        let parentCid: String
+        let rootUri: String
+        let rootCid: String
+    }
+
+    /// Result of publishing an attested post. `proofCreated` is false when the
+    /// post record was created but the proof record failed — the post exists
+    /// but can't be verified.
+    struct PublishResult {
+        let uri: String
+        let cid: String
+        let proofCreated: Bool
+    }
+
+    func publishAttestedPost(text: String, attestation: AttestationRecord, embed: [String: Any]? = nil, reply: ReplyRefs? = nil) async throws -> PublishResult {
         guard let pds = pdsURL, let did = did, let handle = handle else { throw ATProtoError.notLoggedIn }
 
         // Generate rkey upfront so we can construct the verify URL
@@ -354,7 +428,7 @@ final class ATProtoService {
 
         if let reply {
             postRecord["reply"] = [
-                "root": ["uri": reply.parentUri, "cid": reply.parentCid] as [String: Any],
+                "root": ["uri": reply.rootUri, "cid": reply.rootCid] as [String: Any],
                 "parent": ["uri": reply.parentUri, "cid": reply.parentCid] as [String: Any],
             ] as [String: Any]
         }
@@ -380,11 +454,27 @@ final class ATProtoService {
             proofRecord["mediaHashes"] = mediaHashes
         }
 
-        let _: CreateRecordResponse? = try? await createRecord(
-            pds: pds, did: did, collection: "io.speakwrite.proof", record: proofRecord
-        )
+        // The proof record IS the product — don't discard its failure. Retry
+        // once, then report the failure so the UI can tell the user their post
+        // published but is unverifiable.
+        var proofCreated = true
+        do {
+            let _: CreateRecordResponse = try await createRecord(
+                pds: pds, did: did, collection: "io.speakwrite.proof", record: proofRecord
+            )
+        } catch {
+            authLog.error("Proof record creation failed, retrying once")
+            do {
+                let _: CreateRecordResponse = try await createRecord(
+                    pds: pds, did: did, collection: "io.speakwrite.proof", record: proofRecord
+                )
+            } catch {
+                authLog.error("Proof record creation failed after retry")
+                proofCreated = false
+            }
+        }
 
-        return (uri: postResult.uri, cid: postResult.cid)
+        return PublishResult(uri: postResult.uri, cid: postResult.cid, proofCreated: proofCreated)
     }
 
     // MARK: - @Mention Facets
@@ -428,7 +518,8 @@ final class ATProtoService {
     }
 
     func resolveHandleToDID(_ handle: String) async throws -> String {
-        let url = URL(string: "https://bsky.social/xrpc/com.atproto.identity.resolveHandle?handle=\(handle)")!
+        let encoded = handle.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? handle
+        let url = try Self.makeURL("https://bsky.social/xrpc/com.atproto.identity.resolveHandle?handle=\(encoded)")
         let (data, _) = try await URLSession.shared.data(from: url)
         let result = try JSONDecoder().decode(ResolveHandleResponse.self, from: data)
         return result.did
@@ -437,21 +528,29 @@ final class ATProtoService {
     // MARK: - User Search
 
     func searchUsers(query: String, limit: Int = 10) async throws -> [ProfileViewBasic] {
-        let publicAPI = "https://api.bsky.app"
         let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
-        let urlString = "\(publicAPI)/xrpc/app.bsky.actor.searchActors?q=\(encoded)&limit=\(limit)"
+        let path = "/xrpc/app.bsky.actor.searchActors?q=\(encoded)&limit=\(limit)"
 
-        let (data, _) = try await URLSession.shared.data(from: URL(string: urlString)!)
+        let data: Data
+        if let pds = pdsURL, accessToken != nil {
+            (data, _) = try await authenticatedRequest(url: pds + path, method: "GET")
+        } else {
+            (data, _) = try await URLSession.shared.data(from: try Self.makeURL(Self.publicAppView + path))
+        }
         let result = try JSONDecoder().decode(SearchActorsResponse.self, from: data)
         return result.actors
     }
 
     func searchUsersTypeahead(query: String, limit: Int = 8) async throws -> [ProfileViewBasic] {
-        let publicAPI = "https://api.bsky.app"
         let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
-        let urlString = "\(publicAPI)/xrpc/app.bsky.actor.searchActorsTypeahead?q=\(encoded)&limit=\(limit)"
+        let path = "/xrpc/app.bsky.actor.searchActorsTypeahead?q=\(encoded)&limit=\(limit)"
 
-        let (data, _) = try await URLSession.shared.data(from: URL(string: urlString)!)
+        let data: Data
+        if let pds = pdsURL, accessToken != nil {
+            (data, _) = try await authenticatedRequest(url: pds + path, method: "GET")
+        } else {
+            (data, _) = try await URLSession.shared.data(from: try Self.makeURL(Self.publicAppView + path))
+        }
         let result = try JSONDecoder().decode(SearchActorsTypeaheadResponse.self, from: data)
         return result.actors
     }
@@ -459,19 +558,28 @@ final class ATProtoService {
     // MARK: - Feed (Global Verified Posts)
 
     func fetchVerifiedFeed(cursor: String? = nil) async throws -> (posts: [VerifiedPost], cursor: String?) {
-        let publicAPI = "https://api.bsky.app"
-
-        // Single search: #speakwrite matches both tags array and text containing "speakwrite"
-        var urlString = "\(publicAPI)/xrpc/app.bsky.feed.searchPosts?q=%23speakwrite&limit=25&sort=latest"
+        // searchPosts requires authentication on the AppView, so go through the
+        // user's PDS with their session. #speakwrite matches both the tags array
+        // and text containing "speakwrite".
+        var query = "q=%23speakwrite&limit=25&sort=latest"
         if let cursor {
             let encoded = cursor.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? cursor
-            urlString += "&cursor=\(encoded)"
+            query += "&cursor=\(encoded)"
         }
 
-        let (data, response) = try await URLSession.shared.data(from: URL(string: urlString)!)
-
-        guard let httpResp = response as? HTTPURLResponse, httpResp.statusCode == 200 else {
-            return (posts: [], cursor: nil)
+        let data: Data
+        if let pds = pdsURL, accessToken != nil {
+            let urlString = "\(pds)/xrpc/app.bsky.feed.searchPosts?\(query)"
+            (data, _) = try await authenticatedRequest(url: urlString, method: "GET")
+        } else {
+            // Logged out: try the public AppView. This may be rejected — surface
+            // the error rather than rendering a silently empty feed.
+            let urlString = "\(Self.publicAppView)/xrpc/app.bsky.feed.searchPosts?\(query)"
+            let (respData, response) = try await URLSession.shared.data(from: try Self.makeURL(urlString))
+            if let httpResp = response as? HTTPURLResponse, httpResp.statusCode != 200 {
+                throw ATProtoError.oauthError("http_\(httpResp.statusCode)", "Verified feed unavailable while signed out")
+            }
+            data = respData
         }
 
         let result = try JSONDecoder().decode(SearchPostsResponse.self, from: data)
@@ -511,10 +619,9 @@ final class ATProtoService {
             (data, _) = try await authenticatedRequest(url: urlString, method: "GET")
         } else {
             // Fallback to public API (no viewer state)
-            let publicAPI = "https://api.bsky.app"
-            var urlString = "\(publicAPI)/xrpc/app.bsky.feed.getFeed?feed=\(encodedFeed)&limit=30"
+            var urlString = "\(Self.publicAppView)/xrpc/app.bsky.feed.getFeed?feed=\(encodedFeed)&limit=30"
             if let cursor { urlString += "&cursor=\(cursor)" }
-            var request = URLRequest(url: URL(string: urlString)!)
+            var request = URLRequest(url: try Self.makeURL(urlString))
             request.cachePolicy = .reloadIgnoringLocalCacheData
             (data, _) = try await URLSession.shared.data(for: request)
         }
@@ -586,7 +693,9 @@ final class ATProtoService {
                 isVerified: post.record?.isSpeakwrite == true,
                 viewer: post.viewer, repostedBy: repostedBy,
                 images: images,
-                videoURL: videoURL, videoThumbnail: videoThumb
+                videoURL: videoURL, videoThumbnail: videoThumb,
+                rootUri: post.record?.reply?.root?.uri,
+                rootCid: post.record?.reply?.root?.cid
             )
         }
 
@@ -608,9 +717,8 @@ final class ATProtoService {
             let urlString = "\(pds)/xrpc/app.bsky.actor.getProfile?actor=\(encoded)"
             (data, _) = try await authenticatedRequest(url: urlString, method: "GET")
         } else {
-            let publicAPI = "https://api.bsky.app"
-            let urlString = "\(publicAPI)/xrpc/app.bsky.actor.getProfile?actor=\(encoded)"
-            (data, _) = try await URLSession.shared.data(from: URL(string: urlString)!)
+            let urlString = "\(Self.publicAppView)/xrpc/app.bsky.actor.getProfile?actor=\(encoded)"
+            (data, _) = try await URLSession.shared.data(from: try Self.makeURL(urlString))
         }
 
         return try JSONDecoder().decode(ProfileViewDetailed.self, from: data)
@@ -625,10 +733,9 @@ final class ATProtoService {
             if let cursor { urlString += "&cursor=\(cursor)" }
             (data, _) = try await authenticatedRequest(url: urlString, method: "GET")
         } else {
-            let publicAPI = "https://api.bsky.app"
-            var urlString = "\(publicAPI)/xrpc/app.bsky.feed.getAuthorFeed?actor=\(encoded)&limit=30"
+            var urlString = "\(Self.publicAppView)/xrpc/app.bsky.feed.getAuthorFeed?actor=\(encoded)&limit=30"
             if let cursor { urlString += "&cursor=\(cursor)" }
-            (data, _) = try await URLSession.shared.data(from: URL(string: urlString)!)
+            (data, _) = try await URLSession.shared.data(from: try Self.makeURL(urlString))
         }
 
         let result = try JSONDecoder().decode(FeedResponse.self, from: data)
@@ -650,7 +757,9 @@ final class ATProtoService {
                 isVerified: post.record?.isSpeakwrite == true,
                 viewer: post.viewer, repostedBy: nil,
                 images: images,
-                videoURL: videoURL, videoThumbnail: videoThumb
+                videoURL: videoURL, videoThumbnail: videoThumb,
+                rootUri: post.record?.reply?.root?.uri,
+                rootCid: post.record?.reply?.root?.cid
             )
         }
 
@@ -693,41 +802,6 @@ final class ATProtoService {
         try await deleteRecord(collection: "app.bsky.feed.repost", recordUri: repostUri)
     }
 
-    func replyToPost(text: String, parentUri: String, parentCid: String) async throws {
-        guard let pds = pdsURL, let did = self.did else { throw ATProtoError.notLoggedIn }
-        let record: [String: Any] = [
-            "$type": "app.bsky.feed.post",
-            "text": text,
-            "reply": [
-                "root": ["uri": parentUri, "cid": parentCid],
-                "parent": ["uri": parentUri, "cid": parentCid],
-            ] as [String: Any],
-            "createdAt": ISO8601DateFormatter().string(from: Date()),
-        ]
-        let _: CreateRecordResponse = try await createRecord(
-            pds: pds, did: did, collection: "app.bsky.feed.post", record: record
-        )
-    }
-
-    func quotePost(text: String, quotedUri: String, quotedCid: String) async throws {
-        guard let pds = pdsURL, let did = self.did else { throw ATProtoError.notLoggedIn }
-        let record: [String: Any] = [
-            "$type": "app.bsky.feed.post",
-            "text": text,
-            "embed": [
-                "$type": "app.bsky.embed.record",
-                "record": [
-                    "uri": quotedUri,
-                    "cid": quotedCid,
-                ] as [String: Any],
-            ] as [String: Any],
-            "createdAt": ISO8601DateFormatter().string(from: Date()),
-        ]
-        let _: CreateRecordResponse = try await createRecord(
-            pds: pds, did: did, collection: "app.bsky.feed.post", record: record
-        )
-    }
-
     // MARK: - Post Thread
 
     func getPostThread(uri: String) async throws -> PostThreadResponse {
@@ -738,9 +812,8 @@ final class ATProtoService {
             let urlString = "\(pds)/xrpc/app.bsky.feed.getPostThread?uri=\(encoded)&depth=10"
             (data, _) = try await authenticatedRequest(url: urlString, method: "GET")
         } else {
-            let publicAPI = "https://api.bsky.app"
-            let urlString = "\(publicAPI)/xrpc/app.bsky.feed.getPostThread?uri=\(encoded)&depth=10"
-            (data, _) = try await URLSession.shared.data(from: URL(string: urlString)!)
+            let urlString = "\(Self.publicAppView)/xrpc/app.bsky.feed.getPostThread?uri=\(encoded)&depth=10"
+            (data, _) = try await URLSession.shared.data(from: try Self.makeURL(urlString))
         }
 
         return try JSONDecoder().decode(PostThreadResponse.self, from: data)
@@ -763,6 +836,55 @@ final class ATProtoService {
 
     func unfollow(followUri: String) async throws {
         try await deleteRecord(collection: "app.bsky.graph.follow", recordUri: followUri)
+    }
+
+    // MARK: - Notifications
+
+    func listNotifications(cursor: String? = nil, limit: Int = 40) async throws -> (notifications: [AppNotification], cursor: String?) {
+        guard let pds = pdsURL else { throw ATProtoError.notLoggedIn }
+        var urlString = "\(pds)/xrpc/app.bsky.notification.listNotifications?limit=\(limit)"
+        if let cursor {
+            let encoded = cursor.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? cursor
+            urlString += "&cursor=\(encoded)"
+        }
+        let (data, _) = try await authenticatedRequest(url: urlString, method: "GET")
+        let result = try JSONDecoder().decode(ListNotificationsResponse.self, from: data)
+        return (notifications: result.notifications, cursor: result.cursor)
+    }
+
+    func getUnreadNotificationCount() async throws -> Int {
+        guard let pds = pdsURL else { throw ATProtoError.notLoggedIn }
+        let urlString = "\(pds)/xrpc/app.bsky.notification.getUnreadCount"
+        let (data, _) = try await authenticatedRequest(url: urlString, method: "GET")
+        return try JSONDecoder().decode(UnreadCountResponse.self, from: data).count
+    }
+
+    func markNotificationsSeen() async throws {
+        guard let pds = pdsURL else { throw ATProtoError.notLoggedIn }
+        let urlString = "\(pds)/xrpc/app.bsky.notification.updateSeen"
+        let body = try JSONSerialization.data(withJSONObject: [
+            "seenAt": ISO8601DateFormatter().string(from: Date())
+        ])
+        _ = try await authenticatedRequest(url: urlString, method: "POST", body: body)
+    }
+
+    /// Hydrate posts by URI (max 25 per call) — used to show the subject of
+    /// like/repost notifications.
+    func getPosts(uris: [String]) async throws -> [FeedPost] {
+        guard !uris.isEmpty else { return [] }
+        let chunk = Array(uris.prefix(25))
+        let query = chunk
+            .map { "uris=" + ($0.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? $0) }
+            .joined(separator: "&")
+        let path = "/xrpc/app.bsky.feed.getPosts?\(query)"
+
+        let data: Data
+        if let pds = pdsURL, accessToken != nil {
+            (data, _) = try await authenticatedRequest(url: pds + path, method: "GET")
+        } else {
+            (data, _) = try await URLSession.shared.data(from: try Self.makeURL(Self.publicAppView + path))
+        }
+        return try JSONDecoder().decode(GetPostsResponse.self, from: data).posts
     }
 
     // MARK: - XRPC Helpers
@@ -879,45 +1001,20 @@ final class ATProtoService {
         throw ATProtoError.oauthError("video_timeout", "Video processing timed out")
     }
 
-    /// Upload an image blob to the PDS. Returns the blob JSON for use in profile updates.
+    /// Upload an image blob to the PDS. Returns the blob JSON for embedding in records.
+    /// Goes through `authenticatedRequest` so it gets DPoP nonce handling, token
+    /// refresh, and non-2xx errors — a failed upload throws instead of producing
+    /// an empty blob that would corrupt the post record.
     func uploadBlob(imageData: Data, mimeType: String) async throws -> [String: Any] {
-        guard let pds = pdsURL, let token = accessToken else { throw ATProtoError.notLoggedIn }
+        guard let pds = pdsURL else { throw ATProtoError.notLoggedIn }
         let url = "\(pds)/xrpc/com.atproto.repo.uploadBlob"
+        let (data, _) = try await authenticatedRequest(url: url, method: "POST", body: imageData, contentType: mimeType)
 
-        var request = URLRequest(url: URL(string: url)!)
-        request.httpMethod = "POST"
-        request.setValue(mimeType, forHTTPHeaderField: "Content-Type")
-        request.setValue("DPoP \(token)", forHTTPHeaderField: "Authorization")
-        if let dpopHeader = try createDPoPProof(method: "POST", url: url, accessToken: token) {
-            request.setValue(dpopHeader, forHTTPHeaderField: "DPoP")
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let blob = json["blob"] as? [String: Any], !blob.isEmpty else {
+            throw ATProtoError.blobUploadFailed("Server returned no blob reference")
         }
-        request.httpBody = imageData
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        // Handle DPoP nonce
-        if let httpResponse = response as? HTTPURLResponse,
-           let nonce = httpResponse.value(forHTTPHeaderField: "DPoP-Nonce") {
-            dpopNonce = nonce
-
-            if httpResponse.statusCode == 401 {
-                // Retry with nonce
-                var retryReq = URLRequest(url: URL(string: url)!)
-                retryReq.httpMethod = "POST"
-                retryReq.setValue(mimeType, forHTTPHeaderField: "Content-Type")
-                retryReq.setValue("DPoP \(token)", forHTTPHeaderField: "Authorization")
-                if let dpopHeader = try createDPoPProof(method: "POST", url: url, accessToken: token) {
-                    retryReq.setValue(dpopHeader, forHTTPHeaderField: "DPoP")
-                }
-                retryReq.httpBody = imageData
-                let (retryData, _) = try await URLSession.shared.data(for: retryReq)
-                let blob = try JSONSerialization.jsonObject(with: retryData) as? [String: Any]
-                return blob?["blob"] as? [String: Any] ?? [:]
-            }
-        }
-
-        let blob = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        return blob?["blob"] as? [String: Any] ?? [:]
+        return blob
     }
 
     /// Update the user's profile (display name, bio, avatar, banner).
@@ -952,25 +1049,33 @@ final class ATProtoService {
     /// Refresh the access token using the stored refresh token.
     /// The refresh request is DPoP-bound with the same key pair used during initial token exchange.
     private func refreshAccessToken() async throws {
-        guard let rt = refreshToken, let tokenEndpoint = tokenEndpointURL ?? resolveTokenEndpoint() else {
-            authLog.error("Refresh failed: no refresh token or token endpoint")
+        guard let rt = refreshToken else {
+            authLog.error("Refresh failed: no refresh token")
+            throw ATProtoError.notLoggedIn
+        }
+        // Pre-migration sessions didn't persist the token endpoint — discover it now
+        if tokenEndpointURL == nil {
+            tokenEndpointURL = try? await discoverTokenEndpoint()
+        }
+        guard let tokenEndpoint = tokenEndpointURL else {
+            authLog.error("Refresh failed: no token endpoint")
             throw ATProtoError.notLoggedIn
         }
 
         authLog.debug("Attempting token refresh")
 
-        let clientId = "https://www.speakwrite.io/app/client-metadata.json"
-        let bodyDict: [String: String] = [
+        let clientId = Self.clientId
+        // RFC 6749: the token endpoint takes form encoding, not JSON
+        let bodyData = Self.formEncode([
             "grant_type": "refresh_token",
             "refresh_token": rt,
             "client_id": clientId,
-        ]
-        let bodyData = try JSONEncoder().encode(bodyDict)
+        ])
 
         func buildRefreshRequest() throws -> URLRequest {
-            var request = URLRequest(url: URL(string: tokenEndpoint)!)
+            var request = URLRequest(url: try Self.makeURL(tokenEndpoint))
             request.httpMethod = "POST"
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
             if let dpopHeader = try createDPoPProof(method: "POST", url: tokenEndpoint) {
                 request.setValue(dpopHeader, forHTTPHeaderField: "DPoP")
             }
@@ -1048,21 +1153,11 @@ final class ATProtoService {
         persistSession()
     }
 
-    /// Try to discover the token endpoint from the PDS if not already stored.
-    private func resolveTokenEndpoint() -> String? {
-        // Synchronous check — for restored sessions that didn't persist the token endpoint.
-        // The caller can fall back to re-login if this returns nil.
-        guard pdsURL != nil else { return nil }
-        // We can't do async from here, so return nil and let the refresh fail gracefully.
-        // The user will need to re-login (one-time migration).
-        return nil
-    }
-
-    /// Async version: discover token endpoint from PDS metadata.
+    /// Discover token endpoint from PDS metadata.
     private func discoverTokenEndpoint() async throws -> String? {
         guard let pds = pdsURL else { return nil }
         let authServer = try await discoverAuthorizationServer(pds: pds)
-        let metadataURL = URL(string: "\(authServer)/.well-known/oauth-authorization-server")!
+        let metadataURL = try Self.makeURL("\(authServer)/.well-known/oauth-authorization-server")
         let (metaData, _) = try await URLSession.shared.data(from: metadataURL)
         let metadata = try JSONDecoder().decode(OAuthServerMetadata.self, from: metaData)
         tokenEndpointURL = metadata.tokenEndpoint
@@ -1070,15 +1165,15 @@ final class ATProtoService {
         return metadata.tokenEndpoint
     }
 
-    private func authenticatedRequest(url: String, method: String, body: Data? = nil) async throws -> (Data, URLResponse) {
+    private func authenticatedRequest(url: String, method: String, body: Data? = nil, contentType: String = "application/json") async throws -> (Data, URLResponse) {
         guard accessToken != nil else { throw ATProtoError.notLoggedIn }
 
         func buildRequest() throws -> URLRequest {
             guard let token = accessToken else { throw ATProtoError.notLoggedIn }
-            var request = URLRequest(url: URL(string: url)!)
+            var request = URLRequest(url: try Self.makeURL(url))
             request.httpMethod = method
             request.setValue("DPoP \(token)", forHTTPHeaderField: "Authorization")
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue(contentType, forHTTPHeaderField: "Content-Type")
 
             if let dpopHeader = try createDPoPProof(method: method, url: url, accessToken: token) {
                 request.setValue(dpopHeader, forHTTPHeaderField: "DPoP")
@@ -1105,10 +1200,17 @@ final class ATProtoService {
 
         // Handle 401 — could be DPoP nonce challenge OR expired token
         if httpResponse.statusCode == 401 {
-            // Check if this is a token expiry error vs. a nonce issue
+            // The DPoP nonce challenge puts "use_dpop_nonce" in the `error` field;
+            // token expiry shows up as invalid_token/ExpiredToken in `error` or `message`
             let errorJSON = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            let errorCode = errorJSON?["error"] as? String ?? ""
             let errorMessage = errorJSON?["message"] as? String ?? ""
-            let isTokenExpired = errorMessage.contains("exp") || errorMessage.contains("invalid_token") || errorMessage.contains("expired")
+            let isNonceChallenge = errorCode == "use_dpop_nonce"
+            let isTokenExpired = !isNonceChallenge && (
+                errorCode == "invalid_token" || errorCode == "ExpiredToken" ||
+                errorMessage.localizedCaseInsensitiveContains("expired") ||
+                errorMessage.contains("invalid_token")
+            )
 
             if !isTokenExpired {
                 authLog.debug("Got 401, attempting nonce retry")
@@ -1243,10 +1345,20 @@ final class ATProtoService {
             ] as [String: Any],
         ]
 
+        // RFC 9449 §4.2: htu is the URI without query or fragment
+        let htu: String
+        if var components = URLComponents(string: url) {
+            components.query = nil
+            components.fragment = nil
+            htu = components.string ?? url
+        } else {
+            htu = url
+        }
+
         let now = Int(Date().timeIntervalSince1970)
         var payload: [String: Any] = [
             "jti": UUID().uuidString, "htm": method,
-            "htu": url, "iat": now, "exp": now + 120,
+            "htu": htu, "iat": now, "exp": now + 120,
         ]
         if let nonce = dpopNonce { payload["nonce"] = nonce }
         // Include access token hash when presenting a DPoP-bound token (RFC 9449 §4.2)
@@ -1412,7 +1524,7 @@ private struct SearchPostsResponse: Decodable {
     let cursor: String?
 }
 
-private struct PostReplyRef: Decodable {
+struct PostReplyRef: Decodable {
     let root: StrongRef?
     let parent: StrongRef?
     struct StrongRef: Decodable { let uri: String; let cid: String }
@@ -1512,6 +1624,7 @@ struct FeedPost: Decodable {
 }
 struct FeedPostRecord: Decodable {
     let text: String?; let createdAt: String?; let tags: [String]?
+    let reply: PostReplyRef?
 
     var isSpeakwrite: Bool {
         tags?.contains("speakwrite") == true ||
@@ -1541,6 +1654,9 @@ struct TimelinePost: Identifiable, Codable {
     let images: [EmbedImageView]?
     let videoURL: String?
     let videoThumbnail: String?
+    // Thread root refs when this post is itself a reply (nil for top-level posts)
+    var rootUri: String?
+    var rootCid: String?
     var id: String { uri }
 }
 
@@ -1619,6 +1735,8 @@ final class ThreadNode: Decodable {
 }
 
 /// Navigation value for post detail — wraps URI+CID to distinguish from profile navigation (String DID).
+/// Identity is the post URI alone: engagement counts are snapshots and must not
+/// change the navigation value's identity while it's on the path.
 struct PostNavigation: Hashable {
     let uri: String
     let cid: String
@@ -1637,6 +1755,17 @@ struct PostNavigation: Hashable {
     let images: [EmbedImageView]?
     let videoURL: String?
     let videoThumbnail: String?
+    // Thread root refs when the post is itself a reply
+    var rootUri: String?
+    var rootCid: String?
+
+    static func == (lhs: PostNavigation, rhs: PostNavigation) -> Bool {
+        lhs.uri == rhs.uri
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(uri)
+    }
 }
 
 // MARK: - ASWebAuthenticationSession presentation
@@ -1650,7 +1779,9 @@ private class PresentationContextProvider: NSObject, ASWebAuthenticationPresenta
 // MARK: - Errors
 
 enum ATProtoError: Error, LocalizedError {
-    case noPDS, authCancelled, noAuthCode, notLoggedIn, sessionExpired, handleNotFound
+    case noPDS, authCancelled, noAuthCode, notLoggedIn, sessionExpired, handleNotFound, stateMismatch
+    case invalidURL(String)
+    case blobUploadFailed(String)
     case oauthError(String, String?) // error code, description
     var errorDescription: String? {
         switch self {
@@ -1660,6 +1791,9 @@ enum ATProtoError: Error, LocalizedError {
         case .notLoggedIn: return "Not logged in"
         case .sessionExpired: return "Your session has expired. Please sign in again."
         case .handleNotFound: return "Handle not found. Check spelling and try again."
+        case .stateMismatch: return "Sign-in failed a security check. Please try again."
+        case .invalidURL(let url): return "Invalid URL: \(url)"
+        case .blobUploadFailed(let detail): return "Upload failed: \(detail)"
         case .oauthError(let code, let desc): return "OAuth error (\(code)): \(desc ?? "unknown")"
         }
     }
@@ -1679,6 +1813,42 @@ struct SearchActorsResponse: Decodable {
 
 struct SearchActorsTypeaheadResponse: Decodable {
     let actors: [ProfileViewBasic]
+}
+
+// MARK: - Notification Types
+
+struct AppNotification: Identifiable, Decodable {
+    let uri: String
+    let cid: String
+    let author: PostAuthor
+    /// like, repost, follow, mention, reply, quote
+    let reason: String
+    /// URI of the post the reason refers to (e.g. your post that was liked)
+    let reasonSubject: String?
+    let isRead: Bool
+    let indexedAt: String
+    private let record: NotificationRecord?
+
+    /// Text of the notification's own record (replies, mentions, quotes carry text)
+    var recordText: String? { record?.text }
+    var id: String { uri }
+
+    private struct NotificationRecord: Decodable {
+        let text: String?
+    }
+}
+
+struct ListNotificationsResponse: Decodable {
+    let notifications: [AppNotification]
+    let cursor: String?
+}
+
+struct UnreadCountResponse: Decodable {
+    let count: Int
+}
+
+struct GetPostsResponse: Decodable {
+    let posts: [FeedPost]
 }
 
 #if DEBUG

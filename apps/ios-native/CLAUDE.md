@@ -42,7 +42,7 @@ Single `AppViewModel` (`@Observable`) serves as global state, injected via `.env
 
 ### Navigation
 
-`TabView` with 4 tabs (Feed, Verified, Compose, Settings), each with its own `NavigationStack`.
+`TabView` with 4 tabs (Home, Verified, Activity, Profile), each with its own `NavigationStack`. Compose is a full-screen modal presented from a floating action button available on every tab (`viewModel.showCompose`). Settings is pushed from the Profile tab's gear button.
 
 ### Data Types
 
@@ -51,7 +51,7 @@ Single `AppViewModel` (`@Observable`) serves as global state, injected via `.env
 
 ## Theme System
 
-`Theme` enum: spacing tokens (xs/sm/md/lg/xl), typography, colorScheme-aware colors.
+`Theme` enum: spacing tokens (xs/sm/md/lg/xl), Dynamic Type–aware typography (sans for post content, monospaced for the app's own voice), and dynamic colors (trait-collection driven — views never read `colorScheme` to pick a color). `Theme.onAccent` is the only foreground used on accent fills. Shared UI primitives (ThemedDivider, TabHeader, FollowButton, VerificationBadge, EmptyStateView, ErrorStateView, ProfileStat) live in `Views/Components/DesignSystem.swift`; `formatCount` is the one count abbreviator.
 
 ## Testing
 

@@ -79,4 +79,51 @@ final class SpeakwriteTests: XCTestCase {
         XCTAssertFalse(encoded.contains("/"))
         XCTAssertFalse(encoded.contains("="))
     }
+
+    // MARK: - Count Formatting
+
+    func testFormatCountSmall() {
+        XCTAssertEqual(formatCount(0), "0")
+        XCTAssertEqual(formatCount(42), "42")
+        XCTAssertEqual(formatCount(999), "999")
+    }
+
+    func testFormatCountThousands() {
+        XCTAssertEqual(formatCount(1000), "1K")
+        XCTAssertEqual(formatCount(1234), "1.2K")
+        XCTAssertEqual(formatCount(9999), "10K")
+        XCTAssertEqual(formatCount(43_210), "43K")
+    }
+
+    func testFormatCountMillions() {
+        XCTAssertEqual(formatCount(1_000_000), "1M")
+        XCTAssertEqual(formatCount(1_150_000), "1.2M")
+    }
+
+    // MARK: - PostNavigation Identity
+
+    func testPostNavigationEqualityIgnoresCounts() {
+        // Identity is the URI alone — engagement counts changing must not
+        // change the navigation value's identity while it's on a path
+        let base = PostNavigation(
+            uri: "at://did:plc:x/app.bsky.feed.post/1", cid: "cid1",
+            authorHandle: "a.bsky.social", authorDID: "did:plc:x",
+            authorAvatar: nil, authorDisplayName: nil,
+            text: "hi", createdAt: "2026-01-01T00:00:00Z",
+            likeCount: 0, repostCount: 0, replyCount: 0,
+            viewerLike: nil, viewerRepost: nil,
+            isVerified: false, images: nil, videoURL: nil, videoThumbnail: nil
+        )
+        let liked = PostNavigation(
+            uri: "at://did:plc:x/app.bsky.feed.post/1", cid: "cid1",
+            authorHandle: "a.bsky.social", authorDID: "did:plc:x",
+            authorAvatar: nil, authorDisplayName: nil,
+            text: "hi", createdAt: "2026-01-01T00:00:00Z",
+            likeCount: 5, repostCount: 2, replyCount: 1,
+            viewerLike: "at://like", viewerRepost: nil,
+            isVerified: true, images: nil, videoURL: nil, videoThumbnail: nil
+        )
+        XCTAssertEqual(base, liked)
+        XCTAssertEqual(base.hashValue, liked.hashValue)
+    }
 }

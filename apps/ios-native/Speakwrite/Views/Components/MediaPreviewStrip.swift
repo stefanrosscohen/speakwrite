@@ -7,8 +7,6 @@ struct MediaPreviewStrip: View {
     let onRemovePhoto: (UUID) -> Void
     let onRemoveVideo: () -> Void
 
-    @Environment(\.colorScheme) private var colorScheme
-
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
@@ -35,12 +33,12 @@ struct MediaPreviewStrip: View {
                 .resizable()
                 .scaledToFill()
                 .frame(width: 72, height: 72)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .clipShape(RoundedRectangle(cornerRadius: Theme.radiusSm))
 
             // Video badge
             if isVideo {
                 Image(systemName: "play.fill")
-                    .font(.system(size: 12))
+                    .font(Theme.caption)
                     .foregroundStyle(.white)
                     .padding(4)
                     .background(Circle().fill(.black.opacity(0.6)))
@@ -55,6 +53,7 @@ struct MediaPreviewStrip: View {
                     .background(Circle().fill(.black.opacity(0.5)))
             }
             .offset(x: 4, y: -4)
+            .accessibilityLabel(isVideo ? "Remove video" : "Remove photo")
         }
     }
 }

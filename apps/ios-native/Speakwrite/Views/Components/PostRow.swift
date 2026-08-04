@@ -18,16 +18,23 @@ protocol PostDisplayable: Identifiable {
     var images: [EmbedImageView]? { get }
     var videoURL: String? { get }
     var videoThumbnail: String? { get }
+    /// Thread root refs when the post is itself a reply (nil for top-level posts).
+    var threadRootUri: String? { get }
+    var threadRootCid: String? { get }
 }
 
 extension VerifiedPost: PostDisplayable {
     var showVerifiedBadge: Bool { true }
     var repostAttribution: String? { nil }
+    var threadRootUri: String? { nil }
+    var threadRootCid: String? { nil }
 }
 
 extension TimelinePost: PostDisplayable {
     var showVerifiedBadge: Bool { isVerified }
     var repostAttribution: String? { repostedBy }
+    var threadRootUri: String? { rootUri }
+    var threadRootCid: String? { rootCid }
 }
 
 // MARK: - Rich Text (Mentions + URLs)
@@ -88,7 +95,6 @@ struct PostRow<Post: PostDisplayable>: View {
     let post: Post
     var hideFollowButton: Bool = false
     @Environment(AppViewModel.self) private var viewModel
-    @Environment(\.colorScheme) private var colorScheme
 
     @State private var isLiked = false
     @State private var likeUri: String?
@@ -100,6 +106,7 @@ struct PostRow<Post: PostDisplayable>: View {
     @State private var showRepostMenu = false
     @State private var showQuotePost = false
     @State private var isFollowingAuthor = false
+    @State private var isFollowWorking = false
 
     private var verificationStatus: VerificationStatus {
         viewModel.verification.status(for: post.uri)
@@ -119,7 +126,9 @@ struct PostRow<Post: PostDisplayable>: View {
             viewerLike: likeUri, viewerRepost: repostUri,
             isVerified: verificationStatus == .verified,
             images: post.images,
-            videoURL: post.videoURL, videoThumbnail: post.videoThumbnail
+            videoURL: post.videoURL, videoThumbnail: post.videoThumbnail,
+            rootUri: post.threadRootUri,
+            rootCid: post.threadRootCid
         )
     }
 
@@ -129,11 +138,11 @@ struct PostRow<Post: PostDisplayable>: View {
             if let repostedBy = post.repostAttribution {
                 HStack(spacing: 4) {
                     Image(systemName: "arrow.2.squarepath")
-                        .font(.system(size: 12))
+                        .font(Theme.caption)
                     Text("Reposted by \(repostedBy)")
-                        .font(.system(size: 13))
+                        .font(Theme.subhead)
                 }
-                .foregroundStyle(Theme.textTertiary(colorScheme))
+                .foregroundStyle(Theme.textTertiary)
                 .padding(.leading, 52) // Align with post text (avatar + spacing)
                 .padding(.bottom, 2)
             }
@@ -151,19 +160,29 @@ struct PostRow<Post: PostDisplayable>: View {
 
                 // Right column
                 VStack(alignment: .leading, spacing: 4) {
-                    // Header → profile
-                    NavigationLink(value: post.author.did) {
-                        headerLine
+                    // Header: name/handle → profile; follow button is a sibling,
+                    // not nested inside the NavigationLink
+                    HStack(spacing: 0) {
+                        NavigationLink(value: post.author.did) {
+                            headerLine
+                        }
+                        .buttonStyle(.plain)
+
+                        if showsFollowButton {
+                            Spacer(minLength: Theme.xs)
+                            FollowButton(isFollowing: false, isWorking: isFollowWorking) {
+                                Task { await followAuthor() }
+                            }
+                        }
                     }
-                    .buttonStyle(.plain)
 
                     // Post body → post detail
                     NavigationLink(value: postNavigation) {
                         VStack(alignment: .leading, spacing: 8) {
                             if !post.text.isEmpty {
                                 Text(mentionHighlightedText(post.text))
-                                    .font(.system(size: 15))
-                                    .foregroundStyle(Theme.textPrimary(colorScheme))
+                                    .font(Theme.body)
+                                    .foregroundStyle(Theme.textPrimary)
                                     .lineLimit(12)
                                     .multilineTextAlignment(.leading)
                                     .fixedSize(horizontal: false, vertical: true)
@@ -189,7 +208,12 @@ struct PostRow<Post: PostDisplayable>: View {
         .accessibilityIdentifier("post-row")
         .onAppear { syncEngagementState() }
         .task {
-            viewModel.verification.verify(postUri: post.uri, postText: post.text, authorDID: post.author.did)
+            // Only posts that claim to be Speakwrite posts get the cryptographic
+            // check — running it for every ordinary Bluesky post would trigger a
+            // proof lookup per row for posts that can't have proofs.
+            if post.showVerifiedBadge {
+                viewModel.verification.verify(postUri: post.uri, postText: post.text, authorDID: post.author.did)
+            }
         }
         .sheet(isPresented: $showReplySheet) {
             ReplyView(
@@ -198,7 +222,9 @@ struct PostRow<Post: PostDisplayable>: View {
                 replyToHandle: post.author.handle,
                 replyToDisplayName: post.author.displayName,
                 replyToAvatar: post.author.avatar,
-                replyToText: post.text
+                replyToText: post.text,
+                rootUri: post.threadRootUri,
+                rootCid: post.threadRootCid
             )
         }
         .confirmationDialog("", isPresented: $showRepostMenu, titleVisibility: .hidden) {
@@ -234,57 +260,39 @@ struct PostRow<Post: PostDisplayable>: View {
 
     // MARK: - Header
 
+    /// Inline follow appears only when viewer state is available (authenticated
+    /// feed), the author isn't already followed, and it's not our own post.
+    private var showsFollowButton: Bool {
+        !hideFollowButton
+            && !isFollowingAuthor
+            && post.author.viewer != nil
+            && post.author.did != viewModel.atproto.did
+    }
+
     private var headerLine: some View {
         HStack(spacing: 0) {
             if let displayName = post.author.displayName, !displayName.isEmpty {
                 Text(displayName)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Theme.textPrimary(colorScheme))
+                    .font(Theme.bodyEmphasis)
+                    .foregroundStyle(Theme.textPrimary)
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
 
-            if verificationStatus == .verified {
-                Image(systemName: "checkmark.seal.fill")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Theme.accent)
-                    .padding(.leading, 2)
-            } else if verificationStatus == .verifying {
-                Image(systemName: "checkmark.seal")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Theme.textTertiary(colorScheme))
-                    .padding(.leading, 2)
-            }
+            VerificationBadge(status: verificationStatus)
+                .padding(.leading, 2)
 
             Text(" @\(post.author.handle)")
-                .font(.system(size: 14))
-                .foregroundStyle(Theme.textSecondary(colorScheme))
+                .font(Theme.subhead)
+                .foregroundStyle(Theme.textSecondary)
                 .lineLimit(1)
                 .truncationMode(.tail)
 
             Text(" · \(relativeTimeString(from: post.createdAt))")
-                .font(.system(size: 14))
-                .foregroundStyle(Theme.textTertiary(colorScheme))
+                .font(Theme.subhead)
+                .foregroundStyle(Theme.textTertiary)
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
-
-            // Inline follow button — only when viewer state is available (authenticated feed)
-            if !hideFollowButton && !isFollowingAuthor && post.author.viewer != nil && post.author.did != viewModel.atproto.did {
-                Spacer(minLength: 4)
-                Button {
-                    Task { await followAuthor() }
-                } label: {
-                    Text("Follow")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Capsule().fill(Theme.accent))
-                        .frame(minHeight: 44)
-                }
-                .buttonStyle(.plain)
-                .fixedSize()
-            }
         }
     }
 
@@ -296,6 +304,7 @@ struct PostRow<Post: PostDisplayable>: View {
                               activeColor: nil, isActive: false) {
                 showReplySheet = true
             }
+            .accessibilityLabel("Reply")
 
             Spacer(minLength: 0)
 
@@ -303,6 +312,7 @@ struct PostRow<Post: PostDisplayable>: View {
                               activeColor: Theme.accent, isActive: isReposted) {
                 showRepostMenu = true
             }
+            .accessibilityLabel("Repost")
 
             Spacer(minLength: 0)
 
@@ -310,16 +320,18 @@ struct PostRow<Post: PostDisplayable>: View {
                               activeColor: Theme.liked, isActive: isLiked) {
                 Task { await toggleLike() }
             }
+            .accessibilityLabel("Like")
 
             Spacer(minLength: 0)
 
             Button { sharePost() } label: {
                 Image(systemName: "square.and.arrow.up")
                     .font(.system(size: 18))
-                    .foregroundStyle(Theme.textTertiary(colorScheme))
+                    .foregroundStyle(Theme.textTertiary)
                     .padding(5)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Share")
         }
         .frame(maxWidth: 320, alignment: .leading)
     }
@@ -372,13 +384,14 @@ struct PostRow<Post: PostDisplayable>: View {
     }
 
     private func followAuthor() async {
-        isFollowingAuthor = true
+        isFollowWorking = true
         do {
             _ = try await viewModel.atproto.follow(did: post.author.did)
+            isFollowingAuthor = true
         } catch {
-            isFollowingAuthor = false
             notifyFailure()
         }
+        isFollowWorking = false
     }
 
     private func sharePost() {
@@ -403,11 +416,9 @@ private struct PostControlButton: View {
     let isActive: Bool
     let action: () -> Void
 
-    @Environment(\.colorScheme) private var colorScheme
-
     private var foreground: Color {
         if isActive, let activeColor { return activeColor }
-        return Theme.textTertiary(colorScheme)
+        return Theme.textTertiary
     }
 
     var body: some View {
@@ -417,7 +428,7 @@ private struct PostControlButton: View {
                     .font(.system(size: 18))
                 if count > 0 {
                     Text(formatCount(count))
-                        .font(.system(size: 14, weight: isActive ? .semibold : .regular))
+                        .font(Theme.subhead.weight(isActive ? .semibold : .regular))
                 }
             }
             .foregroundStyle(foreground)
@@ -425,12 +436,6 @@ private struct PostControlButton: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-    }
-
-    private func formatCount(_ n: Int) -> String {
-        if n >= 1_000_000 { return String(format: "%.1fM", Double(n) / 1_000_000) }
-        if n >= 1_000 { return String(format: "%.1fK", Double(n) / 1_000) }
-        return "\(n)"
     }
 }
 

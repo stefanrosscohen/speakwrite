@@ -6,8 +6,9 @@ name: Compose and Publish
 ---
 - launchApp
 
-# Navigate to compose tab
-- tapOn: "Compose"
+# Open the compose sheet via the floating compose button
+- tapOn:
+    id: "compose_fab"
 
 # Editor should be visible
 - assertVisible: "What's on your mind?"

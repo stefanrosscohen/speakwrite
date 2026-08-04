@@ -31,13 +31,24 @@ actor DeviceAttestationService {
     // MARK: - Public API
 
     func initialize() async throws -> String {
-        // Generate or restore App Attest key
-        if let stored = UserDefaults.standard.string(forKey: Self.keyIdKey) {
+        // Restore the App Attest key ID. It must live in the Keychain next to
+        // the attestation blob — storing it in UserDefaults (cleared on app
+        // deletion, while the Keychain survives) meant a reinstall paired a
+        // fresh key with the old key's attestation, breaking every proof.
+        if let stored = KeychainHelper.load(key: Self.keyIdKey), !stored.isEmpty {
             keyId = stored
+        } else if let legacy = UserDefaults.standard.string(forKey: Self.keyIdKey) {
+            // One-time migration from the old UserDefaults location
+            keyId = legacy
+            KeychainHelper.save(key: Self.keyIdKey, value: legacy)
+            UserDefaults.standard.removeObject(forKey: Self.keyIdKey)
         } else {
+            // No key ID — any attestation blob in the Keychain belongs to a
+            // key we no longer know; discard it so key and blob stay paired.
+            KeychainHelper.delete(key: Self.attestDataKey)
             let newKeyId = try await service.generateKey()
             keyId = newKeyId
-            UserDefaults.standard.set(newKeyId, forKey: Self.keyIdKey)
+            KeychainHelper.save(key: Self.keyIdKey, value: newKeyId)
         }
 
         guard let keyId else { throw AttestationError.keyGenerationFailed }

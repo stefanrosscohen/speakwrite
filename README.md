@@ -71,10 +71,12 @@ Native SwiftUI. Full AT Protocol client — timeline, verified feed, compose wit
 
 ### Tabs
 
-- **Timeline** — Your Bluesky home feed with client-side verification badges
+- **Home** — Your Bluesky Following and For You feeds with client-side verification badges
 - **Verified** — Posts tagged `speakwrite` — every one typed by a human on a real device
-- **Compose** — Input-restricted editor with camera capture for attested photos and video (up to 4 photos or 1 video)
-- **Profile** — Your posts, followers, following
+- **Activity** — Likes, reposts, follows, replies, mentions, and quotes, with an unread badge
+- **Profile** — Your posts, followers, following, profile editing, and settings
+
+Compose is a full-screen modal available from every tab via the floating compose button: an input-restricted editor with camera capture for attested photos and video (up to 4 photos or 1 video), keystroke counting, and draft persistence.
 
 ## Verification Bot
 

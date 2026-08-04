@@ -3,8 +3,7 @@ import SwiftUI
 /// Global feed of human-verified posts with engagement actions.
 struct VerifiedFeedView: View {
     @Environment(AppViewModel.self) private var viewModel
-    @Environment(\.colorScheme) private var colorScheme
-    @State private var showMyProfile = false
+    @State private var showSearch = false
     @State private var path = NavigationPath()
 
     var body: some View {
@@ -16,15 +15,22 @@ struct VerifiedFeedView: View {
                         avatarURL: viewModel.myProfile?.avatar,
                         handle: viewModel.atproto.handle
                     ) {
-                        showMyProfile = true
+                        viewModel.selectedTab = .profile
                     }
                     Text("speakwrite")
                         .font(Theme.monoTitle)
                         .foregroundStyle(Theme.accent)
                     Image(systemName: "checkmark.seal.fill")
                         .foregroundStyle(Theme.accent)
-                        .font(.system(size: 14))
+                        .font(Theme.subhead)
                     Spacer()
+                    Button {
+                        showSearch = true
+                    } label: {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundStyle(Theme.accent)
+                    }
+                    .accessibilityLabel("Search")
                 }
                 .padding(.horizontal, Theme.lg)
                 .padding(.vertical, Theme.sm)
@@ -37,16 +43,21 @@ struct VerifiedFeedView: View {
                                 .tint(Theme.accent)
                             Text("Loading verified posts...")
                                 .font(Theme.mono)
-                                .foregroundStyle(Theme.textSecondary(colorScheme))
+                                .foregroundStyle(Theme.textSecondary)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if let error = viewModel.feedError, viewModel.verifiedPosts.isEmpty {
+                        ErrorStateView(message: error) {
+                            Task { await viewModel.loadFeed() }
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else if viewModel.verifiedPosts.isEmpty {
-                        ContentUnavailableView {
-                            Label("No verified posts yet", systemImage: "checkmark.seal")
-                        } description: {
-                            Text("Posts written with Speakwrite will appear here.\nBe the first to publish one.")
-                                .font(Theme.mono)
-                        }
+                        EmptyStateView(
+                            icon: "checkmark.seal",
+                            title: "No verified posts yet",
+                            subtitle: "Posts written with Speakwrite will appear here.\nBe the first to publish one."
+                        )
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
                         ScrollView {
                             LazyVStack(spacing: 0) {
@@ -54,8 +65,7 @@ struct VerifiedFeedView: View {
                                     PostRow(post: post)
                                         .padding(.horizontal, Theme.lg)
 
-                                    Divider()
-                                        .foregroundStyle(Theme.separator(colorScheme))
+                                    ThemedDivider()
                                 }
 
                                 if viewModel.feedCursor != nil {
@@ -76,10 +86,10 @@ struct VerifiedFeedView: View {
                     }
                 }
             }
-            .background(Theme.background(colorScheme))
+            .background(Theme.background)
             .navigationBarHidden(true)
-            .sheet(isPresented: $showMyProfile) {
-                MyProfileView()
+            .sheet(isPresented: $showSearch) {
+                SearchUsersView()
             }
             .navigationDestination(for: String.self) { did in
                 ProfileView(actorDID: did)

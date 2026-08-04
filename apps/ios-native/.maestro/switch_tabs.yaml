@@ -6,7 +6,7 @@ name: Switch Tabs
 ---
 - launchApp
 
-# Start on Feed tab
+# Start on Home tab
 - assertVisible: "Following"
 
 # Switch to Verified tab
@@ -14,22 +14,24 @@ name: Switch Tabs
 - assertVisible:
     id: "verified-feed"
 
-# Switch to Compose tab
-- tapOn: "Compose"
+# Switch to Activity tab
+- tapOn: "Activity"
+
+# Switch to Profile tab
+- tapOn: "Profile"
+- assertVisible:
+    id: "my-profile-header"
+
+# Open compose from the FAB and cancel back out
+- tapOn:
+    id: "compose_fab"
 - assertVisible: "What's on your mind?"
-
-# Switch to Settings tab
-- tapOn: "Settings"
-- assertVisible: "Appearance"
-
-# Go back through tabs
-- tapOn: "Verified"
-- tapOn: "Feed"
+- tapOn:
+    id: "compose-cancel"
 
 # Rapid tab switching stress test
-- tapOn: "Settings"
-- tapOn: "Compose"
+- tapOn: "Home"
 - tapOn: "Verified"
-- tapOn: "Feed"
-- tapOn: "Settings"
-- tapOn: "Feed"
+- tapOn: "Activity"
+- tapOn: "Profile"
+- tapOn: "Home"

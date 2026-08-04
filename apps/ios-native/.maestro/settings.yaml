@@ -6,8 +6,10 @@ name: Settings
 ---
 - launchApp
 
-# Navigate to Settings tab
-- tapOn: "Settings"
+# Settings lives behind the Profile tab's gear button
+- tapOn: "Profile"
+- tapOn:
+    id: "settings-button"
 
 # Appearance section should be visible
 - assertVisible: "Appearance"

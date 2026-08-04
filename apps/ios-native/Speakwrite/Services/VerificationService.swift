@@ -8,8 +8,15 @@ final class VerificationService {
     private var cache: [String: VerificationStatus] = [:]
     private var inFlight: [String: Task<Void, Never>] = [:]
     private var authorProofCache: [String: [ProofRecord]] = [:]
+    /// Timestamp of the last proof fetch per author, so a missing proof only
+    /// triggers one re-fetch per author per interval instead of one per row.
+    private var authorFetchedAt: [String: Date] = [:]
+    /// De-duplicates concurrent proof fetches for the same author — N visible
+    /// rows from one author must produce one network call, not N.
+    private var authorFetchTasks: [String: Task<[ProofRecord]?, Never>] = [:]
 
     private let verifier = AppAttestVerifier()
+    private static let refetchInterval: TimeInterval = 60
 
     func status(for postUri: String) -> VerificationStatus {
         cache[postUri] ?? .unverified
@@ -24,33 +31,63 @@ final class VerificationService {
         let task = Task { [weak self] in
             guard let self else { return }
             let result = await self.performVerification(postUri: postUri, postText: postText, authorDID: authorDID)
-            self.cache[postUri] = result
+            if let result {
+                self.cache[postUri] = result
+            } else {
+                // Transient network failure — clear the entry so scrolling back
+                // retries instead of permanently showing a wrong state
+                self.cache.removeValue(forKey: postUri)
+            }
             self.inFlight.removeValue(forKey: postUri)
         }
         inFlight[postUri] = task
     }
 
-    private func performVerification(postUri: String, postText: String, authorDID: String) async -> VerificationStatus {
+    /// Fetch proofs for an author, coalescing concurrent callers into one
+    /// network request. Returns nil on network failure.
+    private func fetchProofsCoalesced(did: String) async -> [ProofRecord]? {
+        if let existing = authorFetchTasks[did] {
+            return await existing.value
+        }
+        let task = Task<[ProofRecord]?, Never> { [weak self] in
+            do {
+                return try await self?.fetchProofs(did: did)
+            } catch {
+                return nil
+            }
+        }
+        authorFetchTasks[did] = task
+        let result = await task.value
+        authorFetchTasks.removeValue(forKey: did)
+        if let result {
+            authorProofCache[did] = result
+            authorFetchedAt[did] = Date()
+        }
+        return result
+    }
+
+    /// Returns nil for a transient failure (do not cache), or a final status.
+    private func performVerification(postUri: String, postText: String, authorDID: String) async -> VerificationStatus? {
         // Fetch proof records for this author (cached per DID)
         var proofs: [ProofRecord]
         if let cached = authorProofCache[authorDID] {
             proofs = cached
+        } else if let fetched = await fetchProofsCoalesced(did: authorDID) {
+            proofs = fetched
         } else {
-            do {
-                proofs = try await fetchProofs(did: authorDID)
-                authorProofCache[authorDID] = proofs
-            } catch {
-                return .failed("Failed to fetch proofs: \(error.localizedDescription)")
-            }
+            return nil
         }
 
-        // Find proof matching this post URI — if not found, re-fetch in case of stale cache
+        // Proof not in cache: re-fetch at most once per interval per author
+        // (the post may be newer than the cached proof list)
         if !proofs.contains(where: { $0.postUri == postUri }) {
-            do {
-                proofs = try await fetchProofs(did: authorDID)
-                authorProofCache[authorDID] = proofs
-            } catch {
-                return .failed("Failed to fetch proofs: \(error.localizedDescription)")
+            let lastFetch = authorFetchedAt[authorDID] ?? .distantPast
+            if Date().timeIntervalSince(lastFetch) > Self.refetchInterval {
+                if let fetched = await fetchProofsCoalesced(did: authorDID) {
+                    proofs = fetched
+                } else {
+                    return nil
+                }
             }
         }
 
@@ -75,7 +112,9 @@ final class VerificationService {
     /// Resolve PDS endpoint for a DID via the PLC directory.
     private func resolvePDS(did: String) async throws -> String {
         let encoded = did.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? did
-        let url = URL(string: "https://plc.directory/\(encoded)")!
+        guard let url = URL(string: "https://plc.directory/\(encoded)") else {
+            throw URLError(.badURL)
+        }
         let (data, _) = try await URLSession.shared.data(from: url)
 
         struct DIDDoc: Decodable {
@@ -98,28 +137,44 @@ final class VerificationService {
 
         // Resolve the author's PDS — proof records live on their PDS, not a central server
         let pds = try await resolvePDS(did: did)
-        let urlString = "\(pds)/xrpc/com.atproto.repo.listRecords?repo=\(encoded)&collection=io.speakwrite.proof&limit=100"
 
-        let (data, response) = try await URLSession.shared.data(from: URL(string: urlString)!)
+        // Paginate: authors with more than one page of proofs must still verify
+        var proofs: [ProofRecord] = []
+        var cursor: String?
+        for _ in 0..<4 {
+            var urlString = "\(pds)/xrpc/com.atproto.repo.listRecords?repo=\(encoded)&collection=io.speakwrite.proof&limit=100"
+            if let cursor {
+                let encodedCursor = cursor.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? cursor
+                urlString += "&cursor=\(encodedCursor)"
+            }
+            guard let url = URL(string: urlString) else { throw URLError(.badURL) }
+            let (data, response) = try await URLSession.shared.data(from: url)
 
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode >= 200 && httpResponse.statusCode < 300 else {
-            return []
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200..<300).contains(httpResponse.statusCode) else {
+                // A real error must throw (transient, retryable) — returning []
+                // here would cache "no proof" for a network hiccup
+                throw URLError(.badServerResponse)
+            }
+
+            let result = try JSONDecoder().decode(ListRecordsResponse.self, from: data)
+            proofs.append(contentsOf: result.records.compactMap { record -> ProofRecord? in
+                guard let value = record.value else { return nil }
+                return ProofRecord(
+                    postUri: value.postUri ?? "",
+                    keyId: value.keyId ?? "",
+                    attestationObject: value.attestationObject ?? "",
+                    assertion: value.assertion ?? "",
+                    contentHash: value.contentHash ?? "",
+                    appId: value.appId ?? "",
+                    mediaHashes: value.mediaHashes
+                )
+            })
+
+            cursor = result.cursor
+            if cursor == nil || result.records.isEmpty { break }
         }
-
-        let result = try JSONDecoder().decode(ListRecordsResponse.self, from: data)
-        return result.records.compactMap { record -> ProofRecord? in
-            guard let value = record.value else { return nil }
-            return ProofRecord(
-                postUri: value.postUri ?? "",
-                keyId: value.keyId ?? "",
-                attestationObject: value.attestationObject ?? "",
-                assertion: value.assertion ?? "",
-                contentHash: value.contentHash ?? "",
-                appId: value.appId ?? "",
-                mediaHashes: value.mediaHashes
-            )
-        }
+        return proofs
     }
 }
 

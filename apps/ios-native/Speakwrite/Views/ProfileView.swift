@@ -4,12 +4,12 @@ import SwiftUI
 struct ProfileView: View {
     let actorDID: String
     @Environment(AppViewModel.self) private var viewModel
-    @Environment(\.colorScheme) private var colorScheme
     @State private var profile: ProfileViewDetailed?
     @State private var posts: [TimelinePost] = []
     @State private var postsCursor: String?
     @State private var isLoading = true
     @State private var isFollowing = false
+    @State private var isFollowWorking = false
     @State private var followUri: String?
     @State private var loadError: String?
 
@@ -25,58 +25,27 @@ struct ProfileView: View {
                             AsyncImage(url: url) { image in
                                 image.resizable().aspectRatio(contentMode: .fill)
                             } placeholder: {
-                                Rectangle().fill(Theme.surface(colorScheme))
+                                Rectangle().fill(Theme.surface)
                             }
                         }
                         .clipped()
                 } else {
                     Rectangle()
-                        .fill(Theme.surface(colorScheme))
+                        .fill(Theme.surface)
                         .frame(height: 150)
                 }
 
                 // Avatar + Follow button
                 HStack {
                     AvatarView(url: profile?.avatar, handle: profile?.handle, size: .large)
-                        .overlay(Circle().stroke(Theme.avatarBorder(colorScheme), lineWidth: 3))
+                        .overlay(Circle().stroke(Theme.background, lineWidth: 3))
 
                     Spacer()
 
                     if actorDID != viewModel.atproto.did {
-                        Button {
-                            Task {
-                                if isFollowing, let uri = followUri {
-                                    isFollowing = false; followUri = nil
-                                    do {
-                                        try await viewModel.atproto.unfollow(followUri: uri)
-                                    } catch {
-                                        isFollowing = true; followUri = uri
-                                    }
-                                } else {
-                                    isFollowing = true
-                                    do {
-                                        followUri = try await viewModel.atproto.follow(did: actorDID)
-                                    } catch {
-                                        isFollowing = false
-                                    }
-                                }
-                            }
-                        } label: {
-                            Text(isFollowing ? "Following" : "Follow")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(isFollowing ? Theme.textPrimary(colorScheme) : .white)
-                                .padding(.horizontal, Theme.xl)
-                                .padding(.vertical, Theme.sm)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 20)
-                                        .fill(isFollowing ? Theme.surface(colorScheme) : Theme.accent)
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 20)
-                                        .stroke(isFollowing ? Theme.separator(colorScheme) : Color.clear, lineWidth: 1)
-                                )
+                        FollowButton(isFollowing: isFollowing, isWorking: isFollowWorking) {
+                            Task { await toggleFollow() }
                         }
-                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.horizontal, Theme.lg)
@@ -87,11 +56,11 @@ struct ProfileView: View {
                     if let name = profile?.displayName, !name.isEmpty {
                         Text(name)
                             .font(.system(size: 22, weight: .bold))
-                            .foregroundStyle(Theme.textPrimary(colorScheme))
+                            .foregroundStyle(Theme.textPrimary)
                     }
                     Text("@\(profile?.handle ?? "")")
-                        .font(.system(size: 15))
-                        .foregroundStyle(Theme.textSecondary(colorScheme))
+                        .font(Theme.body)
+                        .foregroundStyle(Theme.textSecondary)
                 }
                 .padding(.horizontal, Theme.lg)
                 .padding(.top, Theme.sm)
@@ -99,8 +68,8 @@ struct ProfileView: View {
                 // Bio
                 if let bio = profile?.description, !bio.isEmpty {
                     Text(bio)
-                        .font(.system(size: 15))
-                        .foregroundStyle(Theme.textPrimary(colorScheme))
+                        .font(Theme.body)
+                        .foregroundStyle(Theme.textPrimary)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.horizontal, Theme.lg)
                         .padding(.top, Theme.sm)
@@ -108,15 +77,14 @@ struct ProfileView: View {
 
                 // Stats row
                 HStack(spacing: Theme.xl) {
-                    profileStat(count: profile?.postsCount ?? 0, label: "Posts")
-                    profileStat(count: profile?.followersCount ?? 0, label: "Followers")
-                    profileStat(count: profile?.followsCount ?? 0, label: "Following")
+                    ProfileStat(count: profile?.postsCount ?? 0, label: "posts")
+                    ProfileStat(count: profile?.followersCount ?? 0, label: "followers")
+                    ProfileStat(count: profile?.followsCount ?? 0, label: "following")
                 }
                 .padding(.horizontal, Theme.lg)
                 .padding(.top, Theme.md)
 
-                Divider()
-                    .foregroundStyle(Theme.separator(colorScheme))
+                ThemedDivider()
                     .padding(.top, Theme.lg)
 
                 // Author's posts
@@ -128,8 +96,8 @@ struct ProfileView: View {
                 } else if let error = loadError {
                     VStack(spacing: Theme.sm) {
                         Text(error)
-                            .font(.system(size: 14))
-                            .foregroundStyle(Theme.textSecondary(colorScheme))
+                            .font(Theme.subhead)
+                            .foregroundStyle(Theme.textSecondary)
                         Button("Retry") {
                             Task {
                                 loadError = nil
@@ -144,8 +112,8 @@ struct ProfileView: View {
                     .padding(.top, Theme.xxxl)
                 } else if posts.isEmpty {
                     Text("No posts yet")
-                        .font(.system(size: 14))
-                        .foregroundStyle(Theme.textTertiary(colorScheme))
+                        .font(Theme.subhead)
+                        .foregroundStyle(Theme.textTertiary)
                         .frame(maxWidth: .infinity)
                         .padding(.top, Theme.xxxl)
                 } else {
@@ -154,8 +122,7 @@ struct ProfileView: View {
                             PostRow(post: post, hideFollowButton: true)
                                 .padding(.horizontal, Theme.lg)
 
-                            Divider()
-                                .foregroundStyle(Theme.separator(colorScheme))
+                            ThemedDivider()
                         }
 
                         if postsCursor != nil {
@@ -170,15 +137,9 @@ struct ProfileView: View {
             }
         }
         .accessibilityIdentifier("profile-view")
-        .background(Theme.background(colorScheme))
+        .background(Theme.background)
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
-        .navigationDestination(for: String.self) { did in
-            ProfileView(actorDID: did)
-        }
-        .navigationDestination(for: PostNavigation.self) { nav in
-            PostDetailView(nav: nav)
-        }
         .task {
             await loadProfile()
             await loadPosts()
@@ -190,23 +151,27 @@ struct ProfileView: View {
         }
     }
 
-    // MARK: - Helpers
+    // MARK: - Actions
 
-    private func profileStat(count: Int, label: String) -> some View {
-        HStack(spacing: 4) {
-            Text(formatStatCount(count))
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(Theme.textPrimary(colorScheme))
-            Text(label)
-                .font(.system(size: 14))
-                .foregroundStyle(Theme.textSecondary(colorScheme))
+    private func toggleFollow() async {
+        isFollowWorking = true
+        if isFollowing, let uri = followUri {
+            do {
+                try await viewModel.atproto.unfollow(followUri: uri)
+                isFollowing = false
+                followUri = nil
+            } catch {
+                // Keep current state on failure
+            }
+        } else {
+            do {
+                followUri = try await viewModel.atproto.follow(did: actorDID)
+                isFollowing = true
+            } catch {
+                // Keep current state on failure
+            }
         }
-    }
-
-    private func formatStatCount(_ n: Int) -> String {
-        if n >= 1_000_000 { return String(format: "%.1fM", Double(n) / 1_000_000) }
-        if n >= 1_000 { return String(format: "%.1fK", Double(n) / 1_000) }
-        return "\(n)"
+        isFollowWorking = false
     }
 
     // MARK: - Data Loading

@@ -3,7 +3,6 @@ import SwiftUI
 
 struct LoginView: View {
     @Environment(AppViewModel.self) private var viewModel
-    @Environment(\.colorScheme) private var colorScheme
     @State private var handle = ""
     @State private var customServer = ""
     @State private var useCustomServer = false
@@ -29,7 +28,7 @@ struct LoginView: View {
 
             Text("prove a human wrote it")
                 .font(Theme.monoBody)
-                .foregroundStyle(Theme.textSecondary(colorScheme))
+                .foregroundStyle(Theme.textSecondary)
 
             Spacer()
 
@@ -56,7 +55,7 @@ struct LoginView: View {
                                 .font(.system(size: 10))
                                 .rotationEffect(.degrees(useCustomServer ? 180 : 0))
                         }
-                        .foregroundStyle(Theme.textTertiary(colorScheme))
+                        .foregroundStyle(Theme.textTertiary)
                     }
 
                     if useCustomServer {
@@ -75,7 +74,7 @@ struct LoginView: View {
                 } label: {
                     if isLoading {
                         ProgressView()
-                            .tint(Theme.textPrimary(colorScheme))
+                            .tint(Theme.textPrimary)
                     } else {
                         Text("Sign in")
                             .font(Theme.monoHeadline)
@@ -83,7 +82,7 @@ struct LoginView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(Theme.accent)
-                .foregroundStyle(.black)
+                .foregroundStyle(Theme.onAccent)
                 .disabled(handle.isEmpty || isLoading)
                 .padding(.horizontal)
 
@@ -97,7 +96,7 @@ struct LoginView: View {
 
             Spacer()
         }
-        .background(Theme.background(colorScheme))
+        .background(Theme.background)
     }
 
     private func signIn() async {

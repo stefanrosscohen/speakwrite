@@ -8,9 +8,12 @@ struct ReplyView: View {
     let replyToDisplayName: String?
     let replyToAvatar: String?
     let replyToText: String
+    /// Thread root refs — pass the parent's own root when replying to a reply,
+    /// so the new post stays in the original thread.
+    var rootUri: String?
+    var rootCid: String?
 
     @Environment(AppViewModel.self) private var viewModel
-    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dismiss) private var dismiss
     @State private var replyText = ""
     @State private var isSending = false
@@ -24,7 +27,6 @@ struct ReplyView: View {
     @State private var videoProcessingStatus: String? = nil
 
     // @Mention autocomplete
-    @State private var mentionQuery: String = ""
     @State private var mentionResults: [ProfileViewBasic] = []
     @State private var showMentionSuggestions = false
     @State private var mentionSearchTask: Task<Void, Never>?
@@ -44,7 +46,7 @@ struct ReplyView: View {
 
                         // Thread connector line
                         Rectangle()
-                            .fill(Theme.separator(colorScheme))
+                            .fill(Theme.separator)
                             .frame(width: 2, height: 20)
 
                         AvatarView(
@@ -60,20 +62,20 @@ struct ReplyView: View {
                         HStack(spacing: 4) {
                             if let name = replyToDisplayName, !name.isEmpty {
                                 Text(name)
-                                    .font(.system(size: 15, weight: .semibold))
-                                    .foregroundStyle(Theme.textPrimary(colorScheme))
+                                    .font(Theme.bodyEmphasis)
+                                    .foregroundStyle(Theme.textPrimary)
                                     .lineLimit(1)
                             }
                             Text("@\(replyToHandle)")
-                                .font(.system(size: 14))
-                                .foregroundStyle(Theme.textSecondary(colorScheme))
+                                .font(Theme.subhead)
+                                .foregroundStyle(Theme.textSecondary)
                                 .lineLimit(1)
                         }
 
                         // Original post text
                         Text(replyToText)
-                            .font(.system(size: 15))
-                            .foregroundStyle(Theme.textPrimary(colorScheme))
+                            .font(Theme.body)
+                            .foregroundStyle(Theme.textPrimary)
                             .lineLimit(6)
                             .fixedSize(horizontal: false, vertical: true)
                             .padding(.top, 2)
@@ -81,16 +83,18 @@ struct ReplyView: View {
                         // "Replying to" label
                         HStack(spacing: 4) {
                             Text("Replying to")
-                                .foregroundStyle(Theme.textTertiary(colorScheme))
+                                .foregroundStyle(Theme.textTertiary)
                             Text("@\(replyToHandle)")
                                 .foregroundStyle(Theme.accent)
                         }
-                        .font(.system(size: 14))
+                        .font(Theme.subhead)
                         .padding(.top, 8)
                         .padding(.bottom, 12)
 
-                        // Compose area — flows right after the thread connector
-                        InputRestrictedEditor(text: $replyText, placeholder: "Post your reply", inputDelegate: viewModel)
+                        // Compose area — flows right after the thread connector.
+                        // No inputDelegate: the sheet keeps its own text state and
+                        // must not write into the main compose draft.
+                        InputRestrictedEditor(text: $replyText, placeholder: "Post your reply")
                             .frame(minHeight: 100)
                     }
                 }
@@ -127,8 +131,8 @@ struct ReplyView: View {
                         ProgressView()
                             .controlSize(.small)
                         Text(status)
-                            .font(.system(size: 13))
-                            .foregroundStyle(Theme.textSecondary(colorScheme))
+                            .font(Theme.subhead)
+                            .foregroundStyle(Theme.textSecondary)
                     }
                     .padding(.horizontal, Theme.lg)
                     .padding(.top, Theme.xs)
@@ -155,20 +159,21 @@ struct ReplyView: View {
                     } label: {
                         ZStack(alignment: .topTrailing) {
                             Image(systemName: "camera")
-                                .font(.system(size: 15))
+                                .font(Theme.body)
                                 .foregroundStyle(Theme.accent.opacity(0.8))
 
                             let mediaCount = capturedPhotos.count + (capturedVideo != nil ? 1 : 0)
                             if mediaCount > 0 {
                                 Text("\(mediaCount)")
                                     .font(.system(size: 9, weight: .bold))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(Theme.onAccent)
                                     .frame(width: 14, height: 14)
                                     .background(Circle().fill(Theme.accent))
                                     .offset(x: 6, y: -6)
                             }
                         }
                     }
+                    .accessibilityLabel("Add photo or video")
 
                     Spacer()
                 }
@@ -177,7 +182,7 @@ struct ReplyView: View {
 
                 if let error {
                     Text(error)
-                        .font(.system(size: 13))
+                        .font(Theme.subhead)
                         .foregroundStyle(Theme.error)
                         .padding(.horizontal, Theme.lg)
                         .padding(.top, Theme.xs)
@@ -185,12 +190,12 @@ struct ReplyView: View {
 
                 Spacer()
             }
-            .background(Theme.background(colorScheme))
+            .background(Theme.background)
             .navigationTitle("")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { dismiss() }
-                        .font(.system(size: 16))
+                        .font(Theme.body)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     if isSending {
@@ -199,7 +204,7 @@ struct ReplyView: View {
                         Button("Reply") {
                             Task { await sendReply() }
                         }
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(Theme.headline)
                         .foregroundStyle(Theme.accent)
                         .disabled(replyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !hasMedia)
                     }
@@ -209,7 +214,7 @@ struct ReplyView: View {
                 detectMentionQuery(in: newText)
             }
             .fullScreenCover(isPresented: $showCamera) {
-                CameraCaptureView(mode: cameraMode) { media in
+                CameraCaptureView(mode: cameraMode, onCapture: { media in
                     if media.mimeType.starts(with: "video/") {
                         capturedPhotos = []
                         capturedVideo = media
@@ -219,7 +224,9 @@ struct ReplyView: View {
                             capturedPhotos.append(media)
                         }
                     }
-                }
+                }, onError: { message in
+                    error = message
+                })
             }
         }
     }
@@ -244,7 +251,6 @@ struct ReplyView: View {
             return
         }
 
-        mentionQuery = query
         mentionSearchTask?.cancel()
         mentionSearchTask = Task {
             try? await Task.sleep(for: .milliseconds(300))
@@ -283,17 +289,20 @@ struct ReplyView: View {
                 text: text,
                 parentUri: replyToUri,
                 parentCid: replyToCid,
+                rootUri: rootUri,
+                rootCid: rootCid,
                 capturedPhotos: capturedPhotos,
                 capturedVideo: capturedVideo,
                 onVideoStatus: { status in
                     videoProcessingStatus = status
                 }
             )
+            isSending = false
             dismiss()
         } catch {
             self.error = error.localizedDescription
+            isSending = false
         }
-        isSending = false
     }
 }
 

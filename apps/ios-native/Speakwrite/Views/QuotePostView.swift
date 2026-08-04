@@ -10,14 +10,12 @@ struct QuotePostView: View {
     let quotedText: String
 
     @Environment(AppViewModel.self) private var viewModel
-    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dismiss) private var dismiss
     @State private var postText = ""
     @State private var isSending = false
     @State private var error: String?
 
     // @Mention autocomplete
-    @State private var mentionQuery: String = ""
     @State private var mentionResults: [ProfileViewBasic] = []
     @State private var showMentionSuggestions = false
     @State private var mentionSearchTask: Task<Void, Never>?
@@ -33,7 +31,9 @@ struct QuotePostView: View {
                         size: .medium
                     )
 
-                    InputRestrictedEditor(text: $postText, placeholder: "Add your thoughts", inputDelegate: viewModel)
+                    // No inputDelegate: the sheet keeps its own text state and
+                    // must not write into the main compose draft.
+                    InputRestrictedEditor(text: $postText, placeholder: "Add your thoughts")
                         .frame(minHeight: 80)
                 }
                 .padding(.horizontal, Theme.lg)
@@ -56,7 +56,7 @@ struct QuotePostView: View {
 
                 if let error {
                     Text(error)
-                        .font(.system(size: 13))
+                        .font(Theme.subhead)
                         .foregroundStyle(Theme.error)
                         .padding(.horizontal, Theme.lg)
                         .padding(.top, Theme.xs)
@@ -64,7 +64,7 @@ struct QuotePostView: View {
 
                 Spacer()
             }
-            .background(Theme.background(colorScheme))
+            .background(Theme.background)
             .onChange(of: postText) { _, newText in
                 detectMentionQuery(in: newText)
             }
@@ -72,7 +72,7 @@ struct QuotePostView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { dismiss() }
-                        .font(.system(size: 16))
+                        .font(Theme.body)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     if isSending {
@@ -81,7 +81,7 @@ struct QuotePostView: View {
                         Button("Post") {
                             Task { await sendQuotePost() }
                         }
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(Theme.headline)
                         .foregroundStyle(Theme.accent)
                         .disabled(postText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
@@ -100,30 +100,30 @@ struct QuotePostView: View {
 
                 if let name = quotedDisplayName, !name.isEmpty {
                     Text(name)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Theme.textPrimary(colorScheme))
+                        .font(Theme.subhead.weight(.semibold))
+                        .foregroundStyle(Theme.textPrimary)
                         .lineLimit(1)
                 }
                 Text("@\(quotedHandle)")
-                    .font(.system(size: 13))
-                    .foregroundStyle(Theme.textSecondary(colorScheme))
+                    .font(Theme.subhead)
+                    .foregroundStyle(Theme.textSecondary)
                     .lineLimit(1)
             }
 
             // Quoted text
             Text(quotedText)
-                .font(.system(size: 15))
-                .foregroundStyle(Theme.textPrimary(colorScheme))
+                .font(Theme.body)
+                .foregroundStyle(Theme.textPrimary)
                 .lineLimit(6)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(Theme.md)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.surface(colorScheme))
-        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusMd))
+        .background(Theme.surface)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.radiusMd))
         .overlay(
-            RoundedRectangle(cornerRadius: Theme.cornerRadiusMd)
-                .stroke(Theme.separator(colorScheme), lineWidth: 1)
+            RoundedRectangle(cornerRadius: Theme.radiusMd)
+                .stroke(Theme.separator, lineWidth: 1)
         )
     }
 
@@ -147,7 +147,6 @@ struct QuotePostView: View {
             return
         }
 
-        mentionQuery = query
         mentionSearchTask?.cancel()
         mentionSearchTask = Task {
             try? await Task.sleep(for: .milliseconds(300))
@@ -187,11 +186,12 @@ struct QuotePostView: View {
                 quotedUri: quotedUri,
                 quotedCid: quotedCid
             )
+            isSending = false
             dismiss()
         } catch {
             self.error = error.localizedDescription
+            isSending = false
         }
-        isSending = false
     }
 }
 

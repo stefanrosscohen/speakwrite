@@ -5,8 +5,6 @@ struct StatView: View {
     let count: Int
     let label: String
 
-    @Environment(\.colorScheme) private var colorScheme
-
     var body: some View {
         VStack(spacing: 2) {
             Text("\(count)")
@@ -14,7 +12,7 @@ struct StatView: View {
                 .foregroundStyle(Theme.accent)
             Text(label)
                 .font(Theme.monoSmall)
-                .foregroundStyle(Theme.textSecondary(colorScheme))
+                .foregroundStyle(Theme.textSecondary)
         }
     }
 }

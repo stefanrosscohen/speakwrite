@@ -8,7 +8,6 @@ private struct RemoteImage: View {
     let url: URL?
     @State private var uiImage: UIImage?
     @State private var failed = false
-    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         Group {
@@ -18,16 +17,16 @@ private struct RemoteImage: View {
                     .scaledToFill()
             } else if failed {
                 Rectangle()
-                    .fill(Theme.surface(colorScheme))
+                    .fill(Theme.surface)
                     .overlay {
                         Image(systemName: "photo")
                             .font(.system(size: 24))
-                            .foregroundStyle(Theme.textTertiary(colorScheme))
+                            .foregroundStyle(Theme.textTertiary)
                     }
             } else {
                 Rectangle()
-                    .fill(Theme.surface(colorScheme))
-                    .overlay { ProgressView().tint(Theme.textTertiary(colorScheme)) }
+                    .fill(Theme.surface)
+                    .overlay { ProgressView().tint(Theme.textTertiary) }
             }
         }
         .task(id: url) {
@@ -53,7 +52,6 @@ struct PostImagesView: View {
     let images: [EmbedImageView]
     var interactive: Bool = true
     @State private var selectedImage: EmbedImageView?
-    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         Group {
@@ -91,7 +89,7 @@ struct PostImagesView: View {
                 .frame(maxHeight: 280)
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .clipShape(RoundedRectangle(cornerRadius: Theme.radiusMd))
         .fullScreenCover(item: $selectedImage) { image in
             FullScreenImageView(image: image)
         }
@@ -121,7 +119,6 @@ struct PostVideoView: View {
     let thumbnailURL: String
     let playlistURL: String
     @State private var showPlayer = false
-    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         ZStack {
@@ -135,11 +132,13 @@ struct PostVideoView: View {
                 .foregroundStyle(.white.opacity(0.9))
                 .shadow(radius: 4)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .clipShape(RoundedRectangle(cornerRadius: Theme.radiusMd))
         .contentShape(Rectangle())
         .onTapGesture { showPlayer = true }
         .fullScreenCover(isPresented: $showPlayer) {
-            VideoPlayerView(url: URL(string: playlistURL)!)
+            if let url = URL(string: playlistURL) {
+                VideoPlayerView(url: url)
+            }
         }
     }
 }
@@ -167,6 +166,7 @@ private struct VideoPlayerView: View {
                     .foregroundStyle(.white.opacity(0.8))
                     .padding()
             }
+            .accessibilityLabel("Close")
         }
         .onAppear {
             let p = AVPlayer(url: url)
@@ -202,6 +202,7 @@ private struct FullScreenImageView: View {
                     .foregroundStyle(.white.opacity(0.8))
                     .padding()
             }
+            .accessibilityLabel("Close")
         }
     }
 }

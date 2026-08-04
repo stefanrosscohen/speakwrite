@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - Appearance Mode
 
@@ -51,78 +52,126 @@ enum Theme {
     static let radiusLg: CGFloat = 16
 
     // MARK: - Typography
+    //
+    // Sans carries post content; monospaced carries the app's own voice
+    // (headers, stats, proof language). All tokens are Dynamic Type aware.
 
-    static var title: Font { .system(size: 20, weight: .bold) }
-    static var headline: Font { .system(size: 17, weight: .semibold) }
-    static var body: Font { .system(size: 15) }
-    static var subhead: Font { .system(size: 13) }
-    static var caption: Font { .system(size: 12) }
-    static var mono: Font { .system(size: 13, design: .monospaced) }
-    static var monoSmall: Font { .system(size: 11, design: .monospaced) }
-    static var monoTitle: Font { .system(size: 18, weight: .bold, design: .monospaced) }
-    static var monoBody: Font { .system(size: 15, design: .monospaced) }
-    static var monoCaption: Font { .system(size: 12, weight: .medium, design: .monospaced) }
-    static var monoHeadline: Font { .system(size: 16, weight: .semibold, design: .monospaced) }
-    static var monoBold: Font { .system(size: 13, weight: .bold, design: .monospaced) }
-    static var monoStat: Font { .system(size: 16, weight: .bold, design: .monospaced) }
+    static var title: Font { .system(.title3, weight: .bold) }
+    static var headline: Font { .system(.headline, weight: .semibold) }
+    static var body: Font { .system(.subheadline) }
+    static var bodyEmphasis: Font { .system(.subheadline, weight: .semibold) }
+    static var subhead: Font { .system(.footnote) }
+    static var caption: Font { .system(.caption) }
+
+    static var mono: Font { .system(.footnote, design: .monospaced) }
+    static var monoSmall: Font { .system(.caption2, design: .monospaced) }
+    static var monoTitle: Font { .system(.title3, design: .monospaced, weight: .bold) }
+    static var monoBody: Font { .system(.subheadline, design: .monospaced) }
+    static var monoCaption: Font { .system(.caption, design: .monospaced, weight: .medium) }
+    static var monoHeadline: Font { .system(.callout, design: .monospaced, weight: .semibold) }
+    static var monoBold: Font { .system(.footnote, design: .monospaced, weight: .bold) }
+    static var monoStat: Font { .system(.callout, design: .monospaced, weight: .bold) }
 }
 
 // MARK: - Semantic Colors
+//
+// All colors are dynamic (trait-collection driven), so views never need to
+// read `colorScheme` just to pick a color.
 
 extension Theme {
 
+    private static func dynamic(dark: UIColor, light: UIColor) -> Color {
+        Color(UIColor { traits in
+            traits.userInterfaceStyle == .dark ? dark : light
+        })
+    }
+
     // Backgrounds
-    static func background(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color(red: 0.04, green: 0.04, blue: 0.04) : Color(red: 0.98, green: 0.98, blue: 0.98)
-    }
+    static let background = dynamic(
+        dark: UIColor(red: 0.04, green: 0.04, blue: 0.045, alpha: 1),
+        light: UIColor(red: 0.98, green: 0.98, blue: 0.975, alpha: 1)
+    )
 
-    static func surface(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color(red: 0.10, green: 0.10, blue: 0.10) : Color(red: 0.96, green: 0.96, blue: 0.96)
-    }
+    static let surface = dynamic(
+        dark: UIColor(red: 0.09, green: 0.09, blue: 0.095, alpha: 1),
+        light: UIColor(red: 0.955, green: 0.955, blue: 0.95, alpha: 1)
+    )
 
-    static func surfaceElevated(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color(red: 0.13, green: 0.13, blue: 0.13) : .white
-    }
+    static let surfaceElevated = dynamic(
+        dark: UIColor(red: 0.13, green: 0.13, blue: 0.135, alpha: 1),
+        light: .white
+    )
 
     // Text
-    static func textPrimary(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? .white : Color(red: 0.07, green: 0.07, blue: 0.07)
-    }
+    static let textPrimary = dynamic(
+        dark: .white,
+        light: UIColor(red: 0.07, green: 0.07, blue: 0.07, alpha: 1)
+    )
 
-    static func textSecondary(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color(white: 0.6) : Color(white: 0.4)
-    }
+    static let textSecondary = dynamic(
+        dark: UIColor(white: 0.64, alpha: 1),
+        light: UIColor(white: 0.38, alpha: 1)
+    )
 
-    static func textTertiary(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color(white: 0.35) : Color(white: 0.65)
-    }
+    static let textTertiary = dynamic(
+        dark: UIColor(white: 0.52, alpha: 1),
+        light: UIColor(white: 0.5, alpha: 1)
+    )
 
-    // Accent
+    // Accent — Speakwrite green. Foreground on accent is always ink.
     static let accent = Color(red: 0.0, green: 0.85, blue: 0.30)
+    static let onAccent = Color.black
+    static var accentSubtle: Color { accent.opacity(0.15) }
 
-    static var accentSubtle: Color {
-        accent.opacity(0.15)
-    }
+    // Verification states
+    static let verified = accent
+    static let verifying = dynamic(
+        dark: UIColor(white: 0.55, alpha: 1),
+        light: UIColor(white: 0.55, alpha: 1)
+    )
+    static let verificationFailed = Color.orange
 
     // Separator
-    static func separator(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color(white: 0.13) : Color(white: 0.88)
-    }
+    static let separator = dynamic(
+        dark: UIColor(white: 0.14, alpha: 1),
+        light: UIColor(white: 0.88, alpha: 1)
+    )
 
     // Semantic
     static let error = Color.red
     static let liked = Color.pink
-    static let reposted = Color.green
 
-    // Border for avatar on profile (matches background)
-    static func avatarBorder(_ scheme: ColorScheme) -> Color {
-        background(scheme)
+    // UIKit bridges for UITextView-based surfaces
+    static let uiTextPrimary = UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? .white
+            : UIColor(red: 0.07, green: 0.07, blue: 0.07, alpha: 1)
     }
+    static let uiAccent = UIColor(red: 0.0, green: 0.85, blue: 0.30, alpha: 1)
+}
 
-    // Corner radii
-    static let cornerRadiusSm: CGFloat = 8
-    static let cornerRadiusMd: CGFloat = 12
-    static let cornerRadiusLg: CGFloat = 16
+// MARK: - Count Formatting
+
+/// Abbreviates counts the way social clients do: 999, 1.2K, 43K, 1.1M.
+func formatCount(_ count: Int) -> String {
+    switch count {
+    case ..<1000:
+        return "\(count)"
+    case ..<10_000:
+        let value = Double(count) / 1000
+        let rounded = (value * 10).rounded() / 10
+        return rounded == rounded.rounded()
+            ? "\(Int(rounded))K"
+            : String(format: "%.1fK", rounded)
+    case ..<1_000_000:
+        return "\(count / 1000)K"
+    default:
+        let value = Double(count) / 1_000_000
+        let rounded = (value * 10).rounded() / 10
+        return rounded == rounded.rounded()
+            ? "\(Int(rounded))M"
+            : String(format: "%.1fM", rounded)
+    }
 }
 
 // MARK: - Relative Time Utility

@@ -26,8 +26,6 @@ struct AvatarView: View {
         }
     }
 
-    @Environment(\.colorScheme) private var colorScheme
-
     var body: some View {
         if let url, let imageURL = URL(string: url) {
             AsyncImage(url: imageURL) { image in
@@ -46,7 +44,7 @@ struct AvatarView: View {
 
     private var placeholder: some View {
         Circle()
-            .fill(Theme.surface(colorScheme))
+            .fill(Theme.surface)
             .frame(width: size.points, height: size.points)
             .overlay {
                 Text(String((handle?.first ?? "?")).uppercased())

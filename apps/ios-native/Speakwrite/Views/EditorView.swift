@@ -1,49 +1,62 @@
 import SwiftUI
 
-/// Main compose screen with keystroke-captured text editor and toolbar.
+/// Modal compose screen with keystroke-captured text editor and toolbar.
+/// Presented as a full-screen cover from the compose button; the draft
+/// persists across dismissals.
 struct EditorView: View {
     @Environment(AppViewModel.self) private var viewModel
-    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dismiss) private var dismiss
     @State private var showClearConfirm = false
-    @State private var showMyProfile = false
-    @State private var mentionQuery: String = ""
     @State private var mentionResults: [ProfileViewBasic] = []
     @State private var showMentionSuggestions = false
     @State private var mentionSearchTask: Task<Void, Never>?
     @State private var showViolationBanner = false
     @State private var violationDismissTask: Task<Void, Never>?
     @State private var cameraError: String?
+    @State private var showPublishSuccess = false
 
     var body: some View {
         @Bindable var vm = viewModel
 
-        NavigationStack {
+        ZStack {
             VStack(spacing: 0) {
-                // App header
-                HStack(spacing: Theme.sm) {
-                    AvatarButton(
-                        avatarURL: viewModel.myProfile?.avatar,
-                        handle: viewModel.atproto.handle
-                    ) {
-                        showMyProfile = true
+                // Header: Cancel keeps the draft for later
+                HStack {
+                    Button("Cancel") {
+                        dismiss()
                     }
-                    Text("speakwrite")
-                        .font(Theme.monoTitle)
-                        .foregroundStyle(Theme.accent)
+                    .font(Theme.body)
+                    .foregroundStyle(Theme.textSecondary)
+                    .accessibilityIdentifier("compose-cancel")
+
                     Spacer()
+
+                    Text("New Post")
+                        .font(Theme.monoHeadline)
+                        .foregroundStyle(Theme.textPrimary)
+
+                    Spacer()
+
+                    // Balance the Cancel button so the title stays centered
+                    Button("Cancel") { }
+                        .font(Theme.body)
+                        .hidden()
+                        .accessibilityHidden(true)
                 }
                 .padding(.horizontal, Theme.lg)
-                .padding(.vertical, Theme.sm)
+                .padding(.vertical, Theme.md)
+
+                ThemedDivider()
 
                 // Violation banner
                 if showViolationBanner {
                     HStack(spacing: Theme.sm) {
                         Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 13))
+                            .font(Theme.subhead)
                         Text("Naughty naughty — use the iPhone keyboard to make a verified post")
-                            .font(.system(size: 13, weight: .medium, design: .monospaced))
+                            .font(Theme.mono.weight(.medium))
                     }
-                    .foregroundStyle(.black)
+                    .foregroundStyle(Theme.onAccent)
                     .padding(.horizontal, Theme.lg)
                     .padding(.vertical, Theme.sm)
                     .frame(maxWidth: .infinity)
@@ -51,25 +64,13 @@ struct EditorView: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
                 }
 
-                // Editor area with mention overlay
-                ZStack(alignment: .topLeading) {
-                    InputRestrictedEditor(
-                        text: $vm.postText,
-                        placeholder: "What's on your mind?",
-                        inputDelegate: viewModel
-                    )
-                    .accessibilityIdentifier("compose-editor")
-
-                    // Placeholder text (shown when empty)
-                    if viewModel.postText.isEmpty {
-                        Text("What's on your mind?")
-                            .font(.system(size: 17, design: .monospaced))
-                            .foregroundStyle(Theme.textTertiary(colorScheme))
-                            .padding(.top, 8)
-                            .padding(.leading, 5)
-                            .allowsHitTesting(false)
-                    }
-                }
+                InputRestrictedEditor(
+                    text: $vm.postText,
+                    placeholder: "What's on your mind?",
+                    inputDelegate: viewModel,
+                    resetSignal: viewModel.composeResetSignal
+                )
+                .accessibilityIdentifier("compose-editor")
                 .padding(.horizontal, Theme.lg)
                 .padding(.top, Theme.sm)
 
@@ -116,62 +117,81 @@ struct EditorView: View {
                     isVideoDisabled: !viewModel.capturedPhotos.isEmpty || viewModel.capturedVideo != nil
                 )
 
-                Divider()
-                    .background(Theme.separator(colorScheme))
+                ThemedDivider()
 
                 // Post bar with character ring + publish
                 PostBarView()
             }
-            .background(Theme.background(colorScheme))
-            .navigationBarHidden(true)
-            .sheet(isPresented: $showMyProfile) {
-                MyProfileView()
+
+            if showPublishSuccess {
+                PublishSuccessOverlay()
             }
-            .alert("Clear post?", isPresented: $showClearConfirm) {
-                Button("Clear", role: .destructive) {
-                    viewModel.postText = ""
+        }
+        .background(Theme.background)
+        .alert("Clear post?", isPresented: $showClearConfirm) {
+            Button("Clear", role: .destructive) {
+                viewModel.clearDraft()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will delete your current draft.")
+        }
+        .alert("Capture Error", isPresented: Binding(get: { cameraError != nil }, set: { if !$0 { cameraError = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(cameraError ?? "")
+        }
+        .alert("Heads up", isPresented: Binding(
+            get: { viewModel.publishWarning != nil },
+            set: { if !$0 { viewModel.publishWarning = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(viewModel.publishWarning ?? "")
+        }
+        .fullScreenCover(isPresented: $vm.showCamera) {
+            CameraCaptureView(mode: viewModel.cameraMode, onCapture: { media in
+                if media.mimeType.starts(with: "video/") {
                     viewModel.capturedPhotos = []
+                    viewModel.capturedVideo = media
+                } else {
                     viewModel.capturedVideo = nil
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("This will delete your current draft.")
-            }
-            .alert("Capture Error", isPresented: Binding(get: { cameraError != nil }, set: { if !$0 { cameraError = nil } })) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(cameraError ?? "")
-            }
-            .fullScreenCover(isPresented: $vm.showCamera) {
-                CameraCaptureView(mode: viewModel.cameraMode, onCapture: { media in
-                    if media.mimeType.starts(with: "video/") {
-                        viewModel.capturedPhotos = []
-                        viewModel.capturedVideo = media
-                    } else {
-                        viewModel.capturedVideo = nil
-                        if viewModel.capturedPhotos.count < 4 {
-                            viewModel.capturedPhotos.append(media)
-                        }
+                    if viewModel.capturedPhotos.count < 4 {
+                        viewModel.capturedPhotos.append(media)
                     }
-                }, onError: { error in
-                    cameraError = error
-                })
+                }
+            }, onError: { error in
+                cameraError = error
+            })
+        }
+        .onChange(of: viewModel.postText) { _, newText in
+            detectMentionQuery(in: newText)
+        }
+        .onChange(of: viewModel.violationCount) { _, newCount in
+            guard newCount > 0 else { return }
+            violationDismissTask?.cancel()
+            withAnimation(.easeInOut(duration: 0.25)) {
+                showViolationBanner = true
             }
-            .onChange(of: viewModel.postText) { _, newText in
-                detectMentionQuery(in: newText)
-            }
-            .onChange(of: viewModel.violationCount) { _, _ in
-                violationDismissTask?.cancel()
+            violationDismissTask = Task {
+                try? await Task.sleep(for: .seconds(3))
+                guard !Task.isCancelled else { return }
                 withAnimation(.easeInOut(duration: 0.25)) {
-                    showViolationBanner = true
+                    showViolationBanner = false
                 }
-                violationDismissTask = Task {
-                    try? await Task.sleep(for: .seconds(3))
-                    guard !Task.isCancelled else { return }
-                    withAnimation(.easeInOut(duration: 0.25)) {
-                        showViolationBanner = false
-                    }
-                }
+            }
+        }
+        .onChange(of: viewModel.lastPublishedURI) { _, uri in
+            guard uri != nil else { return }
+            // Show success, then land on the Verified feed where the post appears
+            withAnimation(.easeInOut(duration: 0.2)) {
+                showPublishSuccess = true
+            }
+            Task {
+                try? await Task.sleep(for: .seconds(1.1))
+                viewModel.lastPublishedURI = nil
+                viewModel.selectedTab = .verified
+                dismiss()
             }
         }
     }
@@ -179,8 +199,7 @@ struct EditorView: View {
     // MARK: - @Mention Detection
 
     private func detectMentionQuery(in text: String) {
-        // Find if cursor is in the middle of typing @something
-        // Look for the last @ that doesn't have a space after it
+        // Find if the user is in the middle of typing @something at the end
         guard let atIndex = text.lastIndex(of: "@") else {
             showMentionSuggestions = false
             return
@@ -194,12 +213,10 @@ struct EditorView: View {
         }
 
         let query = String(afterAt)
-        guard query.count >= 1 else {
+        guard query.count >= 2 else {
             showMentionSuggestions = false
             return
         }
-
-        mentionQuery = query
 
         // Cancel any previous search
         mentionSearchTask?.cancel()
@@ -222,7 +239,7 @@ struct EditorView: View {
     }
 
     private func insertMention(_ profile: ProfileViewBasic) {
-        // Replace @partial with @handle
+        // Replace the trailing @partial token with the selected @handle
         if let atIndex = viewModel.postText.lastIndex(of: "@") {
             viewModel.postText = String(viewModel.postText[..<atIndex]) + "@\(profile.handle) "
         }
@@ -231,12 +248,37 @@ struct EditorView: View {
     }
 }
 
+// MARK: - Publish Success Overlay
+
+struct PublishSuccessOverlay: View {
+    var body: some View {
+        VStack(spacing: Theme.md) {
+            Image(systemName: "checkmark.seal.fill")
+                .font(.system(size: 48))
+                .foregroundStyle(Theme.accent)
+            Text("Published")
+                .font(Theme.monoHeadline)
+                .foregroundStyle(Theme.textPrimary)
+            Text("Signed by your Secure Enclave")
+                .font(Theme.caption)
+                .foregroundStyle(Theme.textSecondary)
+        }
+        .padding(Theme.xxl)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.radiusLg)
+                .fill(Theme.surfaceElevated)
+                .shadow(color: .black.opacity(0.2), radius: 16, y: 8)
+        )
+        .transition(.scale(scale: 0.9).combined(with: .opacity))
+        .accessibilityIdentifier("publish-success")
+    }
+}
+
 // MARK: - Mention Suggestion List
 
 struct MentionSuggestionList: View {
     let results: [ProfileViewBasic]
     let onSelect: (ProfileViewBasic) -> Void
-    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         ScrollView {
@@ -249,7 +291,7 @@ struct MentionSuggestionList: View {
                             AsyncImage(url: profile.avatar.flatMap { URL(string: $0) }) { image in
                                 image.resizable().scaledToFill()
                             } placeholder: {
-                                Circle().fill(Theme.surfaceElevated(colorScheme))
+                                Circle().fill(Theme.surfaceElevated)
                             }
                             .frame(width: 28, height: 28)
                             .clipShape(Circle())
@@ -257,12 +299,12 @@ struct MentionSuggestionList: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 if let name = profile.displayName, !name.isEmpty {
                                     Text(name)
-                                        .font(.system(size: 14, weight: .medium))
-                                        .foregroundStyle(Theme.textPrimary(colorScheme))
+                                        .font(Theme.subhead.weight(.medium))
+                                        .foregroundStyle(Theme.textPrimary)
                                 }
                                 Text("@\(profile.handle)")
-                                    .font(.system(size: 13, design: .monospaced))
-                                    .foregroundStyle(Theme.textSecondary(colorScheme))
+                                    .font(Theme.mono)
+                                    .foregroundStyle(Theme.textSecondary)
                             }
 
                             Spacer()
@@ -272,14 +314,13 @@ struct MentionSuggestionList: View {
                     }
                     .buttonStyle(.plain)
 
-                    Divider()
-                        .foregroundStyle(Theme.separator(colorScheme))
+                    ThemedDivider()
                 }
             }
         }
         .frame(maxHeight: 200)
-        .background(Theme.surfaceElevated(colorScheme))
-        .cornerRadius(8)
+        .background(Theme.surfaceElevated)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.radiusSm))
         .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
         .padding(.horizontal, Theme.lg)
     }
@@ -295,7 +336,6 @@ struct ComposeToolbar: View {
     var mediaCount: Int
     var isPhotoDisabled: Bool
     var isVideoDisabled: Bool
-    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         HStack(spacing: Theme.xl) {
@@ -303,9 +343,10 @@ struct ComposeToolbar: View {
                 onDismissKeyboard()
             } label: {
                 Image(systemName: "keyboard.chevron.compact.down")
-                    .font(.system(size: 16))
+                    .font(Theme.body)
                     .foregroundStyle(Theme.accent.opacity(0.8))
             }
+            .accessibilityLabel("Dismiss keyboard")
 
             Divider()
                 .frame(height: 18)
@@ -327,19 +368,20 @@ struct ComposeToolbar: View {
             } label: {
                 ZStack(alignment: .topTrailing) {
                     Image(systemName: "camera")
-                        .font(.system(size: 15))
-                        .foregroundStyle((isPhotoDisabled && isVideoDisabled) ? Theme.textTertiary(colorScheme) : Theme.accent.opacity(0.8))
+                        .font(Theme.body)
+                        .foregroundStyle((isPhotoDisabled && isVideoDisabled) ? Theme.textTertiary : Theme.accent.opacity(0.8))
 
                     if mediaCount > 0 {
                         Text("\(mediaCount)")
                             .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Theme.onAccent)
                             .frame(width: 14, height: 14)
                             .background(Circle().fill(Theme.accent))
                             .offset(x: 6, y: -6)
                     }
                 }
             }
+            .accessibilityLabel("Add photo or video")
 
             Divider()
                 .frame(height: 18)
@@ -348,9 +390,10 @@ struct ComposeToolbar: View {
                 showClearConfirm = true
             } label: {
                 Image(systemName: "trash")
-                    .font(.system(size: 15))
-                    .foregroundStyle(Theme.textSecondary(colorScheme))
+                    .font(Theme.body)
+                    .foregroundStyle(Theme.textSecondary)
             }
+            .accessibilityLabel("Clear draft")
 
             Spacer()
         }
