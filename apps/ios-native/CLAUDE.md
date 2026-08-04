@@ -42,7 +42,7 @@ Single `AppViewModel` (`@Observable`) serves as global state, injected via `.env
 
 ### Navigation
 
-`TabView` with 4 tabs (Feed, Verified, Compose, Settings), each with its own `NavigationStack`.
+`TabView` with 4 tabs (Write, Feed, Record, Settings), each with its own `NavigationStack`. Write (compose) is first and the default tab.
 
 ### Data Types
 

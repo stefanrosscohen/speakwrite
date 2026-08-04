@@ -160,6 +160,71 @@
 
     .entry-time { color: var(--text-secondary); }
 
+    /* Verified conversation thread inside an entry */
+    .entry-thread {
+      margin-top: 0.9rem;
+      padding-top: 0.8rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .thread-label {
+      color: var(--text-secondary);
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 0.6rem;
+    }
+
+    .reply-row {
+      display: flex;
+      gap: 0.55rem;
+      padding: 0.45rem 0 0.45rem 0.75rem;
+      border-left: 2px solid var(--accent-dim);
+      margin-bottom: 0.35rem;
+    }
+
+    .reply-avatar {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--bg-surface);
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+
+    .reply-body { min-width: 0; }
+
+    .reply-head {
+      display: flex;
+      align-items: baseline;
+      gap: 0.45rem;
+    }
+
+    .reply-name {
+      color: var(--text-primary);
+      font-weight: 600;
+      font-size: 0.78rem;
+    }
+
+    .reply-verified {
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.75rem;
+    }
+
+    .reply-time {
+      color: var(--text-secondary);
+      font-size: 0.65rem;
+    }
+
+    .reply-text {
+      color: var(--text-primary);
+      font-size: 0.85rem;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+
     .empty-today {
       border: 1px dashed var(--border);
       padding: 1.5rem 1.25rem;
@@ -312,9 +377,10 @@
           const rec = post.record || {};
           const tags = rec.tags || [];
           if (!tags.includes('speakwrite')) continue; // must carry the real tag
-          if (rec.reply) continue;                    // top-level entries only
           const rkey = (post.uri || '').split('/').pop();
           entries.push({
+            uri: post.uri || '',
+            rootUri: rec.reply?.root?.uri || null,
             handle: post.author?.handle || '',
             displayName: post.author?.displayName || '',
             avatar: (post.author?.avatar || '').startsWith('https://') ? post.author.avatar : '',
@@ -329,7 +395,21 @@
         if (!cursor || (data.posts || []).length === 0) { cursor = null; break; }
       }
       if (cursor) truncated = true;
-      return { entries, truncated };
+
+      // Thread verified replies under their entry. Bluesky replies always carry
+      // the thread ROOT, so any depth of verified conversation lands under the
+      // right entry, in conversation (oldest-first) order.
+      const tops = entries.filter(e => !e.rootUri);
+      const byUri = new Map(tops.map(e => [e.uri, e]));
+      for (const reply of entries.filter(e => e.rootUri)) {
+        const parent = byUri.get(reply.rootUri);
+        if (parent) (parent.replies ||= []).push(reply);
+      }
+      for (const e of tops) {
+        if (e.replies) e.replies.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      }
+
+      return { entries: tops, truncated };
     }
 
     function render(entries, truncated) {
@@ -389,6 +469,34 @@
       const avatar = e.avatar
         ? `<img class="entry-avatar" src="${escapeHtml(e.avatar)}" alt="" loading="lazy">`
         : `<div class="entry-avatar"></div>`;
+
+      // Verified conversation under the entry — human on both sides.
+      let thread = '';
+      if (e.replies && e.replies.length) {
+        const rows = e.replies.map(r => {
+          const rAvatar = r.avatar
+            ? `<img class="reply-avatar" src="${escapeHtml(r.avatar)}" alt="" loading="lazy">`
+            : `<div class="reply-avatar"></div>`;
+          const rVerify = `/verify/${encodeURIComponent(r.handle)}/${encodeURIComponent(r.rkey)}`;
+          return `<div class="reply-row">
+            ${rAvatar}
+            <div class="reply-body">
+              <div class="reply-head">
+                <span class="reply-name">${escapeHtml(r.displayName || r.handle)}</span>
+                <a class="reply-verified" href="${rVerify}" title="verified human reply">✓</a>
+                <span class="reply-time">${escapeHtml(formatTime(r.createdAt))}</span>
+              </div>
+              <div class="reply-text">${escapeHtml(r.text)}</div>
+            </div>
+          </div>`;
+        }).join('');
+        const n = e.replies.length;
+        thread = `<div class="entry-thread">
+          <div class="thread-label">${n} verified ${n === 1 ? 'reply' : 'replies'} — human on both sides</div>
+          ${rows}
+        </div>`;
+      }
+
       return `<article class="entry-card">
         <div class="entry-meta">
           ${avatar}
@@ -403,6 +511,7 @@
           <a class="entry-verified" href="${verifyUrl}">✓ verified entry</a>
           <span class="entry-time">${escapeHtml(formatTime(e.createdAt))}</span>
         </div>
+        ${thread}
       </article>`;
     }
 

@@ -255,6 +255,22 @@ Shipped:
   travel to iMessage/Bluesky/anywhere a user's real audience lives and carry
   a link back into the record.
 
+**Verified conversations** (added in a follow-up pass): the record is not just
+monologues — replies published through Speakwrite carry the same proof, so a
+thread is a *provably human conversation*, which no other platform can claim.
+
+- speakwrite.io/record now threads verified replies under their entry
+  ("N verified replies — human on both sides"), grouped by thread root so any
+  depth of conversation lands under the right entry, each reply linking to its
+  own verification page.
+- The app's thread view previously rendered only one level of replies —
+  replies-to-replies were silently dropped. It now walks the full tree with
+  depth indentation and a thread rail.
+- Reply badges in threads were trust-by-tag (a green seal for any post that
+  *claimed* the speakwrite tag). Replies now run the same cryptographic
+  verification pipeline as posts: grey while verifying, green when proven,
+  orange when a claim doesn't check out — with the tappable proof sheet.
+
 Next steps for this direction (not yet built): a daily prompt ("today's
 question, answered only by humans") to solve the blank-page problem; "Real or
 Robot" — a daily Turing-test game built from record entries + AI decoys,

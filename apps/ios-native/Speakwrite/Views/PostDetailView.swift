@@ -64,8 +64,18 @@ struct PostDetailView: View {
                             ReplyRowView(reply: reply, onReplyDismiss: {
                                 Task { await loadThread() }
                             })
-                                .padding(.horizontal, Theme.lg)
+                                .padding(.leading, Theme.lg + CGFloat(min(reply.depth, 3)) * 24)
+                                .padding(.trailing, Theme.lg)
                                 .padding(.vertical, 10)
+                                .overlay(alignment: .leading) {
+                                    // Thread rail for nested replies
+                                    if reply.depth > 0 {
+                                        Rectangle()
+                                            .fill(Theme.separator(colorScheme))
+                                            .frame(width: 2)
+                                            .padding(.leading, Theme.lg + CGFloat(min(reply.depth, 3)) * 24 - 14)
+                                    }
+                                }
 
                             Divider().foregroundStyle(Theme.separator(colorScheme))
                         }
@@ -270,15 +280,19 @@ struct PostDetailView: View {
         isLoading = true
         do {
             let result = try await viewModel.atproto.getPostThread(uri: nav.uri)
-            if let threadReplies = result.thread.replies {
-                replies = threadReplies.compactMap { node -> ThreadReply? in
-                    guard let post = node.post, let record = post.record else { return nil }
+
+            // Walk the full tree — replies-to-replies were previously dropped,
+            // which made real conversations invisible past one level.
+            var collected: [ThreadReply] = []
+            func walk(_ nodes: [ThreadNode], depth: Int) {
+                for node in nodes {
+                    guard let post = node.post, let record = post.record else { continue }
                     let rawText = record.text ?? ""
                     let tags = record.tags ?? []
                     let isSW = tags.contains("speakwrite") ||
                         rawText.contains("#speakwrite") ||
                         (rawText.contains("human verified") && rawText.contains("speakwrite"))
-                    return ThreadReply(
+                    collected.append(ThreadReply(
                         uri: post.uri, cid: post.cid,
                         authorDID: post.author.did, authorHandle: post.author.handle,
                         authorDisplayName: post.author.displayName, authorAvatar: post.author.avatar,
@@ -286,10 +300,17 @@ struct PostDetailView: View {
                         createdAt: record.createdAt ?? "",
                         likeCount: post.likeCount ?? 0, repostCount: post.repostCount ?? 0,
                         replyCount: post.replyCount ?? 0, viewer: post.viewer,
-                        isSpeakwrite: isSW
-                    )
+                        isSpeakwrite: isSW,
+                        depth: depth
+                    ))
+                    if let children = node.replies {
+                        walk(children, depth: depth + 1)
+                    }
                 }
             }
+            walk(result.thread.replies ?? [], depth: 0)
+            replies = collected
+            threadError = nil
         } catch {
             threadError = "Couldn't load replies. Check your connection."
         }
@@ -367,6 +388,8 @@ struct ThreadReply: Identifiable {
     let replyCount: Int
     let viewer: PostViewer?
     let isSpeakwrite: Bool
+    /// Nesting level below the main post (0 = direct reply).
+    var depth: Int = 0
     var id: String { uri }
 }
 
@@ -387,6 +410,11 @@ private struct ReplyRowView: View {
     @State private var showReplySheet = false
     @State private var showRepostMenu = false
     @State private var showQuotePost = false
+    @State private var showProofSheet = false
+
+    private var verificationStatus: VerificationStatus {
+        viewModel.verification.status(for: reply.uri)
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -407,10 +435,15 @@ private struct ReplyRowView: View {
                                 .layoutPriority(1)
                         }
                         if reply.isSpeakwrite {
-                            Image(systemName: "checkmark.seal.fill")
-                                .font(.system(size: 12))
-                                .foregroundStyle(Theme.accent)
-                                .padding(.leading, 2)
+                            // Real cryptographic verification — a reply that
+                            // merely claims the tag must not get a green seal.
+                            Button {
+                                showProofSheet = true
+                            } label: {
+                                VerificationBadge(status: verificationStatus)
+                                    .padding(.leading, 2)
+                            }
+                            .buttonStyle(.plain)
                         }
                         Text(" @\(reply.authorHandle)")
                             .font(.system(size: 14))
@@ -455,6 +488,26 @@ private struct ReplyRowView: View {
             isReposted = reply.viewer?.repost != nil
             repostUri = reply.viewer?.repost
             localRepostCount = reply.repostCount
+        }
+        .task {
+            if reply.isSpeakwrite {
+                viewModel.verification.verify(
+                    postUri: reply.uri, postText: reply.text, authorDID: reply.authorDID
+                )
+            }
+        }
+        .sheet(isPresented: $showProofSheet) {
+            ProofDetailSheet(
+                status: verificationStatus,
+                authorHandle: reply.authorHandle,
+                postUri: reply.uri,
+                onRetry: {
+                    viewModel.verification.verify(
+                        postUri: reply.uri, postText: reply.text,
+                        authorDID: reply.authorDID, force: true
+                    )
+                }
+            )
         }
         .sheet(isPresented: $showReplySheet, onDismiss: {
             onReplyDismiss?()
