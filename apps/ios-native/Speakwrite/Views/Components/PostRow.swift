@@ -100,9 +100,17 @@ struct PostRow<Post: PostDisplayable>: View {
     @State private var showRepostMenu = false
     @State private var showQuotePost = false
     @State private var isFollowingAuthor = false
+    @State private var showProofSheet = false
 
     private var verificationStatus: VerificationStatus {
         viewModel.verification.status(for: post.uri)
+    }
+
+    private var showsProofBadge: Bool {
+        switch verificationStatus {
+        case .verified, .verifying, .unavailable: return true
+        case .failed, .unverified: return false
+        }
     }
 
     /// Build a PostNavigation value for detail view navigation.
@@ -162,7 +170,8 @@ struct PostRow<Post: PostDisplayable>: View {
                         VStack(alignment: .leading, spacing: 8) {
                             if !post.text.isEmpty {
                                 Text(mentionHighlightedText(post.text))
-                                    .font(.system(size: 15))
+                                    .font(.system(size: 16))
+                                    .lineSpacing(2)
                                     .foregroundStyle(Theme.textPrimary(colorScheme))
                                     .lineLimit(12)
                                     .multilineTextAlignment(.leading)
@@ -189,7 +198,13 @@ struct PostRow<Post: PostDisplayable>: View {
         .accessibilityIdentifier("post-row")
         .onAppear { syncEngagementState() }
         .task {
-            viewModel.verification.verify(postUri: post.uri, postText: post.text, authorDID: post.author.did)
+            // Only posts that claim a Speakwrite proof are worth a network round-trip
+            if post.showVerifiedBadge {
+                viewModel.verification.verify(postUri: post.uri, postText: post.text, authorDID: post.author.did)
+            }
+        }
+        .sheet(isPresented: $showProofSheet) {
+            VerificationDetailSheet(authorHandle: post.author.handle, postUri: post.uri)
         }
         .sheet(isPresented: $showReplySheet) {
             ReplyView(
@@ -244,16 +259,16 @@ struct PostRow<Post: PostDisplayable>: View {
                     .truncationMode(.tail)
             }
 
-            if verificationStatus == .verified {
-                Image(systemName: "checkmark.seal.fill")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Theme.accent)
-                    .padding(.leading, 2)
-            } else if verificationStatus == .verifying {
-                Image(systemName: "checkmark.seal")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Theme.textTertiary(colorScheme))
-                    .padding(.leading, 2)
+            if showsProofBadge {
+                Button {
+                    showProofSheet = true
+                } label: {
+                    ProofBadge(status: verificationStatus)
+                        .padding(.leading, 2)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Verification proof")
             }
 
             Text(" @\(post.author.handle)")
@@ -276,7 +291,7 @@ struct PostRow<Post: PostDisplayable>: View {
                 } label: {
                     Text("Follow")
                         .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(.white)
+                        .foregroundStyle(Theme.onAccent)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
                         .background(Capsule().fill(Theme.accent))

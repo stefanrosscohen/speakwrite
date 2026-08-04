@@ -10,24 +10,7 @@ struct VerifiedFeedView: View {
     var body: some View {
         NavigationStack(path: $path) {
             VStack(spacing: 0) {
-                // App header
-                HStack(spacing: Theme.sm) {
-                    AvatarButton(
-                        avatarURL: viewModel.myProfile?.avatar,
-                        handle: viewModel.atproto.handle
-                    ) {
-                        showMyProfile = true
-                    }
-                    Text("speakwrite")
-                        .font(Theme.monoTitle)
-                        .foregroundStyle(Theme.accent)
-                    Image(systemName: "checkmark.seal.fill")
-                        .foregroundStyle(Theme.accent)
-                        .font(.system(size: 14))
-                    Spacer()
-                }
-                .padding(.horizontal, Theme.lg)
-                .padding(.vertical, Theme.sm)
+                AppHeader(onAvatarTap: { showMyProfile = true }, seal: true)
 
                 // Feed content
                 Group {

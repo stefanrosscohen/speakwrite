@@ -15,6 +15,27 @@ final class ATProtoService {
     private(set) var handle: String?
     private(set) var did: String?
 
+    /// True when the user's own PDS failed to respond on the last authenticated
+    /// request. Feeds fall back to the public AppView where possible; the UI can
+    /// surface a banner so a dead PDS doesn't look like a broken app.
+    private(set) var pdsUnreachable = false
+
+    /// Host of the user's PDS, for display (e.g. "bsky.social").
+    var pdsHost: String? {
+        pdsURL.flatMap { URL(string: $0)?.host }
+    }
+
+    /// Shared session with short timeouts — a dead PDS should fail in seconds,
+    /// not hang for the 60s URLSession default.
+    static let session: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 15
+        config.timeoutIntervalForResource = 60
+        return URLSession(configuration: config)
+    }()
+
+    private var session: URLSession { Self.session }
+
     private var accessToken: String?
     private var refreshToken: String?
     private var pdsURL: String?
@@ -79,7 +100,7 @@ final class ATProtoService {
     func resolveHandle(_ handle: String, serviceHost: String = "https://bsky.social") async throws -> (did: String, pds: String) {
         let encoded = handle.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? handle
         let url = URL(string: "\(serviceHost)/xrpc/com.atproto.identity.resolveHandle?handle=\(encoded)")!
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let (data, response) = try await session.data(from: url)
 
         if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode != 200 {
             throw ATProtoError.handleNotFound
@@ -90,7 +111,7 @@ final class ATProtoService {
         }
 
         let didDocURL = URL(string: "https://plc.directory/\(result.did)")!
-        let (didData, _) = try await URLSession.shared.data(from: didDocURL)
+        let (didData, _) = try await session.data(from: didDocURL)
         let didDoc = try JSONDecoder().decode(DIDDocument.self, from: didData)
 
         guard let pds = didDoc.service?.first(where: { $0.type == "AtprotoPersonalDataServer" })?.serviceEndpoint else {
@@ -103,7 +124,7 @@ final class ATProtoService {
     /// Discover the authorization server URL from a PDS's protected resource metadata.
     private func discoverAuthorizationServer(pds: String) async throws -> String {
         let url = URL(string: "\(pds)/.well-known/oauth-protected-resource")!
-        let (data, _) = try await URLSession.shared.data(from: url)
+        let (data, _) = try await session.data(from: url)
         let resource = try JSONDecoder().decode(OAuthProtectedResource.self, from: data)
         guard let server = resource.authorizationServers.first else {
             throw ATProtoError.noPDS
@@ -114,11 +135,18 @@ final class ATProtoService {
     func signIn(handle: String, serviceHost: String = "https://bsky.social", presentationAnchor: ASPresentationAnchor) async throws {
         let (resolvedDID, pds) = try await resolveHandle(handle, serviceHost: serviceHost)
 
-        // Discover the authorization server from the PDS's protected resource metadata
-        let authServer = try await discoverAuthorizationServer(pds: pds)
+        // Discover the authorization server from the PDS's protected resource metadata.
+        // If the PDS itself is down, say so specifically — "sign in failed" hides the
+        // one thing the user can actually act on.
+        let authServer: String
+        do {
+            authServer = try await discoverAuthorizationServer(pds: pds)
+        } catch is URLError {
+            throw ATProtoError.pdsUnreachable(URL(string: pds)?.host ?? pds)
+        }
 
         let metadataURL = URL(string: "\(authServer)/.well-known/oauth-authorization-server")!
-        let (metaData, _) = try await URLSession.shared.data(from: metadataURL)
+        let (metaData, _) = try await session.data(from: metadataURL)
         let metadata = try JSONDecoder().decode(OAuthServerMetadata.self, from: metaData)
 
         let codeVerifier = generateCodeVerifier()
@@ -193,6 +221,7 @@ final class ATProtoService {
         self.pdsURL = pds
         self.tokenEndpointURL = metadata.tokenEndpoint
         self.isLoggedIn = true
+        self.pdsUnreachable = false
         persistSession()
     }
 
@@ -224,7 +253,7 @@ final class ATProtoService {
         }
 
         let request = try buildRequest()
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
         let httpResponse = response as? HTTPURLResponse
 
         // Capture DPoP nonce if provided
@@ -234,7 +263,7 @@ final class ATProtoService {
             // If 400 with a new nonce, it's likely a DPoP nonce challenge — retry
             if httpResponse?.statusCode == 400 {
                 let retryRequest = try buildRequest()
-                let (retryData, retryResponse) = try await URLSession.shared.data(for: retryRequest)
+                let (retryData, retryResponse) = try await session.data(for: retryRequest)
                 let retryStatus = (retryResponse as? HTTPURLResponse)?.statusCode ?? 0
                 // Capture nonce from retry too
                 if let retryNonce = (retryResponse as? HTTPURLResponse)?.value(forHTTPHeaderField: "DPoP-Nonce") {
@@ -272,7 +301,7 @@ final class ATProtoService {
         }
 
         let request = try buildRequest()
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
 
         if let httpResponse = response as? HTTPURLResponse,
            let nonce = httpResponse.value(forHTTPHeaderField: "DPoP-Nonce") {
@@ -281,7 +310,7 @@ final class ATProtoService {
             // Retry with nonce if we got a 400 (DPoP nonce challenge)
             if httpResponse.statusCode == 400 {
                 let retryRequest = try buildRequest()
-                let (retryData, retryResponse) = try await URLSession.shared.data(for: retryRequest)
+                let (retryData, retryResponse) = try await session.data(for: retryRequest)
                 if let retryHttp = retryResponse as? HTTPURLResponse,
                    let retryNonce = retryHttp.value(forHTTPHeaderField: "DPoP-Nonce") {
                     dpopNonce = retryNonce
@@ -428,8 +457,9 @@ final class ATProtoService {
     }
 
     func resolveHandleToDID(_ handle: String) async throws -> String {
-        let url = URL(string: "https://bsky.social/xrpc/com.atproto.identity.resolveHandle?handle=\(handle)")!
-        let (data, _) = try await URLSession.shared.data(from: url)
+        let encoded = handle.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? handle
+        let url = URL(string: "https://bsky.social/xrpc/com.atproto.identity.resolveHandle?handle=\(encoded)")!
+        let (data, _) = try await session.data(from: url)
         let result = try JSONDecoder().decode(ResolveHandleResponse.self, from: data)
         return result.did
     }
@@ -441,7 +471,7 @@ final class ATProtoService {
         let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
         let urlString = "\(publicAPI)/xrpc/app.bsky.actor.searchActors?q=\(encoded)&limit=\(limit)"
 
-        let (data, _) = try await URLSession.shared.data(from: URL(string: urlString)!)
+        let (data, _) = try await session.data(from: URL(string: urlString)!)
         let result = try JSONDecoder().decode(SearchActorsResponse.self, from: data)
         return result.actors
     }
@@ -451,7 +481,7 @@ final class ATProtoService {
         let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
         let urlString = "\(publicAPI)/xrpc/app.bsky.actor.searchActorsTypeahead?q=\(encoded)&limit=\(limit)"
 
-        let (data, _) = try await URLSession.shared.data(from: URL(string: urlString)!)
+        let (data, _) = try await session.data(from: URL(string: urlString)!)
         let result = try JSONDecoder().decode(SearchActorsTypeaheadResponse.self, from: data)
         return result.actors
     }
@@ -468,7 +498,7 @@ final class ATProtoService {
             urlString += "&cursor=\(encoded)"
         }
 
-        let (data, response) = try await URLSession.shared.data(from: URL(string: urlString)!)
+        let (data, response) = try await session.data(from: URL(string: urlString)!)
 
         guard let httpResp = response as? HTTPURLResponse, httpResp.statusCode == 200 else {
             return (posts: [], cursor: nil)
@@ -503,21 +533,35 @@ final class ATProtoService {
         let feedURI = "at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.generator/whats-hot"
         let encodedFeed = feedURI.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? feedURI
 
-        let data: Data
+        let encodedCursor = cursor?.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? nil
+
+        var data: Data?
         if let pds = pdsURL, accessToken != nil {
             // Authenticated — viewer state (following, etc.) will be included
             var urlString = "\(pds)/xrpc/app.bsky.feed.getFeed?feed=\(encodedFeed)&limit=30"
-            if let cursor { urlString += "&cursor=\(cursor)" }
-            (data, _) = try await authenticatedRequest(url: urlString, method: "GET")
-        } else {
-            // Fallback to public API (no viewer state)
+            if let encodedCursor { urlString += "&cursor=\(encodedCursor)" }
+            do {
+                let (d, _) = try await authenticatedRequest(url: urlString, method: "GET")
+                data = d
+                pdsUnreachable = false
+            } catch is URLError {
+                // PDS down — fall through to the public AppView (no viewer state,
+                // but a readable feed beats a spinner that never resolves).
+                pdsUnreachable = true
+            }
+        }
+
+        if data == nil {
             let publicAPI = "https://api.bsky.app"
             var urlString = "\(publicAPI)/xrpc/app.bsky.feed.getFeed?feed=\(encodedFeed)&limit=30"
-            if let cursor { urlString += "&cursor=\(cursor)" }
+            if let encodedCursor { urlString += "&cursor=\(encodedCursor)" }
             var request = URLRequest(url: URL(string: urlString)!)
             request.cachePolicy = .reloadIgnoringLocalCacheData
-            (data, _) = try await URLSession.shared.data(for: request)
+            let (d, _) = try await session.data(for: request)
+            data = d
         }
+
+        guard let data else { throw URLError(.cannotLoadFromNetwork) }
 
         let result = try JSONDecoder().decode(FeedResponse.self, from: data)
 
@@ -530,9 +574,21 @@ final class ATProtoService {
         guard let pds = pdsURL, let myDID = did else { throw ATProtoError.notLoggedIn }
 
         var urlString = "\(pds)/xrpc/app.bsky.feed.getTimeline?limit=50"
-        if let cursor { urlString += "&cursor=\(cursor)" }
+        if let cursor, let encoded = cursor.addingPercentEncoding(withAllowedCharacters: .alphanumerics) {
+            urlString += "&cursor=\(encoded)"
+        }
 
-        let (data, _) = try await authenticatedRequest(url: urlString, method: "GET")
+        let data: Data
+        do {
+            let (d, _) = try await authenticatedRequest(url: urlString, method: "GET")
+            data = d
+            pdsUnreachable = false
+        } catch let err as URLError {
+            // The following timeline requires auth — there is no public fallback.
+            // Flag the outage so the UI can explain why this feed is stale.
+            pdsUnreachable = true
+            throw err
+        }
 
         let result = try JSONDecoder().decode(FeedResponse.self, from: data)
 
@@ -603,15 +659,23 @@ final class ATProtoService {
     func getProfile(actor: String) async throws -> ProfileViewDetailed {
         let encoded = actor.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? actor
 
-        let data: Data
+        var data: Data?
         if let pds = pdsURL, accessToken != nil {
             let urlString = "\(pds)/xrpc/app.bsky.actor.getProfile?actor=\(encoded)"
-            (data, _) = try await authenticatedRequest(url: urlString, method: "GET")
-        } else {
+            do {
+                let (d, _) = try await authenticatedRequest(url: urlString, method: "GET")
+                data = d
+            } catch is URLError {
+                pdsUnreachable = true
+            }
+        }
+        if data == nil {
             let publicAPI = "https://api.bsky.app"
             let urlString = "\(publicAPI)/xrpc/app.bsky.actor.getProfile?actor=\(encoded)"
-            (data, _) = try await URLSession.shared.data(from: URL(string: urlString)!)
+            let (d, _) = try await session.data(from: URL(string: urlString)!)
+            data = d
         }
+        guard let data else { throw URLError(.cannotLoadFromNetwork) }
 
         return try JSONDecoder().decode(ProfileViewDetailed.self, from: data)
     }
@@ -619,17 +683,27 @@ final class ATProtoService {
     func getAuthorFeed(actor: String, cursor: String? = nil) async throws -> (posts: [TimelinePost], cursor: String?) {
         let encoded = actor.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? actor
 
-        let data: Data
+        let encodedCursor = cursor?.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? nil
+
+        var data: Data?
         if let pds = pdsURL, accessToken != nil {
             var urlString = "\(pds)/xrpc/app.bsky.feed.getAuthorFeed?actor=\(encoded)&limit=30"
-            if let cursor { urlString += "&cursor=\(cursor)" }
-            (data, _) = try await authenticatedRequest(url: urlString, method: "GET")
-        } else {
+            if let encodedCursor { urlString += "&cursor=\(encodedCursor)" }
+            do {
+                let (d, _) = try await authenticatedRequest(url: urlString, method: "GET")
+                data = d
+            } catch is URLError {
+                pdsUnreachable = true
+            }
+        }
+        if data == nil {
             let publicAPI = "https://api.bsky.app"
             var urlString = "\(publicAPI)/xrpc/app.bsky.feed.getAuthorFeed?actor=\(encoded)&limit=30"
-            if let cursor { urlString += "&cursor=\(cursor)" }
-            (data, _) = try await URLSession.shared.data(from: URL(string: urlString)!)
+            if let encodedCursor { urlString += "&cursor=\(encodedCursor)" }
+            let (d, _) = try await session.data(from: URL(string: urlString)!)
+            data = d
         }
+        guard let data else { throw URLError(.cannotLoadFromNetwork) }
 
         let result = try JSONDecoder().decode(FeedResponse.self, from: data)
 
@@ -733,15 +807,23 @@ final class ATProtoService {
     func getPostThread(uri: String) async throws -> PostThreadResponse {
         let encoded = uri.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? uri
 
-        let data: Data
+        var data: Data?
         if let pds = pdsURL, accessToken != nil {
             let urlString = "\(pds)/xrpc/app.bsky.feed.getPostThread?uri=\(encoded)&depth=10"
-            (data, _) = try await authenticatedRequest(url: urlString, method: "GET")
-        } else {
+            do {
+                let (d, _) = try await authenticatedRequest(url: urlString, method: "GET")
+                data = d
+            } catch is URLError {
+                pdsUnreachable = true
+            }
+        }
+        if data == nil {
             let publicAPI = "https://api.bsky.app"
             let urlString = "\(publicAPI)/xrpc/app.bsky.feed.getPostThread?uri=\(encoded)&depth=10"
-            (data, _) = try await URLSession.shared.data(from: URL(string: urlString)!)
+            let (d, _) = try await session.data(from: URL(string: urlString)!)
+            data = d
         }
+        guard let data else { throw URLError(.cannotLoadFromNetwork) }
 
         return try JSONDecoder().decode(PostThreadResponse.self, from: data)
     }
@@ -842,7 +924,7 @@ final class ATProtoService {
         request.setValue("\(videoData.count)", forHTTPHeaderField: "Content-Length")
         request.httpBody = videoData
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
 
         if let httpResp = response as? HTTPURLResponse, httpResp.statusCode >= 400 {
             let body = String(data: data, encoding: .utf8) ?? "HTTP \(httpResp.statusCode)"
@@ -858,7 +940,7 @@ final class ATProtoService {
         let urlString = "https://video.bsky.app/xrpc/app.bsky.video.getJobStatus?jobId=\(jobId)"
 
         for _ in 0..<120 { // Max ~2 minutes of polling
-            let (data, _) = try await URLSession.shared.data(from: URL(string: urlString)!)
+            let (data, _) = try await session.data(from: URL(string: urlString)!)
             let result = try JSONDecoder().decode(VideoJobStatusWrapper.self, from: data)
             let status = result.jobStatus
 
@@ -893,7 +975,7 @@ final class ATProtoService {
         }
         request.httpBody = imageData
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
 
         // Handle DPoP nonce
         if let httpResponse = response as? HTTPURLResponse,
@@ -910,7 +992,7 @@ final class ATProtoService {
                     retryReq.setValue(dpopHeader, forHTTPHeaderField: "DPoP")
                 }
                 retryReq.httpBody = imageData
-                let (retryData, _) = try await URLSession.shared.data(for: retryReq)
+                let (retryData, _) = try await session.data(for: retryReq)
                 let blob = try JSONSerialization.jsonObject(with: retryData) as? [String: Any]
                 return blob?["blob"] as? [String: Any] ?? [:]
             }
@@ -979,7 +1061,7 @@ final class ATProtoService {
         }
 
         let request = try buildRefreshRequest()
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
 
         if let httpResponse = response as? HTTPURLResponse {
             if let nonce = httpResponse.value(forHTTPHeaderField: "DPoP-Nonce") {
@@ -991,7 +1073,7 @@ final class ATProtoService {
             // Retry with nonce if 400 or 401 (DPoP nonce challenge)
             if httpResponse.statusCode == 400 || httpResponse.statusCode == 401 {
                 let retryRequest = try buildRefreshRequest()
-                let (retryData, retryResponse) = try await URLSession.shared.data(for: retryRequest)
+                let (retryData, retryResponse) = try await session.data(for: retryRequest)
                 if let retryHttp = retryResponse as? HTTPURLResponse {
                     if let retryNonce = retryHttp.value(forHTTPHeaderField: "DPoP-Nonce") {
                         dpopNonce = retryNonce
@@ -1063,7 +1145,7 @@ final class ATProtoService {
         guard let pds = pdsURL else { return nil }
         let authServer = try await discoverAuthorizationServer(pds: pds)
         let metadataURL = URL(string: "\(authServer)/.well-known/oauth-authorization-server")!
-        let (metaData, _) = try await URLSession.shared.data(from: metadataURL)
+        let (metaData, _) = try await session.data(from: metadataURL)
         let metadata = try JSONDecoder().decode(OAuthServerMetadata.self, from: metaData)
         tokenEndpointURL = metadata.tokenEndpoint
         UserDefaults.standard.set(metadata.tokenEndpoint, forKey: "sw_token_endpoint")
@@ -1095,7 +1177,7 @@ final class ATProtoService {
         }
 
         let request = try buildRequest()
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             return (data, response)
@@ -1114,7 +1196,7 @@ final class ATProtoService {
                 authLog.debug("Got 401, attempting nonce retry")
                 // First retry: might just need the fresh DPoP nonce
                 let retryRequest = try buildRequest()
-                let (retryData, retryResponse) = try await URLSession.shared.data(for: retryRequest)
+                let (retryData, retryResponse) = try await session.data(for: retryRequest)
                 if let retryHttp = retryResponse as? HTTPURLResponse {
                     captureNonce(from: retryHttp)
                     if retryHttp.statusCode >= 200 && retryHttp.statusCode < 300 {
@@ -1139,7 +1221,7 @@ final class ATProtoService {
                     try await refreshAccessToken()
                     // Retry with the fresh token
                     let freshRequest = try buildRequest()
-                    let (freshData, freshResponse) = try await URLSession.shared.data(for: freshRequest)
+                    let (freshData, freshResponse) = try await session.data(for: freshRequest)
                     if let freshHttp = freshResponse as? HTTPURLResponse {
                         captureNonce(from: freshHttp)
                         if freshHttp.statusCode >= 200 && freshHttp.statusCode < 300 {
@@ -1150,7 +1232,7 @@ final class ATProtoService {
                         if freshHttp.statusCode == 401 {
                             authLog.debug("Got 401 after refresh, trying one more time with fresh nonce")
                             let finalRequest = try buildRequest()
-                            let (finalData, finalResponse) = try await URLSession.shared.data(for: finalRequest)
+                            let (finalData, finalResponse) = try await session.data(for: finalRequest)
                             if let finalHttp = finalResponse as? HTTPURLResponse {
                                 captureNonce(from: finalHttp)
                                 if finalHttp.statusCode >= 200 && finalHttp.statusCode < 300 {
@@ -1243,10 +1325,16 @@ final class ATProtoService {
             ] as [String: Any],
         ]
 
+        // RFC 9449 §4.2: htu is the URI without query and fragment
+        var htu = url
+        if let queryStart = htu.firstIndex(where: { $0 == "?" || $0 == "#" }) {
+            htu = String(htu[..<queryStart])
+        }
+
         let now = Int(Date().timeIntervalSince1970)
         var payload: [String: Any] = [
             "jti": UUID().uuidString, "htm": method,
-            "htu": url, "iat": now, "exp": now + 120,
+            "htu": htu, "iat": now, "exp": now + 120,
         ]
         if let nonce = dpopNonce { payload["nonce"] = nonce }
         // Include access token hash when presenting a DPoP-bound token (RFC 9449 §4.2)
@@ -1287,6 +1375,7 @@ final class ATProtoService {
         handle = nil
         did = nil
         isLoggedIn = false
+        pdsUnreachable = false
     }
 }
 
@@ -1651,6 +1740,7 @@ private class PresentationContextProvider: NSObject, ASWebAuthenticationPresenta
 
 enum ATProtoError: Error, LocalizedError {
     case noPDS, authCancelled, noAuthCode, notLoggedIn, sessionExpired, handleNotFound
+    case pdsUnreachable(String) // PDS host that failed to respond
     case oauthError(String, String?) // error code, description
     var errorDescription: String? {
         switch self {
@@ -1660,6 +1750,8 @@ enum ATProtoError: Error, LocalizedError {
         case .notLoggedIn: return "Not logged in"
         case .sessionExpired: return "Your session has expired. Please sign in again."
         case .handleNotFound: return "Handle not found. Check spelling and try again."
+        case .pdsUnreachable(let host):
+            return "Your data server (\(host)) isn't responding. It may be down — check your PDS and try again."
         case .oauthError(let code, let desc): return "OAuth error (\(code)): \(desc ?? "unknown")"
         }
     }

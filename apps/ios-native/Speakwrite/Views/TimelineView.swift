@@ -17,27 +17,19 @@ struct TimelineView: View {
     var body: some View {
         NavigationStack(path: $path) {
             VStack(spacing: 0) {
-                // App header
-                HStack(spacing: Theme.sm) {
-                    AvatarButton(
-                        avatarURL: viewModel.myProfile?.avatar,
-                        handle: viewModel.atproto.handle
-                    ) {
-                        showMyProfile = true
-                    }
-                    Text("speakwrite")
-                        .font(Theme.monoTitle)
-                        .foregroundStyle(Theme.accent)
-                    Spacer()
+                AppHeader(onAvatarTap: { showMyProfile = true }) {
                     Button {
                         showSearch = true
                     } label: {
                         Image(systemName: "magnifyingglass")
                             .foregroundStyle(Theme.accent)
                     }
+                    .accessibilityIdentifier("search-button")
                 }
-                .padding(.horizontal, Theme.lg)
-                .padding(.vertical, Theme.sm)
+
+                if viewModel.atproto.pdsUnreachable {
+                    PDSStatusBanner()
+                }
 
                 // Sub-tab picker
                 feedPicker

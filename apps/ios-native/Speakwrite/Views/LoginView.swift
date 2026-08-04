@@ -3,7 +3,6 @@ import SwiftUI
 
 struct LoginView: View {
     @Environment(AppViewModel.self) private var viewModel
-    @Environment(\.colorScheme) private var colorScheme
     @State private var handle = ""
     @State private var customServer = ""
     @State private var useCustomServer = false
@@ -20,25 +19,51 @@ struct LoginView: View {
     }
 
     var body: some View {
-        VStack(spacing: Theme.xxxl) {
+        VStack(spacing: 0) {
             Spacer()
 
-            Text("speakwrite")
-                .font(.system(size: 36, weight: .bold, design: .monospaced))
-                .foregroundStyle(Theme.accent)
+            // Hero
+            VStack(spacing: Theme.md) {
+                Image(systemName: "checkmark.seal.fill")
+                    .font(.system(size: 44))
+                    .foregroundStyle(Theme.accent)
 
-            Text("prove a human wrote it")
-                .font(Theme.monoBody)
-                .foregroundStyle(Theme.textSecondary(colorScheme))
+                Text("speakwrite")
+                    .font(.system(size: 36, weight: .bold, design: .monospaced))
+                    .foregroundStyle(Theme.primaryText)
+
+                Text("Prove a human wrote it.")
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(Theme.secondaryText)
+            }
+
+            // How it works — three beats, one line each
+            VStack(alignment: .leading, spacing: Theme.md) {
+                heroPoint(icon: "keyboard", text: "Type it yourself — no paste, no dictation")
+                heroPoint(icon: "cpu", text: "Signed by your iPhone's Secure Enclave")
+                heroPoint(icon: "checkmark.seal", text: "Anyone can verify it, no server involved")
+            }
+            .padding(.top, Theme.xxxl)
 
             Spacer()
 
+            // Sign in
             VStack(spacing: Theme.lg) {
                 TextField("handle.bsky.social", text: $handle)
-                    .textFieldStyle(.roundedBorder)
+                    .textFieldStyle(.plain)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
+                    .keyboardType(.URL)
                     .font(Theme.monoHeadline)
+                    .padding(Theme.lg)
+                    .background(
+                        RoundedRectangle(cornerRadius: Theme.radiusMd)
+                            .fill(Theme.surfaceColor)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.radiusMd)
+                            .stroke(Theme.divider, lineWidth: 1)
+                    )
                     .padding(.horizontal)
                     .accessibilityIdentifier("handle-field")
 
@@ -56,7 +81,7 @@ struct LoginView: View {
                                 .font(.system(size: 10))
                                 .rotationEffect(.degrees(useCustomServer ? 180 : 0))
                         }
-                        .foregroundStyle(Theme.textTertiary(colorScheme))
+                        .foregroundStyle(Theme.tertiaryText)
                     }
 
                     if useCustomServer {
@@ -73,31 +98,49 @@ struct LoginView: View {
                 Button {
                     Task { await signIn() }
                 } label: {
-                    if isLoading {
-                        ProgressView()
-                            .tint(Theme.textPrimary(colorScheme))
-                    } else {
-                        Text("Sign in")
-                            .font(Theme.monoHeadline)
+                    Group {
+                        if isLoading {
+                            ProgressView()
+                                .tint(Theme.onAccent)
+                        } else {
+                            Text("Sign in")
+                                .font(Theme.monoHeadline)
+                        }
                     }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 4)
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(Theme.accent)
-                .foregroundStyle(.black)
+                .foregroundStyle(Theme.onAccent)
                 .disabled(handle.isEmpty || isLoading)
                 .padding(.horizontal)
 
                 if let error {
                     Text(error)
-                        .font(Theme.mono)
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(Theme.error)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
                         .padding(.horizontal)
                 }
             }
 
             Spacer()
         }
-        .background(Theme.background(colorScheme))
+        .background(Theme.backgroundColor)
+    }
+
+    private func heroPoint(icon: String, text: String) -> some View {
+        HStack(spacing: Theme.md) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(Theme.accent)
+                .frame(width: 22)
+            Text(text)
+                .font(.system(size: 14))
+                .foregroundStyle(Theme.secondaryText)
+        }
     }
 
     private func signIn() async {
@@ -110,7 +153,7 @@ struct LoginView: View {
                 throw ATProtoError.authCancelled
             }
             try await viewModel.atproto.signIn(
-                handle: handle,
+                handle: handle.trimmingCharacters(in: .whitespacesAndNewlines),
                 serviceHost: serviceHost,
                 presentationAnchor: window
             )
@@ -124,6 +167,8 @@ struct LoginView: View {
                 self.error = nil
             case .handleNotFound:
                 self.error = "Handle not found. Check spelling — use your handle (e.g. alice.bsky.social), not email."
+            case .pdsUnreachable:
+                self.error = err.localizedDescription
             default:
                 self.error = err.localizedDescription
             }
@@ -132,7 +177,7 @@ struct LoginView: View {
             case .notConnectedToInternet, .networkConnectionLost:
                 self.error = "No internet connection. Check your network and try again."
             case .timedOut:
-                self.error = "Connection timed out. Try again."
+                self.error = "Connection timed out. Your data server may be down — try again."
             default:
                 self.error = "Network error. Check your connection and try again."
             }

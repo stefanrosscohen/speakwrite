@@ -35,10 +35,10 @@ Single `AppViewModel` (`@Observable`) serves as global state, injected via `.env
 
 ### Key Services
 
-- **ATProtoService** — OAuth (PKCE + DPoP) and XRPC API calls
+- **ATProtoService** — OAuth (PKCE + DPoP) and XRPC API calls. Uses a shared 15s-timeout `URLSession`; authenticated reads fall back to the public AppView (`api.bsky.app`) when the user's PDS is unreachable, and expose `pdsUnreachable` for UI banners
 - **DeviceAttestation** — Apple App Attest integration
-- **VerificationService** — Human-verified posting flow
-- **KeystrokeCapture** — Typing behavior for authenticity signals
+- **VerificationService** — Client-side proof verification; produces a `VerificationReport` (per-check results) shown in the proof detail sheet. Transient failures are `.unavailable` and retried on feed refresh
+- **KeystrokeCapture** — Input-restricted UITextView (soft keyboard only)
 
 ### Navigation
 
@@ -51,7 +51,15 @@ Single `AppViewModel` (`@Observable`) serves as global state, injected via `.env
 
 ## Theme System
 
-`Theme` enum: spacing tokens (xs/sm/md/lg/xl), typography, colorScheme-aware colors.
+`Theme` enum: spacing tokens (xs/sm/md/lg/xl), typography, and trait-aware
+dynamic colors (`Theme.primaryText`, `Theme.accent`, `Theme.onAccent`, …) that
+adapt to light/dark automatically — no `colorScheme` plumbing needed. The
+legacy `Theme.x(scheme)` functions still exist as wrappers. Monospace type is
+reserved for evidence (wordmark, handles, hashes, counters). See `REDESIGN.md`
+for the design language.
+
+Shared chrome lives in `Views/Components/ProofComponents.swift`: `AppHeader`,
+`ProofBadge`, `VerificationDetailSheet`, `PDSStatusBanner`.
 
 ## Testing
 

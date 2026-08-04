@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - Appearance Mode
 
@@ -25,6 +26,12 @@ enum AppearanceMode: Int, CaseIterable {
 }
 
 // MARK: - Theme
+//
+// Design language: "Signal"
+// - Near-monochrome ink/paper surfaces; true black in dark mode, warm paper in light.
+// - One accent: proof green. Brighter in dark mode, deeper in light mode for contrast.
+// - Monospace is reserved for evidence — the wordmark, handles, hashes, counters.
+//   Everything else reads in the system face.
 
 enum Theme {
 
@@ -54,7 +61,7 @@ enum Theme {
 
     static var title: Font { .system(size: 20, weight: .bold) }
     static var headline: Font { .system(size: 17, weight: .semibold) }
-    static var body: Font { .system(size: 15) }
+    static var body: Font { .system(size: 16) }
     static var subhead: Font { .system(size: 13) }
     static var caption: Font { .system(size: 12) }
     static var mono: Font { .system(size: 13, design: .monospaced) }
@@ -67,62 +74,101 @@ enum Theme {
     static var monoStat: Font { .system(size: 16, weight: .bold, design: .monospaced) }
 }
 
-// MARK: - Semantic Colors
+// MARK: - Dynamic Colors
+//
+// All colors adapt to the active trait collection, so views don't need to
+// thread `colorScheme` through. The `(scheme)`-parameterized functions below
+// are compatibility wrappers that return the same dynamic colors.
 
 extension Theme {
 
-    // Backgrounds
-    static func background(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color(red: 0.04, green: 0.04, blue: 0.04) : Color(red: 0.98, green: 0.98, blue: 0.98)
+    private static func dynamic(light: UIColor, dark: UIColor) -> Color {
+        Color(UIColor { trait in
+            trait.userInterfaceStyle == .dark ? dark : light
+        })
     }
 
-    static func surface(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color(red: 0.10, green: 0.10, blue: 0.10) : Color(red: 0.96, green: 0.96, blue: 0.96)
-    }
+    // Backgrounds — true black (OLED) in dark, warm paper in light
+    static let backgroundColor = dynamic(
+        light: UIColor(red: 0.985, green: 0.982, blue: 0.975, alpha: 1),
+        dark: UIColor(red: 0.015, green: 0.015, blue: 0.02, alpha: 1)
+    )
 
-    static func surfaceElevated(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color(red: 0.13, green: 0.13, blue: 0.13) : .white
-    }
+    static let surfaceColor = dynamic(
+        light: UIColor(red: 0.945, green: 0.942, blue: 0.935, alpha: 1),
+        dark: UIColor(red: 0.09, green: 0.09, blue: 0.10, alpha: 1)
+    )
+
+    static let elevatedColor = dynamic(
+        light: .white,
+        dark: UIColor(red: 0.12, green: 0.12, blue: 0.13, alpha: 1)
+    )
 
     // Text
-    static func textPrimary(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? .white : Color(red: 0.07, green: 0.07, blue: 0.07)
-    }
+    static let primaryText = dynamic(
+        light: UIColor(red: 0.09, green: 0.09, blue: 0.10, alpha: 1),
+        dark: UIColor(red: 0.94, green: 0.94, blue: 0.93, alpha: 1)
+    )
 
-    static func textSecondary(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color(white: 0.6) : Color(white: 0.4)
-    }
+    static let secondaryText = dynamic(
+        light: UIColor(white: 0.40, alpha: 1),
+        dark: UIColor(white: 0.62, alpha: 1)
+    )
 
-    static func textTertiary(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color(white: 0.35) : Color(white: 0.65)
-    }
+    static let tertiaryText = dynamic(
+        light: UIColor(white: 0.62, alpha: 1),
+        dark: UIColor(white: 0.38, alpha: 1)
+    )
 
-    // Accent
-    static let accent = Color(red: 0.0, green: 0.85, blue: 0.30)
+    // Accent — proof green. Deep in light mode (readable on paper),
+    // bright in dark mode (glows on black).
+    static let accent = dynamic(
+        light: UIColor(red: 0.0, green: 0.52, blue: 0.26, alpha: 1),
+        dark: UIColor(red: 0.10, green: 0.87, blue: 0.42, alpha: 1)
+    )
 
-    static var accentSubtle: Color {
-        accent.opacity(0.15)
-    }
+    /// Text/icon color for content sitting on an accent-filled background.
+    static let onAccent = dynamic(
+        light: .white,
+        dark: UIColor(red: 0.015, green: 0.015, blue: 0.02, alpha: 1)
+    )
+
+    static var accentSubtle: Color { accent.opacity(0.14) }
+
+    /// The verification color — same hue as accent, named for intent at call sites.
+    static var verified: Color { accent }
+    static var verifiedSubtle: Color { accentSubtle }
 
     // Separator
-    static func separator(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color(white: 0.13) : Color(white: 0.88)
-    }
+    static let divider = dynamic(
+        light: UIColor(white: 0.89, alpha: 1),
+        dark: UIColor(white: 0.14, alpha: 1)
+    )
 
     // Semantic
     static let error = Color.red
+    static let warning = Color.orange
     static let liked = Color.pink
     static let reposted = Color.green
 
-    // Border for avatar on profile (matches background)
-    static func avatarBorder(_ scheme: ColorScheme) -> Color {
-        background(scheme)
-    }
-
-    // Corner radii
+    // Corner radii (legacy aliases)
     static let cornerRadiusSm: CGFloat = 8
     static let cornerRadiusMd: CGFloat = 12
     static let cornerRadiusLg: CGFloat = 16
+}
+
+// MARK: - Compatibility Wrappers (scheme parameter ignored — colors are dynamic)
+
+extension Theme {
+
+    static func background(_ scheme: ColorScheme) -> Color { backgroundColor }
+    static func surface(_ scheme: ColorScheme) -> Color { surfaceColor }
+    static func surfaceElevated(_ scheme: ColorScheme) -> Color { elevatedColor }
+    static func textPrimary(_ scheme: ColorScheme) -> Color { primaryText }
+    static func textSecondary(_ scheme: ColorScheme) -> Color { secondaryText }
+    static func textTertiary(_ scheme: ColorScheme) -> Color { tertiaryText }
+    static func separator(_ scheme: ColorScheme) -> Color { divider }
+    static func avatarBorder(_ scheme: ColorScheme) -> Color { backgroundColor }
 }
 
 // MARK: - Relative Time Utility

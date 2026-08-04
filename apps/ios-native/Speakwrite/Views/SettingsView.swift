@@ -11,21 +11,7 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // App header
-                HStack(spacing: Theme.sm) {
-                    AvatarButton(
-                        avatarURL: viewModel.myProfile?.avatar,
-                        handle: viewModel.atproto.handle
-                    ) {
-                        showMyProfile = true
-                    }
-                    Text("speakwrite")
-                        .font(Theme.monoTitle)
-                        .foregroundStyle(Theme.accent)
-                    Spacer()
-                }
-                .padding(.horizontal, Theme.lg)
-                .padding(.vertical, Theme.sm)
+                AppHeader(onAvatarTap: { showMyProfile = true })
 
                 List {
                     // Profile header
@@ -64,8 +50,60 @@ struct SettingsView: View {
                         .listRowBackground(Theme.surfaceElevated(colorScheme))
                     }
 
+                    // Verification
+                    Section("Verification") {
+                        HStack(spacing: Theme.sm) {
+                            Image(systemName: "lock.shield")
+                                .foregroundStyle(Theme.accent)
+                                .font(.system(size: 15))
+                            Text("Posts are signed by this device's Secure Enclave and verified by readers on their own devices — no server in the loop.")
+                                .font(Theme.subhead)
+                                .foregroundStyle(Theme.secondaryText)
+                        }
+                        .listRowBackground(Theme.elevatedColor)
+
+                        Link(destination: URL(string: "https://www.speakwrite.io/verify")!) {
+                            LabeledContent("Web verifier") {
+                                Image(systemName: "arrow.up.right")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(Theme.tertiaryText)
+                            }
+                        }
+                        .listRowBackground(Theme.elevatedColor)
+
+                        Link(destination: URL(string: "https://bsky.app/profile/verify.speakwrite.io")!) {
+                            LabeledContent("Verification bot") {
+                                HStack(spacing: 4) {
+                                    Text("@verify.speakwrite.io")
+                                        .font(Theme.monoSmall)
+                                        .foregroundStyle(Theme.secondaryText)
+                                    Image(systemName: "arrow.up.right")
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(Theme.tertiaryText)
+                                }
+                            }
+                        }
+                        .listRowBackground(Theme.elevatedColor)
+                    }
+
                     // Account
                     Section("Account") {
+                        if let pdsHost = viewModel.atproto.pdsHost {
+                            LabeledContent("Data server") {
+                                HStack(spacing: 4) {
+                                    if viewModel.atproto.pdsUnreachable {
+                                        Image(systemName: "exclamationmark.triangle.fill")
+                                            .font(.system(size: 12))
+                                            .foregroundStyle(Theme.warning)
+                                    }
+                                    Text(pdsHost)
+                                        .font(Theme.mono)
+                                        .foregroundStyle(viewModel.atproto.pdsUnreachable ? Theme.warning : Theme.secondaryText)
+                                }
+                            }
+                            .listRowBackground(Theme.elevatedColor)
+                        }
+
                         if let handle = viewModel.atproto.handle {
                             LabeledContent("Handle") {
                                 Text("@\(handle)")
@@ -121,13 +159,17 @@ struct SettingsView: View {
                         }
                         .listRowBackground(Theme.surfaceElevated(colorScheme))
 
-                        HStack(spacing: Theme.sm) {
-                            Image(systemName: "lock.shield")
-                                .foregroundStyle(Theme.accent)
-                                .font(.system(size: 15))
-                            Text("Built with hardware attestation")
-                                .font(Theme.subhead)
-                                .foregroundStyle(Theme.textSecondary(colorScheme))
+                        Link(destination: URL(string: "https://www.speakwrite.io")!) {
+                            LabeledContent("Website") {
+                                HStack(spacing: 4) {
+                                    Text("speakwrite.io")
+                                        .font(Theme.mono)
+                                        .foregroundStyle(Theme.secondaryText)
+                                    Image(systemName: "arrow.up.right")
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(Theme.tertiaryText)
+                                }
+                            }
                         }
                         .listRowBackground(Theme.surfaceElevated(colorScheme))
                     }

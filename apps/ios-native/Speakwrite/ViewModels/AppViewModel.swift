@@ -31,8 +31,14 @@ final class AppViewModel: InputRestrictedDelegate {
     // Own profile (loaded after login / session restore)
     var myProfile: ProfileViewDetailed?
 
-    // Compose state
-    var postText: String = ""
+    // Compose state — draft survives app restarts
+    private static let draftKey = "sw_draft"
+    var postText: String = "" {
+        didSet {
+            guard postText != oldValue else { return }
+            UserDefaults.standard.set(postText, forKey: Self.draftKey)
+        }
+    }
     var isPublishing: Bool = false
     var publishError: String?
     var lastPublishedURI: String?
@@ -75,6 +81,8 @@ final class AppViewModel: InputRestrictedDelegate {
         verifiedPosts = FeedCache.load("verified") ?? []
         followingPosts = FeedCache.load("following") ?? []
         timelinePosts = FeedCache.load("timeline") ?? []
+        // Restore unpublished draft
+        postText = UserDefaults.standard.string(forKey: Self.draftKey) ?? ""
     }
 
     // MARK: - InputRestrictedDelegate
@@ -434,6 +442,9 @@ final class AppViewModel: InputRestrictedDelegate {
     // MARK: - Verified Feed
 
     func loadFeed() async {
+        // Refresh is the retry point for proofs that couldn't be fetched earlier
+        verification.retryUnavailable()
+
         // Only show loading spinner on first load (no cached posts)
         let isFirstLoad = verifiedPosts.isEmpty
         if isFirstLoad { isFeedLoading = true }
@@ -498,6 +509,7 @@ final class AppViewModel: InputRestrictedDelegate {
     // MARK: - Following Timeline (Authenticated)
 
     func loadFollowing() async {
+        verification.retryUnavailable()
         isFollowingLoading = true
 
         do {

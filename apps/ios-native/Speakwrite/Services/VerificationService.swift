@@ -5,32 +5,52 @@ import Foundation
 @Observable
 @MainActor
 final class VerificationService {
-    private var cache: [String: VerificationStatus] = [:]
+    private var reports: [String: VerificationReport] = [:]
     private var inFlight: [String: Task<Void, Never>] = [:]
     private var authorProofCache: [String: [ProofRecord]] = [:]
 
     private let verifier = AppAttestVerifier()
 
     func status(for postUri: String) -> VerificationStatus {
-        cache[postUri] ?? .unverified
+        reports[postUri]?.status ?? .unverified
+    }
+
+    /// Full report (individual checks + evidence) for the proof detail sheet.
+    func report(for postUri: String) -> VerificationReport? {
+        reports[postUri]
+    }
+
+    /// Drop transient results (`.unavailable`) and stale proof caches so a
+    /// pull-to-refresh re-attempts verification after a network/PDS outage.
+    func retryUnavailable() {
+        var cleared = false
+        for (uri, report) in reports {
+            if case .unavailable = report.status {
+                reports.removeValue(forKey: uri)
+                cleared = true
+            }
+        }
+        if cleared {
+            authorProofCache.removeAll()
+        }
     }
 
     func verify(postUri: String, postText: String, authorDID: String) {
         // Already cached or in-flight
-        if cache[postUri] != nil || inFlight[postUri] != nil { return }
+        if reports[postUri] != nil || inFlight[postUri] != nil { return }
 
-        cache[postUri] = .verifying
+        reports[postUri] = VerificationReport(status: .verifying, checks: [], contentHash: nil, keyId: nil)
 
         let task = Task { [weak self] in
             guard let self else { return }
             let result = await self.performVerification(postUri: postUri, postText: postText, authorDID: authorDID)
-            self.cache[postUri] = result
+            self.reports[postUri] = result
             self.inFlight.removeValue(forKey: postUri)
         }
         inFlight[postUri] = task
     }
 
-    private func performVerification(postUri: String, postText: String, authorDID: String) async -> VerificationStatus {
+    private func performVerification(postUri: String, postText: String, authorDID: String) async -> VerificationReport {
         // Fetch proof records for this author (cached per DID)
         var proofs: [ProofRecord]
         if let cached = authorProofCache[authorDID] {
@@ -40,7 +60,10 @@ final class VerificationService {
                 proofs = try await fetchProofs(did: authorDID)
                 authorProofCache[authorDID] = proofs
             } catch {
-                return .failed("Failed to fetch proofs: \(error.localizedDescription)")
+                return VerificationReport(
+                    status: .unavailable("Couldn't reach the author's data server"),
+                    checks: [], contentHash: nil, keyId: nil
+                )
             }
         }
 
@@ -50,12 +73,15 @@ final class VerificationService {
                 proofs = try await fetchProofs(did: authorDID)
                 authorProofCache[authorDID] = proofs
             } catch {
-                return .failed("Failed to fetch proofs: \(error.localizedDescription)")
+                return VerificationReport(
+                    status: .unavailable("Couldn't reach the author's data server"),
+                    checks: [], contentHash: nil, keyId: nil
+                )
             }
         }
 
         guard let proof = proofs.first(where: { $0.postUri == postUri }) else {
-            return .failed("No proof record")
+            return .failure("No Speakwrite proof found for this post")
         }
 
         // Run cryptographic verification
@@ -76,7 +102,7 @@ final class VerificationService {
     private func resolvePDS(did: String) async throws -> String {
         let encoded = did.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? did
         let url = URL(string: "https://plc.directory/\(encoded)")!
-        let (data, _) = try await URLSession.shared.data(from: url)
+        let (data, _) = try await ATProtoService.session.data(from: url)
 
         struct DIDDoc: Decodable {
             struct Service: Decodable {
@@ -100,7 +126,7 @@ final class VerificationService {
         let pds = try await resolvePDS(did: did)
         let urlString = "\(pds)/xrpc/com.atproto.repo.listRecords?repo=\(encoded)&collection=io.speakwrite.proof&limit=100"
 
-        let (data, response) = try await URLSession.shared.data(from: URL(string: urlString)!)
+        let (data, response) = try await ATProtoService.session.data(from: URL(string: urlString)!)
 
         guard let httpResponse = response as? HTTPURLResponse,
               httpResponse.statusCode >= 200 && httpResponse.statusCode < 300 else {

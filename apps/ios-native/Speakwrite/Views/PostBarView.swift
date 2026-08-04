@@ -38,14 +38,18 @@ struct PostBarView: View {
                     Button {
                         showPublishConfirm = true
                     } label: {
-                        Text("Publish")
-                            .font(Theme.monoBold)
-                            .padding(.horizontal, Theme.xl)
-                            .padding(.vertical, Theme.sm)
+                        HStack(spacing: 6) {
+                            Image(systemName: "checkmark.seal.fill")
+                                .font(.system(size: 12))
+                            Text("Publish")
+                                .font(Theme.monoBold)
+                        }
+                        .padding(.horizontal, Theme.xl)
+                        .padding(.vertical, Theme.sm)
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(Theme.accent)
-                    .foregroundStyle(.black)
+                    .foregroundStyle(Theme.onAccent)
                     .clipShape(Capsule())
                     .disabled(
                         (viewModel.postText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty

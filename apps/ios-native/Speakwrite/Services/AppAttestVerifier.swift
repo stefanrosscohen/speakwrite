@@ -9,6 +9,33 @@ enum VerificationStatus: Equatable {
     case verifying
     case verified
     case failed(String)
+    /// The proof could not be checked (author's PDS unreachable, network down).
+    /// Distinct from `.failed` — the proof may be fine; we just couldn't see it.
+    case unavailable(String)
+}
+
+// MARK: - Verification Report
+
+/// One step of the verification pipeline, for display in the proof detail sheet.
+struct VerificationCheck: Identifiable, Equatable {
+    let name: String
+    let detail: String
+    let passed: Bool
+    var id: String { name }
+}
+
+/// Full result of verifying a post's proof — status plus the individual checks
+/// and the evidence (hash, key) that was verified.
+struct VerificationReport: Equatable {
+    let status: VerificationStatus
+    let checks: [VerificationCheck]
+    let contentHash: String?
+    let keyId: String?
+
+    static func failure(_ message: String, checks: [VerificationCheck] = [],
+                        contentHash: String? = nil, keyId: String? = nil) -> VerificationReport {
+        VerificationReport(status: .failed(message), checks: checks, contentHash: contentHash, keyId: keyId)
+    }
 }
 
 // MARK: - App Attest Verifier
@@ -37,7 +64,14 @@ actor AppAttestVerifier {
         let mediaHashes: [String]?     // Hex SHA-256 of each media blob
     }
 
-    func verify(proof: ProofData, postText: String) -> VerificationStatus {
+    func verify(proof: ProofData, postText: String) -> VerificationReport {
+        var checks: [VerificationCheck] = []
+
+        func fail(_ name: String, _ detail: String) -> VerificationReport {
+            checks.append(VerificationCheck(name: name, detail: detail, passed: false))
+            return .failure(detail, checks: checks, contentHash: proof.contentHash, keyId: proof.keyId)
+        }
+
         // 1. Content hash verification
         // Text-only (no media): SHA256(text) == contentHash
         // With media: SHA256(SHA256(text) + sorted_media_hashes) == contentHash
@@ -60,45 +94,50 @@ actor AppAttestVerifier {
         let expectedHex = expectedHash.map { String(format: "%02x", $0) }.joined()
 
         guard expectedHex == proof.contentHash else {
-            return .failed("Content hash mismatch")
+            return fail("Content hash", "The post text does not match the signed hash")
         }
+        checks.append(VerificationCheck(
+            name: "Content hash",
+            detail: "SHA-256 of the post matches the signed hash",
+            passed: true
+        ))
 
         // 2. Decode attestation object (CBOR) → extract x5c cert chain + authData
         guard let attestationData = Data(base64Encoded: proof.attestationObject) else {
-            return .failed("Invalid attestation base64")
+            return fail("Attestation", "Invalid attestation encoding")
         }
 
         guard let attestationCBOR = try? CBORDecoder.decode(attestationData) else {
-            return .failed("Invalid attestation CBOR")
+            return fail("Attestation", "Invalid attestation CBOR")
         }
 
         // Extract attestation statement x5c certificates
         guard let attStmt = attestationCBOR["attStmt"],
               let x5cArray = attStmt["x5c"]?.arrayValue,
               !x5cArray.isEmpty else {
-            return .failed("No x5c certificates in attestation")
+            return fail("Attestation", "No certificates in attestation")
         }
 
         let certDatas = x5cArray.compactMap { $0.dataValue }
         guard !certDatas.isEmpty else {
-            return .failed("Invalid x5c certificate data")
+            return fail("Attestation", "Invalid certificate data")
         }
 
         // 3. Validate certificate chain against Apple App Attest Root CA
         guard let rootCert = rootCertificate else {
-            return .failed("Apple Root CA not available")
+            return fail("Certificate chain", "Apple Root CA not available")
         }
 
         let secCerts = certDatas.compactMap { SecCertificateCreateWithData(nil, $0 as CFData) }
         guard secCerts.count == certDatas.count else {
-            return .failed("Failed to create SecCertificate objects")
+            return fail("Certificate chain", "Failed to parse certificates")
         }
 
         var trust: SecTrust?
         let policy = SecPolicyCreateBasicX509()
         let status = SecTrustCreateWithCertificates(secCerts as CFArray, policy, &trust)
         guard status == errSecSuccess, let trust else {
-            return .failed("Failed to create SecTrust")
+            return fail("Certificate chain", "Failed to create trust chain")
         }
 
         SecTrustSetAnchorCertificates(trust, [rootCert] as CFArray)
@@ -115,35 +154,40 @@ actor AppAttestVerifier {
         var error: CFError?
         let trusted = SecTrustEvaluateWithError(trust, &error)
         guard trusted else {
-            return .failed("Certificate chain validation failed")
+            return fail("Certificate chain", "Chain does not validate against Apple's Root CA")
         }
+        checks.append(VerificationCheck(
+            name: "Certificate chain",
+            detail: "Signed by Apple's App Attest Root CA — genuine device",
+            passed: true
+        ))
 
         // 4. Extract P-256 public key from leaf certificate
         guard let leafKey = SecTrustCopyKey(trust) else {
-            return .failed("Failed to extract public key from certificate")
+            return fail("Device signature", "Failed to extract public key from certificate")
         }
 
         var extractError: Unmanaged<CFError>?
         guard let keyData = SecKeyCopyExternalRepresentation(leafKey, &extractError) as Data? else {
-            return .failed("Failed to export public key")
+            return fail("Device signature", "Failed to export public key")
         }
 
         guard let publicKey = try? P256.Signing.PublicKey(x963Representation: keyData) else {
-            return .failed("Invalid P-256 public key")
+            return fail("Device signature", "Invalid P-256 public key")
         }
 
         // 5. Decode assertion (CBOR) → extract signature + authenticatorData
         guard let assertionData = Data(base64Encoded: proof.assertion) else {
-            return .failed("Invalid assertion base64")
+            return fail("Device signature", "Invalid assertion encoding")
         }
 
         guard let assertionCBOR = try? CBORDecoder.decode(assertionData) else {
-            return .failed("Invalid assertion CBOR")
+            return fail("Device signature", "Invalid assertion CBOR")
         }
 
         guard let signatureData = assertionCBOR["signature"]?.dataValue,
               let authenticatorData = assertionCBOR["authenticatorData"]?.dataValue else {
-            return .failed("Missing signature or authenticatorData in assertion")
+            return fail("Device signature", "Missing signature in assertion")
         }
 
         // 6. Verify signature: nonce = SHA256(authenticatorData || clientDataHash)
@@ -155,15 +199,25 @@ actor AppAttestVerifier {
         let nonce = Data(SHA256.hash(data: nonceInput))
 
         guard let signature = try? P256.Signing.ECDSASignature(derRepresentation: signatureData) else {
-            return .failed("Invalid ECDSA signature")
+            return fail("Device signature", "Invalid ECDSA signature")
         }
 
         let isValid = publicKey.isValidSignature(signature, for: nonce)
         guard isValid else {
-            return .failed("Signature verification failed")
+            return fail("Device signature", "Secure Enclave signature does not verify")
         }
+        checks.append(VerificationCheck(
+            name: "Device signature",
+            detail: "P-256 ECDSA signature from the Secure Enclave verifies",
+            passed: true
+        ))
 
-        return .verified
+        return VerificationReport(
+            status: .verified,
+            checks: checks,
+            contentHash: proof.contentHash,
+            keyId: proof.keyId
+        )
     }
 
     // MARK: - X.509 notBefore Extraction

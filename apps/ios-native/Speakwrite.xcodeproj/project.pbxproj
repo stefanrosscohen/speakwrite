@@ -15,7 +15,6 @@
 		A10001010000000000000018 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000018 /* LoginView.swift */; };
 		A10001010000000000000019 /* EditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000019 /* EditorView.swift */; };
 		A10001010000000000000020 /* PostBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000020 /* PostBarView.swift */; };
-		A10001010000000000000022 /* PublishView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000022 /* PublishView.swift */; };
 		A10001010000000000000023 /* FeedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000023 /* FeedView.swift */; };
 		A10001010000000000000024 /* TimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000024 /* TimelineView.swift */; };
 		A10001010000000000000025 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000025 /* Assets.xcassets */; };
@@ -29,6 +28,7 @@
 		A10001010000000000000033 /* PostRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000033 /* PostRow.swift */; };
 		A10001010000000000000034 /* AvatarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000034 /* AvatarView.swift */; };
 		A10001010000000000000035 /* StatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000035 /* StatView.swift */; };
+		A100010100000000000000AA /* ProofComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100020100000000000000AA /* ProofComponents.swift */; };
 		A10001010000000000000036 /* PostDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000036 /* PostDetailView.swift */; };
 		A10001010000000000000037 /* QuotePostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000037 /* QuotePostView.swift */; };
 		A10001010000000000000038 /* SearchUsersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002010000000000000038 /* SearchUsersView.swift */; };
@@ -57,7 +57,6 @@
 		A10002010000000000000018 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		A10002010000000000000019 /* EditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorView.swift; sourceTree = "<group>"; };
 		A10002010000000000000020 /* PostBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostBarView.swift; sourceTree = "<group>"; };
-		A10002010000000000000022 /* PublishView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublishView.swift; sourceTree = "<group>"; };
 		A10002010000000000000023 /* FeedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedView.swift; sourceTree = "<group>"; };
 		A10002010000000000000024 /* TimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineView.swift; sourceTree = "<group>"; };
 		A10002010000000000000025 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -71,6 +70,7 @@
 		A10002010000000000000033 /* PostRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostRow.swift; sourceTree = "<group>"; };
 		A10002010000000000000034 /* AvatarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvatarView.swift; sourceTree = "<group>"; };
 		A10002010000000000000035 /* StatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatView.swift; sourceTree = "<group>"; };
+		A100020100000000000000AA /* ProofComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProofComponents.swift; sourceTree = "<group>"; };
 		A10002010000000000000036 /* PostDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostDetailView.swift; sourceTree = "<group>"; };
 		A10002010000000000000037 /* QuotePostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuotePostView.swift; sourceTree = "<group>"; };
 		A10002010000000000000038 /* SearchUsersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchUsersView.swift; sourceTree = "<group>"; };
@@ -196,7 +196,6 @@
 				A10002010000000000000018 /* LoginView.swift */,
 				A10002010000000000000019 /* EditorView.swift */,
 				A10002010000000000000020 /* PostBarView.swift */,
-				A10002010000000000000022 /* PublishView.swift */,
 				A10002010000000000000023 /* FeedView.swift */,
 				A10002010000000000000024 /* TimelineView.swift */,
 				A10002010000000000000027 /* ProfileView.swift */,
@@ -218,6 +217,7 @@
 				A10002010000000000000033 /* PostRow.swift */,
 				A10002010000000000000034 /* AvatarView.swift */,
 				A10002010000000000000035 /* StatView.swift */,
+				A100020100000000000000AA /* ProofComponents.swift */,
 				A10002010000000000000044 /* PostImagesView.swift */,
 				A10002010000000000000045 /* MediaPreviewStrip.swift */,
 			);
@@ -375,7 +375,6 @@
 				A10001010000000000000018 /* LoginView.swift in Sources */,
 				A10001010000000000000019 /* EditorView.swift in Sources */,
 				A10001010000000000000020 /* PostBarView.swift in Sources */,
-				A10001010000000000000022 /* PublishView.swift in Sources */,
 				A10001010000000000000023 /* FeedView.swift in Sources */,
 				A10001010000000000000024 /* TimelineView.swift in Sources */,
 				A10001010000000000000026 /* KeychainHelper.swift in Sources */,
@@ -388,6 +387,7 @@
 				A10001010000000000000033 /* PostRow.swift in Sources */,
 				A10001010000000000000034 /* AvatarView.swift in Sources */,
 				A10001010000000000000035 /* StatView.swift in Sources */,
+				A100010100000000000000AA /* ProofComponents.swift in Sources */,
 				A10001010000000000000036 /* PostDetailView.swift in Sources */,
 				A10001010000000000000037 /* QuotePostView.swift in Sources */,
 				A10001010000000000000038 /* SearchUsersView.swift in Sources */,

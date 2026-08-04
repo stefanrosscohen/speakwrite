@@ -20,6 +20,14 @@ struct PostDetailView: View {
     @State private var localRepostCount: Int = 0
     @State private var showRepostMenu = false
     @State private var showQuotePost = false
+    @State private var showProofSheet = false
+
+    private var showsProofBadge: Bool {
+        switch viewModel.verification.status(for: nav.uri) {
+        case .verified, .verifying, .unavailable: return true
+        case .failed, .unverified: return false
+        }
+    }
 
     var body: some View {
         ScrollView {
@@ -113,6 +121,9 @@ struct PostDetailView: View {
                 quotedText: nav.text
             )
         }
+        .sheet(isPresented: $showProofSheet) {
+            VerificationDetailSheet(authorHandle: nav.authorHandle, postUri: nav.uri)
+        }
     }
 
     // MARK: - Main Post (Expanded)
@@ -134,14 +145,15 @@ struct PostDetailView: View {
                                     .font(.system(size: 16, weight: .semibold))
                                     .foregroundStyle(Theme.textPrimary(colorScheme))
                             }
-                            if viewModel.verification.status(for: nav.uri) == .verified {
-                                Image(systemName: "checkmark.seal.fill")
-                                    .font(.system(size: 13))
-                                    .foregroundStyle(Theme.accent)
-                            } else if viewModel.verification.status(for: nav.uri) == .verifying {
-                                Image(systemName: "checkmark.seal")
-                                    .font(.system(size: 13))
-                                    .foregroundStyle(Theme.textTertiary(colorScheme))
+                            if showsProofBadge {
+                                Button {
+                                    showProofSheet = true
+                                } label: {
+                                    ProofBadge(status: viewModel.verification.status(for: nav.uri))
+                                        .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Verification proof")
                             }
                         }
                         Text("@\(nav.authorHandle)")

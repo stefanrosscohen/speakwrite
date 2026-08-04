@@ -19,35 +19,34 @@ struct EditorView: View {
 
         NavigationStack {
             VStack(spacing: 0) {
-                // App header
-                HStack(spacing: Theme.sm) {
-                    AvatarButton(
-                        avatarURL: viewModel.myProfile?.avatar,
-                        handle: viewModel.atproto.handle
-                    ) {
-                        showMyProfile = true
+                AppHeader(onAvatarTap: { showMyProfile = true }) {
+                    // Live attestation indicator — typing is being counted and will be signed
+                    if viewModel.keystrokeCount > 0 {
+                        HStack(spacing: 4) {
+                            Image(systemName: "hand.tap")
+                                .font(.system(size: 11))
+                            Text("\(viewModel.keystrokeCount)")
+                                .font(Theme.monoCaption)
+                                .contentTransition(.numericText())
+                        }
+                        .foregroundStyle(Theme.secondaryText)
+                        .accessibilityLabel("\(viewModel.keystrokeCount) keystrokes recorded")
                     }
-                    Text("speakwrite")
-                        .font(Theme.monoTitle)
-                        .foregroundStyle(Theme.accent)
-                    Spacer()
                 }
-                .padding(.horizontal, Theme.lg)
-                .padding(.vertical, Theme.sm)
 
                 // Violation banner
                 if showViolationBanner {
                     HStack(spacing: Theme.sm) {
-                        Image(systemName: "exclamationmark.triangle.fill")
+                        Image(systemName: "hand.raised.fill")
                             .font(.system(size: 13))
-                        Text("Naughty naughty — use the iPhone keyboard to make a verified post")
-                            .font(.system(size: 13, weight: .medium, design: .monospaced))
+                        Text("Blocked — only keyboard typing can be verified")
+                            .font(.system(size: 13, weight: .semibold))
                     }
-                    .foregroundStyle(.black)
+                    .foregroundStyle(Theme.onAccent)
                     .padding(.horizontal, Theme.lg)
                     .padding(.vertical, Theme.sm)
                     .frame(maxWidth: .infinity)
-                    .background(Theme.accent.opacity(0.9))
+                    .background(Theme.accent.opacity(0.95))
                     .transition(.move(edge: .top).combined(with: .opacity))
                 }
 
